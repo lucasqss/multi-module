@@ -11,8 +11,11 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>crud</module>
+        <module>jpa-core</module>
         <module>string-generator</module>
+        <module>biblioteca-command</module>
+        <module>biblioteca-query</module>
+        <module>biblioteca-app</module>
     </modules>
 
     <properties>
@@ -24,6 +27,8 @@
         <compiler-plugin.version>3.14.0</compiler-plugin.version>
         <surefire-plugin.version>3.5.3</surefire-plugin.version>
         <jandex-plugin.version>3.3.1</jandex-plugin.version>
+        <resources-plugin.version>3.3.1</resources-plugin.version>
+        <archunit.version>1.5.1</archunit.version>
     </properties>
 
     <dependencyManagement>
@@ -36,10 +41,30 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit</artifactId>
+                <version>${archunit.version}</version>
+            </dependency>
             <!-- Módulos internos: versão única gerenciada aqui -->
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>crud</artifactId>
+                <artifactId>jpa-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>string-generator</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>biblioteca-command</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>biblioteca-query</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>
@@ -77,6 +102,28 @@
                         </execution>
                     </executions>
                 </plugin>
+                <plugin>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>${resources-plugin.version}</version>
+                </plugin>
+                <!-- @QuarkusIntegrationTest (*IT) roda contra o artefato empacotado, na fase verify -->
+                <plugin>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>${surefire-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>integration-test</goal>
+                                <goal>verify</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <systemPropertyVariables>
+                            <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                        </systemPropertyVariables>
+                    </configuration>
+                </plugin>
             </plugins>
         </pluginManagement>
         <plugins>
@@ -85,6 +132,15 @@
                 <version>${compiler-plugin.version}</version>
                 <configuration>
                     <parameters>true</parameters>
+                    <!-- Hibernate Processor: gera o metamodel (LivroEntity_) e as implementações dos
+                         repositórios Jakarta Data, validando o HQL de @Query em tempo de compilação -->
+                    <annotationProcessorPathsUseDepMgmt>true</annotationProcessorPathsUseDepMgmt>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.hibernate.orm</groupId>
+                            <artifactId>hibernate-processor</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <plugin>

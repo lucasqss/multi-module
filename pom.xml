@@ -4,36 +4,35 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- POM pai: só agrega os módulos e centraliza versões/plugins -->
+    <!-- POM pai: agrega os módulos e centraliza versões e plugins. Não tem código.
+         Para adicionar um módulo, veja docs/adicionando-modulos.md -->
     <groupId>com.example</groupId>
-    <artifactId>multi-module-parent</artifactId>
+    <artifactId>modelo-parent</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
+    <!-- A ordem aqui não importa: o reactor ordena pelas dependências entre os módulos -->
     <modules>
-        <module>jpa-core</module>
-        <module>string-generator</module>
-        <module>biblioteca-command</module>
-        <module>biblioteca-query</module>
-        <module>biblioteca-app</module>
+        <module>modelo-core</module>
+        <module>modelo-app</module>
     </modules>
 
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.version>3.33.4</quarkus.platform.version>
         <compiler-plugin.version>3.14.0</compiler-plugin.version>
         <surefire-plugin.version>3.5.3</surefire-plugin.version>
+        <enforcer-plugin.version>3.6.2</enforcer-plugin.version>
         <jandex-plugin.version>3.3.1</jandex-plugin.version>
-        <resources-plugin.version>3.3.1</resources-plugin.version>
-        <archunit.version>1.5.1</archunit.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
-            <!-- BOM do Quarkus: os módulos declaram dependências quarkus sem versão -->
+            <!-- BOM do Quarkus: os módulos declaram dependências do Quarkus (e JUnit, RestAssured...) sem versão -->
             <dependency>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>${quarkus.platform.artifact-id}</artifactId>
@@ -41,30 +40,10 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <dependency>
-                <groupId>com.tngtech.archunit</groupId>
-                <artifactId>archunit</artifactId>
-                <version>${archunit.version}</version>
-            </dependency>
-            <!-- Módulos internos: versão única gerenciada aqui -->
+            <!-- Módulos internos: a versão fica só aqui, os módulos declaram sem <version> -->
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>jpa-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>string-generator</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>biblioteca-command</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>biblioteca-query</artifactId>
+                <artifactId>modelo-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>
@@ -73,6 +52,7 @@
     <build>
         <pluginManagement>
             <plugins>
+                <!-- Só o módulo que gera o executável (modelo-app) ativa este plugin -->
                 <plugin>
                     <groupId>${quarkus.platform.group-id}</groupId>
                     <artifactId>quarkus-maven-plugin</artifactId>
@@ -88,7 +68,7 @@
                         </execution>
                     </executions>
                 </plugin>
-                <!-- Gera META-INF/jandex.idx para que o Quarkus descubra beans/entidades em módulos-biblioteca -->
+                <!-- Gera META-INF/jandex.idx: sem ele o Quarkus não enxerga os beans CDI de um módulo-biblioteca -->
                 <plugin>
                     <groupId>io.smallrye</groupId>
                     <artifactId>jandex-maven-plugin</artifactId>
@@ -101,10 +81,6 @@
                             </goals>
                         </execution>
                     </executions>
-                </plugin>
-                <plugin>
-                    <artifactId>maven-resources-plugin</artifactId>
-                    <version>${resources-plugin.version}</version>
                 </plugin>
                 <!-- @QuarkusIntegrationTest (*IT) roda contra o artefato empacotado, na fase verify -->
                 <plugin>
@@ -126,21 +102,38 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <!-- Plugins herdados por TODOS os módulos -->
         <plugins>
+            <!-- Falha cedo, com mensagem clara, se o JDK ou o Maven forem antigos demais -->
+            <plugin>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${enforcer-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>enforce-versions</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[25,)</version>
+                                </requireJavaVersion>
+                                <requireMavenVersion>
+                                    <version>[3.9.6,)</version>
+                                </requireMavenVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${compiler-plugin.version}</version>
                 <configuration>
+                    <!-- Mantém o nome dos parâmetros no bytecode (usado pelo REST para @PathParam/@QueryParam sem valor) -->
                     <parameters>true</parameters>
-                    <!-- Hibernate Processor: gera o metamodel (LivroEntity_) e as implementações dos
-                         repositórios Jakarta Data, validando o HQL de @Query em tempo de compilação -->
-                    <annotationProcessorPathsUseDepMgmt>true</annotationProcessorPathsUseDepMgmt>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>org.hibernate.orm</groupId>
-                            <artifactId>hibernate-processor</artifactId>
-                        </path>
-                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <plugin>

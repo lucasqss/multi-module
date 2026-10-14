@@ -1,5 +1,6 @@
 package com.example.modelo.core;
 
+import com.example.modelo.core.interno.Nomes;
 import jakarta.enterprise.context.ApplicationScoped;
 
 /** Bean CDI de um módulo-biblioteca: só é descoberto pelo app porque este módulo gera o índice Jandex. */
@@ -13,10 +14,7 @@ public class SaudacaoService {
     }
 
     public Saudacao saudar(String nome) {
-        if (nome == null || nome.isBlank()) {
-            throw new IllegalArgumentException("nome é obrigatório");
-        }
-        var limpo = nome.strip();
+        var limpo = Nomes.limpar(nome);
         return new Saudacao(limpo, config.prefixo() + ", " + limpo + "!");
     }
 }

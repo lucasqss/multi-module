@@ -15,6 +15,11 @@ class SaudacaoServiceTest {
     }
 
     @Test
+    void juntaEspacosRepetidosNoNome() {
+        assertEquals(new Saudacao("Ana Maria", "Oi, Ana Maria!"), service.saudar("Ana   Maria"));
+    }
+
+    @Test
     void rejeitaNomeEmBranco() {
         assertThrows(IllegalArgumentException.class, () -> service.saudar(" "));
     }

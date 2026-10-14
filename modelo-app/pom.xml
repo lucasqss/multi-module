@@ -11,14 +11,14 @@
     </parent>
 
     <!-- Módulo da aplicação: o único com quarkus-maven-plugin e application.properties.
-         Expõe o core via REST, gera o executável em target/quarkus-app/ e, por ser o último do reactor,
-         junta a cobertura de todos os módulos no target/ da raiz. -->
+         Expõe o core via REST e gera o ÚNICO artefato de deploy, target/modelo.jar (uber-jar com todos os
+         módulos; veja application.properties). Também guarda as regras de arquitetura (ArchUnit) e gera a
+         cobertura agregada, porque é o único módulo que enxerga todos os outros. -->
     <artifactId>modelo-app</artifactId>
 
     <dependencies>
-        <!-- Módulo interno: sem versão, gerenciada no POM pai.
-             Declare aqui DIRETAMENTE todo módulo interno usado, mesmo que já venha por transitividade:
-             o relatório de cobertura agregado só inclui as dependências diretas deste pom. -->
+        <!-- Módulo interno: sem versão, gerenciada no POM pai. Todo módulo precisa chegar até aqui (direta ou
+             transitivamente): é o que o coloca no jar, nas regras do ArchUnit e na cobertura. -->
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>modelo-core</artifactId>
@@ -38,6 +38,11 @@
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -49,21 +54,40 @@
             <plugin>
                 <artifactId>maven-failsafe-plugin</artifactId>
             </plugin>
-            <!-- Cobertura agregada (este módulo + dependências diretas) em target/site/jacoco-aggregate/ da raiz.
-                 Fica no app, e não no POM pai, porque o pai é construído antes de qualquer teste rodar. -->
+            <!-- Cobertura agregada de TODOS os módulos em target/site/jacoco-aggregate/ (o que o Sonar lê).
+                 Roda aqui porque o app depende de todos os módulos e é o último do reactor; o POM pai é
+                 construído antes de qualquer teste. Usa a tarefa Ant do JaCoCo, e não o report-aggregate, porque
+                 este só procura os .exec dentro da pasta de cada módulo, e o build usa um target/ único.
+                 Pega qualquer módulo por convenção de diretório: target/*/classes e */src/main/java. -->
             <plugin>
-                <groupId>org.jacoco</groupId>
-                <artifactId>jacoco-maven-plugin</artifactId>
+                <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
                     <execution>
-                        <id>report-aggregate</id>
+                        <id>cobertura-agregada</id>
                         <phase>verify</phase>
                         <goals>
-                            <goal>report-aggregate</goal>
+                            <goal>run</goal>
                         </goals>
                         <configuration>
-                            <includeCurrentProject>true</includeCurrentProject>
-                            <outputDirectory>${relatorios.dir}/site/jacoco-aggregate</outputDirectory>
+                            <target>
+                                <taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml"
+                                         classpathref="maven.plugin.classpath"/>
+                                <jacoco:report xmlns:jacoco="antlib:org.jacoco.ant">
+                                    <executiondata>
+                                        <fileset dir="${target.raiz}" includes="*/jacoco.exec"/>
+                                    </executiondata>
+                                    <structure name="${project.parent.artifactId}">
+                                        <classfiles>
+                                            <fileset dir="${target.raiz}" includes="*/classes/**/*.class"/>
+                                        </classfiles>
+                                        <sourcefiles encoding="${project.build.sourceEncoding}">
+                                            <dirset dir="${maven.multiModuleProjectDirectory}" includes="*/src/main/java"/>
+                                        </sourcefiles>
+                                    </structure>
+                                    <html destdir="${target.raiz}/site/jacoco-aggregate"/>
+                                    <xml destfile="${target.raiz}/site/jacoco-aggregate/jacoco.xml"/>
+                                </jacoco:report>
+                            </target>
                         </configuration>
                     </execution>
                 </executions>

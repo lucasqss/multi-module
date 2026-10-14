@@ -5,7 +5,9 @@
     <modelVersion>4.0.0</modelVersion>
 
     <!-- POM pai: agrega os módulos e centraliza versões e plugins. Não tem código.
-         Para adicionar um módulo, veja docs/adicionando-modulos.md -->
+         Os módulos existem para separar o design e limitar o acoplamento (Maven + ArchUnit); a entrega é
+         UM jar (modelo-app) e o build usa UM target/, na raiz. Para adicionar um módulo, veja
+         docs/adicionando-modulos.md -->
     <groupId>com.example</groupId>
     <artifactId>modelo-parent</artifactId>
     <version>1.0.0-SNAPSHOT</version>
@@ -29,16 +31,20 @@
         <enforcer-plugin.version>3.6.2</enforcer-plugin.version>
         <jandex-plugin.version>3.3.1</jandex-plugin.version>
         <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
+        <antrun-plugin.version>3.2.0</antrun-plugin.version>
+        <clean-plugin.version>3.5.0</clean-plugin.version>
+        <archunit.version>1.5.1</archunit.version>
 
-        <!-- target/ da RAIZ do repositório, onde ficam os relatórios de teste e cobertura de todos os módulos.
+        <!-- O único target/ do build, na RAIZ do repositório: cada módulo compila em target/<artifactId>/ e os
+             relatórios de teste/cobertura e o jar final ficam direto em target/.
              maven.multiModuleProjectDirectory é a pasta que contém o .mvn/ (por isso ele não pode ser removido). -->
-        <relatorios.dir>${maven.multiModuleProjectDirectory}/target</relatorios.dir>
+        <target.raiz>${maven.multiModuleProjectDirectory}/target</target.raiz>
         <!-- Preenchido pelo jacoco:prepare-agent; o valor vazio evita erro se o JaCoCo for pulado -->
         <argLine/>
 
         <!-- Onde o Sonar procura resultados de testes e cobertura -->
-        <sonar.junit.reportPaths>${relatorios.dir}/surefire-reports,${relatorios.dir}/failsafe-reports</sonar.junit.reportPaths>
-        <sonar.coverage.jacoco.xmlReportPaths>${relatorios.dir}/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.junit.reportPaths>${target.raiz}/surefire-reports,${target.raiz}/failsafe-reports</sonar.junit.reportPaths>
+        <sonar.coverage.jacoco.xmlReportPaths>${target.raiz}/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
     <dependencyManagement>
@@ -51,6 +57,12 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Testes de arquitetura (regras de acoplamento entre módulos), no modelo-app -->
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit</artifactId>
+                <version>${archunit.version}</version>
+            </dependency>
             <!-- Módulos internos: a versão fica só aqui, os módulos declaram sem <version> -->
             <dependency>
                 <groupId>com.example</groupId>
@@ -61,6 +73,9 @@
     </dependencyManagement>
 
     <build>
+        <!-- Nada de <módulo>/target/: tudo vai para target/<artifactId>/ na raiz -->
+        <directory>${target.raiz}/${project.artifactId}</directory>
+
         <pluginManagement>
             <plugins>
                 <!-- Só o módulo que gera o executável (modelo-app) ativa este plugin -->
@@ -98,6 +113,19 @@
                     <artifactId>jacoco-maven-plugin</artifactId>
                     <version>${jacoco-plugin.version}</version>
                 </plugin>
+                <!-- Relatório de cobertura agregado (tarefa Ant do JaCoCo), usado pelo modelo-app -->
+                <plugin>
+                    <artifactId>maven-antrun-plugin</artifactId>
+                    <version>${antrun-plugin.version}</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.jacoco</groupId>
+                            <artifactId>org.jacoco.ant</artifactId>
+                            <version>${jacoco-plugin.version}</version>
+                            <classifier>nodeps</classifier>
+                        </dependency>
+                    </dependencies>
+                </plugin>
                 <!-- @QuarkusIntegrationTest (*IT) roda contra o artefato empacotado, na fase verify -->
                 <plugin>
                     <artifactId>maven-failsafe-plugin</artifactId>
@@ -111,9 +139,11 @@
                         </execution>
                     </executions>
                     <configuration>
-                        <reportsDirectory>${relatorios.dir}/failsafe-reports</reportsDirectory>
+                        <reportsDirectory>${target.raiz}/failsafe-reports</reportsDirectory>
                         <systemPropertyVariables>
                             <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                            <!-- Log do jar iniciado pelo @QuarkusIntegrationTest; o padrão criaria <módulo>/target/ -->
+                            <quarkus.log.file.path>${project.build.directory}/quarkus.log</quarkus.log.file.path>
                         </systemPropertyVariables>
                     </configuration>
                 </plugin>
@@ -122,6 +152,20 @@
 
         <!-- Plugins herdados por TODOS os módulos -->
         <plugins>
+            <!-- "mvn clean" na raiz apaga o target/ inteiro (relatórios e jar incluídos). Não é herdado: se fosse,
+                 cada módulo apagaria o que os anteriores já construíram no mesmo build. -->
+            <plugin>
+                <artifactId>maven-clean-plugin</artifactId>
+                <version>${clean-plugin.version}</version>
+                <inherited>false</inherited>
+                <configuration>
+                    <filesets>
+                        <fileset>
+                            <directory>${target.raiz}</directory>
+                        </fileset>
+                    </filesets>
+                </configuration>
+            </plugin>
             <!-- Falha cedo, com mensagem clara, se o JDK ou o Maven forem antigos demais -->
             <plugin>
                 <artifactId>maven-enforcer-plugin</artifactId>
@@ -153,7 +197,7 @@
                     <parameters>true</parameters>
                 </configuration>
             </plugin>
-            <!-- Agente de cobertura em todos os módulos: grava <módulo>/target/jacoco.exec durante os testes -->
+            <!-- Agente de cobertura em todos os módulos: grava target/<artifactId>/jacoco.exec durante os testes -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
@@ -171,7 +215,7 @@
                 <version>${surefire-plugin.version}</version>
                 <configuration>
                     <!-- Todos os módulos gravam no target/ da raiz (nomes TEST-<classe>.xml não colidem) -->
-                    <reportsDirectory>${relatorios.dir}/surefire-reports</reportsDirectory>
+                    <reportsDirectory>${target.raiz}/surefire-reports</reportsDirectory>
                     <!-- @{argLine} (avaliado tarde) recebe o agente do JaCoCo -->
                     <argLine>@{argLine}</argLine>
                     <systemPropertyVariables>

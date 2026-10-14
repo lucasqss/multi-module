@@ -1,20 +1,26 @@
 # Modelo multi-module — Quarkus 3.33 · Java 25 · Maven
 
-Esqueleto mínimo de uma aplicação Quarkus dividida em módulos Maven, para servir de ponto de partida.
-Tem só dois módulos, um de cada tipo:
+Esqueleto de uma aplicação Quarkus dividida em módulos Maven **para separar o design e limitar o
+acoplamento**, não para gerar entregas separadas:
+
+- o build gera **um único jar**, `target/modelo.jar`, com todos os módulos dentro;
+- existe **um único `target/`**, na raiz: cada módulo compila em `target/<artifactId>/`;
+- o acoplamento é verificado pelo **Maven** (um módulo só enxerga o que declarou como dependência) e pelo
+  **ArchUnit** (sem ciclos entre pacotes, pacotes `interno` fechados, bibliotecas sem REST/JSON).
 
 ```
-modelo-parent (pom.xml da raiz)   agrega os módulos e centraliza versões e plugins
-├─ .mvn/                          marca a raiz do projeto (não remova: veja "Relatórios para o Sonar")
-├─ modelo-core/                   módulo-biblioteca: regra de negócio + beans CDI (jar comum)
-└─ modelo-app/                    módulo da aplicação: REST, application.properties, executável Quarkus
-                                  └─ depende de modelo-core; também agrega a cobertura de todos os módulos
+modelo-parent (pom.xml da raiz)   agrega os módulos e centraliza versões, plugins e o target/ único
+├─ .mvn/                          marca a raiz do projeto (não remova: o target/ único depende dele)
+├─ modelo-core/                   biblioteca: regra de negócio + beans CDI
+│  └─ ...core.interno             detalhes de implementação, proibidos para outros módulos
+└─ modelo-app/                    aplicação: REST, application.properties, regras ArchUnit, jar único
+                                  └─ depende de modelo-core
 ```
 
 | Módulo | Tipo | O que mostra |
 |---|---|---|
-| `modelo-core` | biblioteca | bean `@ApplicationScoped` descoberto via índice Jandex; `@ConfigMapping` com padrão em `@WithDefault`; teste JUnit puro, sem subir o Quarkus |
-| `modelo-app` | aplicação | único módulo com `quarkus-maven-plugin` e `application.properties`; REST sobre o core; `@QuarkusTest` e `@QuarkusIntegrationTest`; relatório JaCoCo agregado |
+| `modelo-core` | biblioteca | bean `@ApplicationScoped` descoberto via índice Jandex; `@ConfigMapping` com padrão em `@WithDefault`; pacote `interno`; teste JUnit puro, sem subir o Quarkus |
+| `modelo-app` | aplicação | único módulo com `quarkus-maven-plugin` e `application.properties`; REST sobre o core; `ArquiteturaTest` (ArchUnit); `@QuarkusTest` e `@QuarkusIntegrationTest`; empacota o uber-jar e agrega a cobertura |
 
 O POM pai importa o BOM do Quarkus, gerencia a versão dos módulos internos e roda o `maven-enforcer-plugin`,
 que falha logo no início se o JDK for anterior ao 25 ou o Maven anterior ao 3.9.6.
@@ -24,18 +30,17 @@ que falha logo no início se o JDK for anterior ao 25 ou o Maven anterior ao 3.9
 Pré-requisitos: JDK 25 e Maven 3.9.6+. Não precisa de Docker.
 
 ```bash
-# Build completo: testes unitários, @QuarkusTest e @QuarkusIntegrationTest contra o jar
-mvn verify
+# Build completo: testes unitários, ArchUnit, @QuarkusTest, jar único, @QuarkusIntegrationTest e cobertura
+mvn clean verify
 
-# Só um módulo (e o que ele precisa): -pl escolhe, -am inclui as dependências do reactor
-mvn -pl modelo-core test
-mvn -pl modelo-app -am verify
+# A entrega
+java -jar target/modelo.jar
+
+# Só um módulo (e o que ele precisa): -pl escolhe, -am inclui as dependências e a raiz
+mvn clean -pl modelo-core -am test
 
 # Modo dev a partir da raiz: não precisa de "mvn install" e recarrega também alterações no modelo-core
 mvn quarkus:dev
-
-# Jar empacotado
-java -jar modelo-app/target/quarkus-app/quarkus-run.jar
 ```
 
 ```bash
@@ -43,29 +48,24 @@ curl localhost:8080/saudacoes/Ana     # {"nome":"Ana","mensagem":"Olá, Ana!"}
 curl localhost:8080/saudacoes/%20     # 400 {"motivo":"nome é obrigatório"}
 ```
 
-## Relatórios para o Sonar
-
-Os relatórios de **todos** os módulos vão para o `target/` da raiz do repositório:
+## O que fica no `target/`
 
 ```
 target/
-├─ surefire-reports/TEST-*.xml            testes unitários e @QuarkusTest de todos os módulos
-├─ failsafe-reports/TEST-*.xml            @QuarkusIntegrationTest
-└─ site/jacoco-aggregate/jacoco.xml       cobertura agregada (também index.html para ver no navegador)
+├─ modelo.jar                         a entrega (uber-jar com todos os módulos)
+├─ modelo-core/  modelo-app/          saída de compilação de cada módulo
+├─ surefire-reports/TEST-*.xml        testes unitários, ArchUnit e @QuarkusTest de todos os módulos
+├─ failsafe-reports/TEST-*.xml        @QuarkusIntegrationTest
+└─ site/jacoco-aggregate/jacoco.xml   cobertura de todos os módulos (também index.html)
 ```
 
-```bash
-mvn clean verify                          # gera tudo acima
-mvn clean verify sonar:sonar              # idem + análise (com sonar.host.url / sonar.token configurados)
-```
-
-O POM pai já declara `sonar.junit.reportPaths` e `sonar.coverage.jacoco.xmlReportPaths` apontando para esses
-caminhos. A raiz é descoberta pelo diretório `.mvn/`, então o destino é o mesmo rodando o `mvn` da raiz ou de
-dentro de um módulo. Use sempre `clean`: sem ele, relatórios de execuções anteriores continuam na pasta.
+O POM pai declara `sonar.junit.reportPaths` e `sonar.coverage.jacoco.xmlReportPaths` apontando para esses
+caminhos (`mvn clean verify sonar:sonar`, com `sonar.host.url`/`sonar.token` configurados). Use sempre
+`clean`: o da raiz apaga o `target/` inteiro, inclusive relatórios de execuções anteriores.
 
 ## Adicionando módulos
 
-O passo a passo e as armadilhas (Jandex, `application.properties` em biblioteca, versões, pacotes, rotas,
-JPA...) estão em [`docs/adicionando-modulos.md`](docs/adicionando-modulos.md).
+O passo a passo e as armadilhas (Jandex, `application.properties` em biblioteca, regras do ArchUnit, o
+`target/` único, versões, pacotes, rotas, JPA...) estão em [`docs/adicionando-modulos.md`](docs/adicionando-modulos.md).
 
 Um exemplo maior, com cinco módulos, CQRS, Jakarta Data e Oracle, está na branch `feat/biblioteca-cqrs`.

@@ -15,8 +15,6 @@
     <modules>
         <module>modelo-core</module>
         <module>modelo-app</module>
-        <!-- Técnico: junta a cobertura de todos os módulos (não é exemplo; veja o pom dele) -->
-        <module>modelo-cobertura</module>
     </modules>
 
     <properties>
@@ -57,11 +55,6 @@
             <dependency>
                 <groupId>com.example</groupId>
                 <artifactId>modelo-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>modelo-app</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

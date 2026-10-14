@@ -85,20 +85,7 @@ Dois lugares em `pom.xml` da raiz:
 
 A ordem em `<modules>` não importa: o reactor calcula a ordem de build pelas dependências.
 
-### 2.3 Inclua o módulo na cobertura
-
-No `modelo-cobertura/pom.xml`, adicione o módulo novo em `<dependencies>` (sem versão). O relatório agregado
-do JaCoCo só considera os módulos dos quais o `modelo-cobertura` depende: esquecer este passo não dá erro,
-o módulo simplesmente some da cobertura no Sonar.
-
-```xml
-<dependency>
-    <groupId>com.example</groupId>
-    <artifactId>modelo-pedidos</artifactId>
-</dependency>
-```
-
-### 2.4 Declare a dependência em quem usa
+### 2.3 Declare a dependência em quem usa
 
 No `modelo-app/pom.xml` (ou em outra biblioteca), **sem versão**:
 
@@ -109,11 +96,16 @@ No `modelo-app/pom.xml` (ou em outra biblioteca), **sem versão**:
 </dependency>
 ```
 
-### 2.5 Crie o pacote raiz do módulo
+Todo módulo interno precisa ser dependência **direta** do `modelo-app`, mesmo quando o app só o usa por
+transitividade (ex.: `modelo-app → modelo-pedidos → modelo-util`: declare também o `modelo-util` no app). O
+relatório de cobertura agregado, gerado no app, só inclui as dependências diretas dele: esquecer não dá erro,
+o módulo simplesmente some da cobertura no Sonar. Veja [3.10](#310-relatórios-de-teste-e-cobertura-na-raiz-sonar).
+
+### 2.4 Crie o pacote raiz do módulo
 
 Um pacote raiz exclusivo por módulo: `com.example.modelo.pedidos`. Veja o porquê em [3.5](#35-um-pacote-raiz-por-módulo).
 
-### 2.6 Valide
+### 2.5 Valide
 
 ```bash
 mvn verify                             # tudo, a partir da raiz
@@ -128,7 +120,7 @@ dentro do próprio módulo passa mesmo sem o índice Jandex.
 - [ ] diretório = `artifactId`, com prefixo do projeto
 - [ ] `<parent>` apontando para `modelo-parent`
 - [ ] entrada em `<modules>` **e** em `<dependencyManagement>` do pai
-- [ ] dependência no `modelo-cobertura/pom.xml`
+- [ ] dependência **direta** no `modelo-app/pom.xml` (cobertura)
 - [ ] dependências sem `<version>` (Quarkus pelo BOM, internos pelo pai)
 - [ ] `jandex-maven-plugin` se houver beans/REST/entidades/config mapping
 - [ ] **sem** `quarkus-maven-plugin` e **sem** `application.properties` se for biblioteca
@@ -239,8 +231,13 @@ Como funciona, para não quebrar sem perceber:
 - Um módulo **não** deve configurar `<reportsDirectory>` nem `<argLine>` próprios no Surefire/Failsafe: isso
   tira os relatórios da raiz ou desliga o agente do JaCoCo. Se precisar de argumentos de JVM nos testes,
   mantenha o `@{argLine}`: `<argLine>@{argLine} -Xmx1g</argLine>`.
-- O pai é construído antes de todos os módulos, por isso a cobertura é agregada no `modelo-cobertura`, que é
-  construído por último. Módulo fora das dependências dele não aparece na cobertura ([2.3](#23-inclua-o-módulo-na-cobertura)).
+- O pai é construído antes de todos os módulos, então não consegue agregar a cobertura. Quem agrega é o
+  `modelo-app` (`report-aggregate` com `includeCurrentProject`), que é construído por último por depender
+  dos demais. O JaCoCo considera só as dependências **diretas** do app ([2.3](#23-declare-a-dependência-em-quem-usa)).
+- Se o projeto passar a ter módulos que o app não usa (um segundo executável, um módulo de utilitários de
+  teste com código próprio...), mova o `report-aggregate` para um módulo técnico, sem código
+  (`<packaging>pom</packaging>`), que dependa de todos os módulos — inclusive dos apps — e seja o único
+  a gerar o relatório.
 - A cobertura vem dos testes unitários e dos `@QuarkusTest`. Os `@QuarkusIntegrationTest` rodam o jar em outro
   processo, sem o agente, e não contam para a cobertura — no modelo eles repetem os cenários do `@QuarkusTest`.
 - Sempre `mvn clean ...`: o `clean` da raiz apaga o `target/` com os relatórios antigos. Sem ele, e

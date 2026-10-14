@@ -1,22 +1,20 @@
 # Modelo multi-module — Quarkus 3.33 · Java 25 · Maven
 
 Esqueleto mínimo de uma aplicação Quarkus dividida em módulos Maven, para servir de ponto de partida.
-Tem dois módulos de exemplo, um de cada tipo, mais um módulo técnico de cobertura:
+Tem só dois módulos, um de cada tipo:
 
 ```
 modelo-parent (pom.xml da raiz)   agrega os módulos e centraliza versões e plugins
 ├─ .mvn/                          marca a raiz do projeto (não remova: veja "Relatórios para o Sonar")
 ├─ modelo-core/                   módulo-biblioteca: regra de negócio + beans CDI (jar comum)
-├─ modelo-app/                    módulo da aplicação: REST, application.properties, executável Quarkus
-│                                 └─ depende de modelo-core
-└─ modelo-cobertura/              técnico, sem código: junta a cobertura de todos os módulos
+└─ modelo-app/                    módulo da aplicação: REST, application.properties, executável Quarkus
+                                  └─ depende de modelo-core; também agrega a cobertura de todos os módulos
 ```
 
 | Módulo | Tipo | O que mostra |
 |---|---|---|
 | `modelo-core` | biblioteca | bean `@ApplicationScoped` descoberto via índice Jandex; `@ConfigMapping` com padrão em `@WithDefault`; teste JUnit puro, sem subir o Quarkus |
-| `modelo-app` | aplicação | único módulo com `quarkus-maven-plugin` e `application.properties`; REST sobre o core; `@QuarkusTest` e `@QuarkusIntegrationTest` |
-| `modelo-cobertura` | técnico | relatório JaCoCo agregado de todos os módulos (`report-aggregate`) |
+| `modelo-app` | aplicação | único módulo com `quarkus-maven-plugin` e `application.properties`; REST sobre o core; `@QuarkusTest` e `@QuarkusIntegrationTest`; relatório JaCoCo agregado |
 
 O POM pai importa o BOM do Quarkus, gerencia a versão dos módulos internos e roda o `maven-enforcer-plugin`,
 que falha logo no início se o JDK for anterior ao 25 ou o Maven anterior ao 3.9.6.

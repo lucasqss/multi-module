@@ -11,11 +11,14 @@
     </parent>
 
     <!-- Módulo da aplicação: o único com quarkus-maven-plugin e application.properties.
-         Expõe o core via REST e gera o executável em target/quarkus-app/. -->
+         Expõe o core via REST, gera o executável em target/quarkus-app/ e, por ser o último do reactor,
+         junta a cobertura de todos os módulos no target/ da raiz. -->
     <artifactId>modelo-app</artifactId>
 
     <dependencies>
-        <!-- Módulo interno: sem versão, gerenciada no POM pai -->
+        <!-- Módulo interno: sem versão, gerenciada no POM pai.
+             Declare aqui DIRETAMENTE todo módulo interno usado, mesmo que já venha por transitividade:
+             o relatório de cobertura agregado só inclui as dependências diretas deste pom. -->
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>modelo-core</artifactId>
@@ -45,6 +48,25 @@
             </plugin>
             <plugin>
                 <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
+            <!-- Cobertura agregada (este módulo + dependências diretas) em target/site/jacoco-aggregate/ da raiz.
+                 Fica no app, e não no POM pai, porque o pai é construído antes de qualquer teste rodar. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>report-aggregate</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report-aggregate</goal>
+                        </goals>
+                        <configuration>
+                            <includeCurrentProject>true</includeCurrentProject>
+                            <outputDirectory>${relatorios.dir}/site/jacoco-aggregate</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

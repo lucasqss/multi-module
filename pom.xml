@@ -15,6 +15,8 @@
     <modules>
         <module>modelo-core</module>
         <module>modelo-app</module>
+        <!-- Técnico: junta a cobertura de todos os módulos (não é exemplo; veja o pom dele) -->
+        <module>modelo-cobertura</module>
     </modules>
 
     <properties>
@@ -28,6 +30,17 @@
         <surefire-plugin.version>3.5.3</surefire-plugin.version>
         <enforcer-plugin.version>3.6.2</enforcer-plugin.version>
         <jandex-plugin.version>3.3.1</jandex-plugin.version>
+        <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
+
+        <!-- target/ da RAIZ do repositório, onde ficam os relatórios de teste e cobertura de todos os módulos.
+             maven.multiModuleProjectDirectory é a pasta que contém o .mvn/ (por isso ele não pode ser removido). -->
+        <relatorios.dir>${maven.multiModuleProjectDirectory}/target</relatorios.dir>
+        <!-- Preenchido pelo jacoco:prepare-agent; o valor vazio evita erro se o JaCoCo for pulado -->
+        <argLine/>
+
+        <!-- Onde o Sonar procura resultados de testes e cobertura -->
+        <sonar.junit.reportPaths>${relatorios.dir}/surefire-reports,${relatorios.dir}/failsafe-reports</sonar.junit.reportPaths>
+        <sonar.coverage.jacoco.xmlReportPaths>${relatorios.dir}/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
     <dependencyManagement>
@@ -44,6 +57,11 @@
             <dependency>
                 <groupId>com.example</groupId>
                 <artifactId>modelo-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>modelo-app</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>
@@ -82,6 +100,11 @@
                         </execution>
                     </executions>
                 </plugin>
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco-plugin.version}</version>
+                </plugin>
                 <!-- @QuarkusIntegrationTest (*IT) roda contra o artefato empacotado, na fase verify -->
                 <plugin>
                     <artifactId>maven-failsafe-plugin</artifactId>
@@ -95,6 +118,7 @@
                         </execution>
                     </executions>
                     <configuration>
+                        <reportsDirectory>${relatorios.dir}/failsafe-reports</reportsDirectory>
                         <systemPropertyVariables>
                             <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         </systemPropertyVariables>
@@ -136,10 +160,27 @@
                     <parameters>true</parameters>
                 </configuration>
             </plugin>
+            <!-- Agente de cobertura em todos os módulos: grava <módulo>/target/jacoco.exec durante os testes -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire-plugin.version}</version>
                 <configuration>
+                    <!-- Todos os módulos gravam no target/ da raiz (nomes TEST-<classe>.xml não colidem) -->
+                    <reportsDirectory>${relatorios.dir}/surefire-reports</reportsDirectory>
+                    <!-- @{argLine} (avaliado tarde) recebe o agente do JaCoCo -->
+                    <argLine>@{argLine}</argLine>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>

@@ -85,7 +85,20 @@ Dois lugares em `pom.xml` da raiz:
 
 A ordem em `<modules>` não importa: o reactor calcula a ordem de build pelas dependências.
 
-### 2.3 Declare a dependência em quem usa
+### 2.3 Inclua o módulo na cobertura
+
+No `modelo-cobertura/pom.xml`, adicione o módulo novo em `<dependencies>` (sem versão). O relatório agregado
+do JaCoCo só considera os módulos dos quais o `modelo-cobertura` depende: esquecer este passo não dá erro,
+o módulo simplesmente some da cobertura no Sonar.
+
+```xml
+<dependency>
+    <groupId>com.example</groupId>
+    <artifactId>modelo-pedidos</artifactId>
+</dependency>
+```
+
+### 2.4 Declare a dependência em quem usa
 
 No `modelo-app/pom.xml` (ou em outra biblioteca), **sem versão**:
 
@@ -96,11 +109,11 @@ No `modelo-app/pom.xml` (ou em outra biblioteca), **sem versão**:
 </dependency>
 ```
 
-### 2.4 Crie o pacote raiz do módulo
+### 2.5 Crie o pacote raiz do módulo
 
 Um pacote raiz exclusivo por módulo: `com.example.modelo.pedidos`. Veja o porquê em [3.5](#35-um-pacote-raiz-por-módulo).
 
-### 2.5 Valide
+### 2.6 Valide
 
 ```bash
 mvn verify                             # tudo, a partir da raiz
@@ -115,12 +128,14 @@ dentro do próprio módulo passa mesmo sem o índice Jandex.
 - [ ] diretório = `artifactId`, com prefixo do projeto
 - [ ] `<parent>` apontando para `modelo-parent`
 - [ ] entrada em `<modules>` **e** em `<dependencyManagement>` do pai
+- [ ] dependência no `modelo-cobertura/pom.xml`
 - [ ] dependências sem `<version>` (Quarkus pelo BOM, internos pelo pai)
 - [ ] `jandex-maven-plugin` se houver beans/REST/entidades/config mapping
 - [ ] **sem** `quarkus-maven-plugin` e **sem** `application.properties` se for biblioteca
 - [ ] pacote raiz exclusivo
 - [ ] nenhuma dependência circular
-- [ ] `mvn verify` verde na raiz
+- [ ] `mvn clean verify` verde na raiz, com os testes do módulo em `target/surefire-reports/` e as classes em
+      `target/site/jacoco-aggregate/` da raiz
 
 ## 3. Ao que atentar
 
@@ -211,7 +226,27 @@ Se mais de um módulo expõe REST, use o caminho completo no `@Path` da classe (
   `mvn install` (verificado alterando o `modelo-core` com o dev mode rodando).
 - Depois de adicionar um módulo, reimporte o projeto Maven na IDE.
 
-### 3.10 Se o módulo novo tiver JPA / Jakarta Data
+### 3.10 Relatórios de teste e cobertura na raiz (Sonar)
+
+Como funciona, para não quebrar sem perceber:
+
+- O POM pai define `relatorios.dir` = `${maven.multiModuleProjectDirectory}/target`. Essa variável é a pasta
+  que contém o `.mvn/`; **sem o `.mvn/`**, ela vira a pasta onde o `mvn` foi executado e, rodando de dentro de
+  um módulo, os relatórios voltam para o `target/` do módulo (verificado).
+- Surefire e Failsafe de todos os módulos gravam na mesma pasta. Os arquivos se chamam
+  `TEST-<pacote>.<Classe>.xml`: duas classes de teste com o mesmo nome completo em módulos diferentes se
+  sobrescrevem. O pacote raiz exclusivo por módulo ([3.5](#35-um-pacote-raiz-por-módulo)) evita isso.
+- Um módulo **não** deve configurar `<reportsDirectory>` nem `<argLine>` próprios no Surefire/Failsafe: isso
+  tira os relatórios da raiz ou desliga o agente do JaCoCo. Se precisar de argumentos de JVM nos testes,
+  mantenha o `@{argLine}`: `<argLine>@{argLine} -Xmx1g</argLine>`.
+- O pai é construído antes de todos os módulos, por isso a cobertura é agregada no `modelo-cobertura`, que é
+  construído por último. Módulo fora das dependências dele não aparece na cobertura ([2.3](#23-inclua-o-módulo-na-cobertura)).
+- A cobertura vem dos testes unitários e dos `@QuarkusTest`. Os `@QuarkusIntegrationTest` rodam o jar em outro
+  processo, sem o agente, e não contam para a cobertura — no modelo eles repetem os cenários do `@QuarkusTest`.
+- Sempre `mvn clean ...`: o `clean` da raiz apaga o `target/` com os relatórios antigos. Sem ele, e
+  principalmente com `-pl`, sobram relatórios de execuções anteriores.
+
+### 3.11 Se o módulo novo tiver JPA / Jakarta Data
 
 Pontos validados no exemplo da branch `feat/biblioteca-cqrs`:
 

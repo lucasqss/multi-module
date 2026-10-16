@@ -23,7 +23,7 @@ Os módulos existem para **separar o design e limitar o acoplamento**, não para
 ```
             ┌──────────────────────┐
             │    biblioteca-app    │  sem classes Java: junta tudo no jar único e abriga
-            │ (ITs + ArchUnit +    │  os @QuarkusIntegrationTest, as regras entre módulos
+            │ (ITs + ArchUnit +    │  os testes de API (*IT), as regras entre módulos
             │  cobertura agregada) │  e a cobertura agregada
             └──────────┬───────────┘
           ┌────────────┴────────────┐
@@ -101,13 +101,18 @@ target/
 ├─ jpa-core/  string-generator/  biblioteca-command/  biblioteca-query/  biblioteca-app/
 │                                     saída de compilação de cada módulo
 ├─ surefire-reports/TEST-*.xml        testes unitários e de arquitetura de todos os módulos
-├─ failsafe-reports/TEST-*.xml        @QuarkusIntegrationTest
-└─ site/jacoco-aggregate/jacoco.xml   cobertura de todos os módulos, unitários + integração (também index.html)
+├─ failsafe-reports/TEST-*.xml        testes de API (*IT, @QuarkusTest com Oracle do Dev Services)
+├─ jacoco/jacoco.exec                 dados de cobertura de todos os testes
+└─ site/jacoco-aggregate/jacoco.xml   cobertura de todos os módulos, unitários + *IT (também index.html)
 ```
 
 O POM pai declara `sonar.junit.reportPaths` e `sonar.coverage.jacoco.xmlReportPaths` apontando para esses
 caminhos (`mvn clean verify sonar:sonar`, com `sonar.host.url`/`sonar.token` configurados). Use sempre
-`clean`: o da raiz apaga o `target/` inteiro, inclusive relatórios de execuções anteriores.
+`clean`: o da raiz apaga o `target/` inteiro, inclusive relatórios e dados de cobertura de execuções anteriores
+(que, sem ele, se acumulariam no `jacoco.exec`).
+
+A cobertura usa só plugins Maven padrão e a extensão `quarkus-jacoco` (sem antrun); os detalhes estão em
+[`docs/adicionando-modulos.md`](docs/adicionando-modulos.md#312-relatórios-de-teste-e-cobertura-sonar).
 
 ## Mais detalhes
 

@@ -35,7 +35,6 @@
         <jandex-plugin.version>3.3.1</jandex-plugin.version>
         <resources-plugin.version>3.3.1</resources-plugin.version>
         <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
-        <antrun-plugin.version>3.2.0</antrun-plugin.version>
         <clean-plugin.version>3.5.0</clean-plugin.version>
         <archunit.version>1.5.1</archunit.version>
 
@@ -43,6 +42,8 @@
              relatórios de teste/cobertura e o jar final ficam direto em target/.
              maven.multiModuleProjectDirectory é a pasta que contém o .mvn/ (por isso ele não pode ser removido). -->
         <target.raiz>${maven.multiModuleProjectDirectory}/target</target.raiz>
+        <!-- Dados de cobertura de todos os testes, de todos os módulos -->
+        <jacoco.dados>${target.raiz}/jacoco/jacoco.exec</jacoco.dados>
         <!-- Preenchido pelo jacoco:prepare-agent; o valor vazio evita erro se o JaCoCo for pulado -->
         <argLine/>
 
@@ -136,20 +137,8 @@
                     <artifactId>jacoco-maven-plugin</artifactId>
                     <version>${jacoco-plugin.version}</version>
                 </plugin>
-                <!-- Relatório de cobertura agregado (tarefa Ant do JaCoCo), usado pelo biblioteca-app -->
-                <plugin>
-                    <artifactId>maven-antrun-plugin</artifactId>
-                    <version>${antrun-plugin.version}</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.jacoco</groupId>
-                            <artifactId>org.jacoco.ant</artifactId>
-                            <version>${jacoco-plugin.version}</version>
-                            <classifier>nodeps</classifier>
-                        </dependency>
-                    </dependencies>
-                </plugin>
-                <!-- @QuarkusIntegrationTest (*IT) roda contra o artefato empacotado, na fase verify -->
+                <!-- Testes *IT (que sobem o Quarkus e o Oracle do Dev Services) rodam na fase verify, depois do
+                     package; assim "mvn test" continua rápido e sem Docker -->
                 <plugin>
                     <artifactId>maven-failsafe-plugin</artifactId>
                     <version>${surefire-plugin.version}</version>
@@ -165,8 +154,6 @@
                         <reportsDirectory>${target.raiz}/failsafe-reports</reportsDirectory>
                         <systemPropertyVariables>
                             <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
-                            <!-- Log do jar iniciado pelo @QuarkusIntegrationTest; o padrão criaria <módulo>/target/ -->
-                            <quarkus.log.file.path>${project.build.directory}/quarkus.log</quarkus.log.file.path>
                         </systemPropertyVariables>
                     </configuration>
                 </plugin>
@@ -229,7 +216,9 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            <!-- Agente de cobertura em todos os módulos: grava target/<artifactId>/jacoco.exec durante os testes -->
+            <!-- Agente de cobertura nos testes unitários de todos os módulos. Todos acumulam no MESMO arquivo,
+                 target/jacoco/jacoco.exec, que a extensão quarkus-jacoco completa com os *IT e usa para gerar o
+                 relatório agregado (biblioteca-app). -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
@@ -239,6 +228,9 @@
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
+                        <configuration>
+                            <destFile>${jacoco.dados}</destFile>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

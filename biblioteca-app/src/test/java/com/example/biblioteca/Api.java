@@ -10,7 +10,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import static io.restassured.RestAssured.given;
 
 /**
- * Cliente HTTP dos testes caixa preta: a massa de dados entra pelo lado command e é verificada pelo lado query.
+ * Cliente HTTP dos testes de API: a massa de dados entra pelo lado command e é verificada pelo lado query.
  * Os testes compartilham o mesmo banco, então cada dado gerado aqui é único (ISBN, tombo, e-mail, título).
  */
 final class Api {

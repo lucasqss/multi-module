@@ -14,6 +14,12 @@
          e abriga os testes de integração caixa preta (@QuarkusIntegrationTest). -->
     <artifactId>biblioteca-app</artifactId>
 
+    <properties>
+        <!-- O Sonar lê só target/surefire-reports por padrão; aqui ficam os @QuarkusIntegrationTest. Se o app
+             ganhar testes unitários, acrescente ${project.build.directory}/surefire-reports. -->
+        <sonar.junit.reportPaths>${project.build.directory}/failsafe-reports</sonar.junit.reportPaths>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.example</groupId>

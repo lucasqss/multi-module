@@ -81,26 +81,35 @@ java -jar biblioteca-app/target/quarkus-app/quarkus-run.jar
 
 ## Sonar e cobertura
 
-Cada módulo usa o `target/` padrão do Maven. A análise roda pelo scanner do Maven, que entende o multi-module
-sozinho (fontes, classes e relatórios de cada módulo):
+Cada módulo usa o `target/` padrão do Maven. O fluxo esperado é o de CI, em dois passos, sem nada no comando
+além do que já se usa num projeto de módulo único:
 
 ```bash
-mvn clean verify sonar:sonar -Dsonar.host.url=... -Dsonar.token=...
+mvn clean verify                       # 1. build, testes e relatórios (o report-aggregate roda aqui)
+mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
+    -Dsonar.sources=pom.xml,src/main -DskipTests -Dsonar.host.url=... -Dsonar.login=...   # 2. análise
 ```
 
-| O que | Onde | Configuração |
+O scanner do Maven entende o multi-module sozinho: aplica `sonar.sources` relativo a cada módulo e lê
+`<módulo>/target/classes` e `<módulo>/target/surefire-reports`. O que está nos POMs:
+
+| Propriedade | Onde | Por quê |
 |---|---|---|
-| Testes unitários | `<módulo>/target/surefire-reports/` | padrão |
-| `@QuarkusIntegrationTest` | `biblioteca-app/target/failsafe-reports/` | `sonar.junit.reportPaths` no POM pai inclui o failsafe |
-| Cobertura (todos os módulos) | `biblioteca-app/target/site/jacoco-aggregate/jacoco.xml` | `sonar.coverage.jacoco.xmlReportPaths` no POM pai |
+| `sonar.coverage.jacoco.xmlReportPaths` | POM pai | todos os módulos leem o relatório agregado, `biblioteca-app/target/site/jacoco-aggregate/jacoco.xml`; cada um importa só os próprios arquivos |
+| `sonar.java.source` | POM pai | o scanner 3.6 não lê `maven.compiler.release`; sem isso os `record` dão `Parse error at line 1 column 1` |
+| `sonar.junit.reportPaths` | `biblioteca-app` | os `@QuarkusIntegrationTest` ficam em `failsafe-reports`, que o Sonar não lê por padrão |
 
 - O agente do JaCoCo roda nos testes unitários de todos os módulos (`<módulo>/target/jacoco.exec`) e o
   `report-aggregate` do `biblioteca-app` junta tudo num relatório só, contando o teste de um módulo também para
   os outros.
-- Os `@QuarkusIntegrationTest` ficam **fora** da cobertura: rodam contra o jar em outro processo, sem agente.
+- Os `@QuarkusIntegrationTest` contam como testes no Sonar, mas ficam **fora** da cobertura: rodam contra o jar
+  em outro processo, sem agente.
 - O `report-aggregate` só considera as dependências **diretas** do `biblioteca-app`: por isso ele declara também
   `jpa-core` e `string-generator`. Módulo novo precisa entrar nessa lista para aparecer na cobertura.
-- Com um scanner que não seja o do Maven, a configuração de módulos e caminhos teria de ser feita à mão.
+- O passo 2 não pode ter `clean`: ele lê os relatórios gerados no passo 1.
+
+Validado com SonarQube Community 26.10 e o `sonar-maven-plugin` 3.6.0.1398: 56 testes (21 + 21 + 14 ITs) e
+cobertura por módulo igual à do JaCoCo, sem erros na análise.
 
 ## Decisões e armadilhas encontradas
 

@@ -33,11 +33,12 @@
         <!-- Preenchido pelo jacoco:prepare-agent; o valor vazio evita erro se o JaCoCo for pulado -->
         <argLine/>
 
-        <!-- Sonar (scanner do Maven: mvn verify sonar:sonar). Cada módulo usa o target/ padrão; o scanner lê
-             fontes, classes e relatórios de cada um sozinho. Só duas coisas fogem do padrão: -->
-        <!-- 1. Incluir os *IT na contagem de testes (por padrão o Sonar só lê target/surefire-reports).
-                Herdada, a propriedade é resolvida para a pasta de cada módulo. -->
-        <sonar.junit.reportPaths>${project.build.directory}/surefire-reports,${project.build.directory}/failsafe-reports</sonar.junit.reportPaths>
+        <!-- Sonar (scanner do Maven, rodado pelo CI em um passo separado, com -DskipTests, depois do build que
+             executa os testes). Cada módulo usa o target/ padrão; o scanner lê fontes, classes e
+             target/surefire-reports de cada um sozinho. Fora do padrão: -->
+        <!-- 1. Versão do Java para o analisador: o sonar-maven-plugin 3.6 não lê maven.compiler.release e,
+                sem isso, não reconhece records ("Parse error at line 1 column 1"). -->
+        <sonar.java.source>${maven.compiler.release}</sonar.java.source>
         <!-- 2. Cobertura agregada: um único relatório (report-aggregate no biblioteca-app), lido por todos os
                 módulos; cada um importa só as linhas dos próprios arquivos. -->
         <sonar.coverage.jacoco.xmlReportPaths>${maven.multiModuleProjectDirectory}/biblioteca-app/target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>

@@ -23,6 +23,16 @@
             <groupId>com.example</groupId>
             <artifactId>biblioteca-query</artifactId>
         </dependency>
+        <!-- Já chegam pelo command/query, mas são declarados aqui porque o report-aggregate do JaCoCo só
+             considera as dependências DIRETAS: módulo fora desta lista fica fora da cobertura agregada -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>jpa-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>string-generator</artifactId>
+        </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-jdbc-oracle</artifactId>
@@ -48,6 +58,29 @@
             </plugin>
             <plugin>
                 <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
+            <!-- Cobertura agregada dos testes unitários de todos os módulos em
+                 target/site/jacoco-aggregate/ (jacoco.xml para o Sonar, index.html para pessoas). Lê o
+                 <módulo>/target/jacoco.exec de cada dependência do reactor. Os *IT ficam de fora: rodam contra o
+                 jar em outro processo, sem agente. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>report-aggregate</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report-aggregate</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Metamodel e repositórios gerados pelo Hibernate Processor (LivroEntity_, Livros_) -->
+                            <excludes>
+                                <exclude>**/*_.class</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

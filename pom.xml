@@ -29,6 +29,18 @@
         <jandex-plugin.version>3.3.1</jandex-plugin.version>
         <resources-plugin.version>3.3.1</resources-plugin.version>
         <archunit.version>1.5.1</archunit.version>
+        <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
+        <!-- Preenchido pelo jacoco:prepare-agent; o valor vazio evita erro se o JaCoCo for pulado -->
+        <argLine/>
+
+        <!-- Sonar (scanner do Maven: mvn verify sonar:sonar). Cada módulo usa o target/ padrão; o scanner lê
+             fontes, classes e relatórios de cada um sozinho. Só duas coisas fogem do padrão: -->
+        <!-- 1. Incluir os *IT na contagem de testes (por padrão o Sonar só lê target/surefire-reports).
+                Herdada, a propriedade é resolvida para a pasta de cada módulo. -->
+        <sonar.junit.reportPaths>${project.build.directory}/surefire-reports,${project.build.directory}/failsafe-reports</sonar.junit.reportPaths>
+        <!-- 2. Cobertura agregada: um único relatório (report-aggregate no biblioteca-app), lido por todos os
+                módulos; cada um importa só as linhas dos próprios arquivos. -->
+        <sonar.coverage.jacoco.xmlReportPaths>${maven.multiModuleProjectDirectory}/biblioteca-app/target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
     <dependencyManagement>
@@ -106,6 +118,11 @@
                     <artifactId>maven-resources-plugin</artifactId>
                     <version>${resources-plugin.version}</version>
                 </plugin>
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco-plugin.version}</version>
+                </plugin>
                 <!-- @QuarkusIntegrationTest (*IT) roda contra o artefato empacotado, na fase verify -->
                 <plugin>
                     <artifactId>maven-failsafe-plugin</artifactId>
@@ -143,10 +160,25 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+            <!-- Agente de cobertura nos testes unitários de todos os módulos: grava <módulo>/target/jacoco.exec -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire-plugin.version}</version>
                 <configuration>
+                    <!-- @{argLine} (avaliado tarde) recebe o agente do JaCoCo -->
+                    <argLine>@{argLine}</argLine>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>

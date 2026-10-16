@@ -79,6 +79,29 @@ QUARKUS_DATASOURCE_USERNAME=biblioteca QUARKUS_DATASOURCE_PASSWORD=biblioteca \
 java -jar biblioteca-app/target/quarkus-app/quarkus-run.jar
 ```
 
+## Sonar e cobertura
+
+Cada módulo usa o `target/` padrão do Maven. A análise roda pelo scanner do Maven, que entende o multi-module
+sozinho (fontes, classes e relatórios de cada módulo):
+
+```bash
+mvn clean verify sonar:sonar -Dsonar.host.url=... -Dsonar.token=...
+```
+
+| O que | Onde | Configuração |
+|---|---|---|
+| Testes unitários | `<módulo>/target/surefire-reports/` | padrão |
+| `@QuarkusIntegrationTest` | `biblioteca-app/target/failsafe-reports/` | `sonar.junit.reportPaths` no POM pai inclui o failsafe |
+| Cobertura (todos os módulos) | `biblioteca-app/target/site/jacoco-aggregate/jacoco.xml` | `sonar.coverage.jacoco.xmlReportPaths` no POM pai |
+
+- O agente do JaCoCo roda nos testes unitários de todos os módulos (`<módulo>/target/jacoco.exec`) e o
+  `report-aggregate` do `biblioteca-app` junta tudo num relatório só, contando o teste de um módulo também para
+  os outros.
+- Os `@QuarkusIntegrationTest` ficam **fora** da cobertura: rodam contra o jar em outro processo, sem agente.
+- O `report-aggregate` só considera as dependências **diretas** do `biblioteca-app`: por isso ele declara também
+  `jpa-core` e `string-generator`. Módulo novo precisa entrar nessa lista para aparecer na cobertura.
+- Com um scanner que não seja o do Maven, a configuração de módulos e caminhos teria de ser feita à mão.
+
 ## Decisões e armadilhas encontradas
 
 O desenho completo e as armadilhas encontradas no caminho (validação do HQL que é pulada sem aviso, colisão de

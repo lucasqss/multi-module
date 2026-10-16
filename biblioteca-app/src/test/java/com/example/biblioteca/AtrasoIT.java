@@ -1,13 +1,14 @@
 package com.example.biblioteca;
 
-import io.quarkus.test.junit.QuarkusTest;
-import jakarta.inject.Inject;
+import io.quarkus.test.common.DevServicesContext;
+import io.quarkus.test.junit.QuarkusIntegrationTest;
 import org.junit.jupiter.api.Test;
 
-import javax.sql.DataSource;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static com.example.biblioteca.Api.emprestar;
@@ -21,16 +22,15 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 
 /**
- * Único ponto que não passa só pela API: ela não permite avançar o relógio da aplicação, então o empréstimo é
- * criado pela API e a data prevista é recuada direto no banco (o mesmo Oracle do Dev Services que a aplicação usa).
+ * Único ponto não caixa preta: um teste de ponta a ponta não consegue avançar o relógio da aplicação,
+ * então o empréstimo é criado pela API e a data prevista é recuada direto no banco do Dev Services.
  */
-@QuarkusTest
+@QuarkusIntegrationTest
 class AtrasoIT {
 
     static final int DIAS_DE_ATRASO = 5;
 
-    @Inject
-    DataSource banco;
+    DevServicesContext devServices;
 
     @Test
     void atrasoApareceNoRelatorioEDevolucaoSuspendeLeitor() throws SQLException {
@@ -64,7 +64,9 @@ class AtrasoIT {
     }
 
     private void recuarDataPrevista(String emprestimoId, int dias) throws SQLException {
-        try (var conexao = banco.getConnection();
+        Map<String, String> props = devServices.devServicesProperties();
+        try (var conexao = DriverManager.getConnection(props.get("quarkus.datasource.jdbc.url"),
+                props.get("quarkus.datasource.username"), props.get("quarkus.datasource.password"));
              var update = conexao.prepareStatement("UPDATE EMPRESTIMO SET DATA_PREVISTA = ? WHERE ID = ?")) {
             update.setObject(1, LocalDate.now().minusDays(dias));
             update.setBytes(2, bytes(UUID.fromString(emprestimoId)));

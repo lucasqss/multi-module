@@ -24,8 +24,8 @@ Domínio: **Biblioteca** — livros, exemplares, leitores e empréstimos.
 | Repositórios | **Jakarta Data** (`@Repository`, `@Find`, `@Query`, `@Insert`, `@Save`) sobre `StatelessSession`, com HQL validado em compilação pelo `hibernate-processor` |
 | Deploy | único, via `biblioteca-app` **sem nenhuma classe Java** (pom + `application.properties` + testes): um uber-jar, `target/biblioteca.jar` |
 | Build | um único `target/`, na raiz: cada módulo compila em `target/<artifactId>/`; relatórios de teste, cobertura e o jar ficam direto em `target/` |
-| Testes | unitários puros (string-generator; domínio e casos de uso com fakes dos ports); ArchUnit guardando o pacote `domain` (command) e as fronteiras entre módulos (app); testes de API (`@QuarkusTest`, `*IT`) no `biblioteca-app` |
-| Cobertura | agente do JaCoCo nos testes unitários e extensão `quarkus-jacoco` nos `*IT`, num único `target/jacoco/jacoco.exec`; relatório agregado gerado pela extensão em `target/site/jacoco-aggregate/` (só plugins Maven padrão e extensões Quarkus, sem antrun) |
+| Testes | unitários puros (string-generator; domínio e casos de uso com fakes dos ports); ArchUnit guardando o pacote `domain` (command) e as fronteiras entre módulos (app); `@QuarkusIntegrationTest` caixa preta no `biblioteca-app` |
+| Cobertura | só testes unitários: `jacoco:report` em cada módulo, em `target/site/jacoco/<artifactId>/`; os `@QuarkusIntegrationTest` ficam de fora (só plugins Maven padrão, sem antrun) |
 | Versão anterior | o exemplo simples (`crud` + `string-generator`) está na branch `main` |
 
 ### Por que Jakarta Data e não Panache
@@ -50,7 +50,7 @@ multi-module/
 ├─ biblioteca-command/   domain · application · adapter    → jpa-core, jakarta.data-api, quarkus-rest-jackson
 ├─ biblioteca-query/     @Repository de leitura · REST     → jpa-core, string-generator, jakarta.data-api, quarkus-rest-jackson
 └─ biblioteca-app/       jar único + ITs + ArchUnit        → biblioteca-command, biblioteca-query, quarkus-jdbc-oracle
-                         entre módulos + cobertura
+                         entre módulos
 ```
 
 `biblioteca-query` **não** depende de `biblioteca-command`: o Maven impede o lado de leitura de importar o
@@ -132,14 +132,15 @@ Entrada: `ObraRef(List<AutorRef> autores, titulo, subtitulo, edicao, local, edit
 | `string-generator` | casos ABNT (JUnit puro) | não |
 | `biblioteca-command` | agregados, specifications, casos de uso com fakes em memória; ArchUnit das camadas | não |
 | `biblioteca-app` | `ArquiteturaModulosTest`: fronteiras entre módulos (ArchUnit) | não |
-| `biblioteca-app` | `*IT`: `@QuarkusTest` com a aplicação inteira (todos os módulos) e Oracle do Dev Services, na fase `verify` | sim |
+| `biblioteca-app` | `@QuarkusIntegrationTest` contra o `target/biblioteca.jar` e Oracle do Dev Services | sim |
 
-Os ITs passam pela API HTTP: a massa entra pelo command e é verificada pelo query. Única exceção: o cenário de
-atraso recua `DATA_PREVISTA` por JDBC (`DataSource` injetado), porque a API não controla o relógio da aplicação.
+Os ITs são caixa preta: a massa entra pela API do command e é verificada pela API do query. Única exceção:
+o cenário de atraso recua `DATA_PREVISTA` por JDBC (credenciais via `DevServicesContext`), porque um teste de
+ponta a ponta não controla o relógio da aplicação.
 
-Os ITs são `@QuarkusTest`, e não `@QuarkusIntegrationTest`, por causa da cobertura (armadilha 10): eles sobem a
-mesma aplicação, com todos os módulos, mas a partir das classes compiladas, e não do `target/biblioteca.jar`. O
-empacotamento em si (configuração do uber-jar) não é exercitado pelos testes.
+Os ITs não contam na cobertura (armadilha 10): garantem que o jar fechado sobe e atende, e a cobertura mede o
+que os testes unitários de cada módulo exercitam. Por isso `jpa-core` (só mapeamento) e `biblioteca-query`
+(consultas e REST, testados ponta a ponta) aparecem sem cobertura.
 
 ## Armadilhas encontradas
 
@@ -162,20 +163,18 @@ empacotamento em si (configuração do uber-jar) não é exercitado pelos testes
    `jpa-core` declara `@Column(name = ...)` nos campos compostos para não depender de configuração do app.
 7. **ArchUnit com JUnit 6.** O engine `archunit-junit5` não executa sob o JUnit 6 do BOM (0 testes); usa-se a API
    core (`ClassFileImporter` + `check`) dentro de um `@Test` comum.
-8. **Conexão do jar por variável de ambiente.** Uma URL de banco no `application.properties` sem perfil desliga
-   o Dev Services nos testes (e, num `@QuarkusIntegrationTest`, até `%prod` desligaria, porque ele roda no
-   perfil prod); o jar recebe a conexão por `QUARKUS_DATASOURCE_*`.
+8. **`%prod` x ITs.** Configurar a URL do banco em `%prod` desliga o Dev Services nos `@QuarkusIntegrationTest`,
+   que rodam no perfil prod; o jar recebe a conexão por variáveis de ambiente.
 9. **BOM 3.33** gerencia `org.hibernate.orm:hibernate-processor` (7.2.x) e `jakarta.data:jakarta.data-api`
    (1.0.1); o `quarkus-data-processor` citado nos guias mais novos não existe nesta versão.
-10. **Cobertura e classes transformadas.** O Quarkus reescreve algumas classes (entidades enriquecidas pelo
-    Hibernate, repositórios Jakarta Data, recursos REST). Medida com o agente do JaCoCo, a cobertura dessas
-    classes não casa com os `.class` de `target/*/classes` e é descartada (`Execution data for class ... does
-    not match`); com `@QuarkusIntegrationTest` não há como evitar sem ler as classes de dentro do jar (o que
-    exigiria antrun ou exec). A extensão `quarkus-jacoco` instrumenta **antes** das transformações, por isso os
-    ITs são `@QuarkusTest`. Ela só instrumenta módulos com índice Jandex: o `string-generator` entra no
-    relatório só com a cobertura dos próprios testes unitários.
+10. **Cobertura dos ITs e classes transformadas.** O Quarkus reescreve no build algumas classes (entidades
+    enriquecidas pelo Hibernate, repositórios Jakarta Data, recursos REST) e é essa versão que roda no jar dos
+    `@QuarkusIntegrationTest`. Com os `.class` originais, o JaCoCo descarta a cobertura delas
+    (`Execution data for class ... does not match`). Contá-las exigiria ler as classes de dentro do jar (tarefa
+    Ant do JaCoCo, via antrun) ou trocar os ITs por `@QuarkusTest` com a extensão `quarkus-jacoco`, que
+    instrumenta antes da transformação mas não testa o jar. Decisão: ITs contra o jar, fora da cobertura.
 11. **`target/` único e ferramentas que assumem `target/`.** O `ImportOption.DO_NOT_INCLUDE_TESTS` do ArchUnit
     procura `target/test-classes` e não reconhece `target/<artifactId>/test-classes` (filtro próprio nos testes);
-    o `@QuarkusTest` assume `<módulo>/target/` quando as classes de teste estão fora do módulo (por isso todo
-    caminho da `quarkus-jacoco` é absoluto, no failsafe do app); o `report-aggregate` do JaCoCo só procura `.exec`
-    dentro da pasta de cada módulo (não é usado).
+    o log do jar dos ITs ia para `<módulo>/target/quarkus.log` (failsafe recebe `quarkus.log.file.path`); o
+    `report-aggregate` do JaCoCo só procura `.exec` dentro da pasta de cada módulo, por isso há um relatório por
+    módulo (`jacoco:report`) em vez de um agregado.

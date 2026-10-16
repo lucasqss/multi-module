@@ -109,7 +109,7 @@ Declare a dependência em quem usa, **sem versão** — no `biblioteca-app/pom.x
 
 O módulo precisa chegar ao `biblioteca-app`, direta ou transitivamente (`app → command → notificacao`). É isso
 que o coloca no jar único, nas regras do `ArquiteturaModulosTest` (que roda no app e enxerga o classpath dele) e
-na cobertura agregada (gerada nos `*IT` do app, o último módulo do reactor).
+nos testes ponta a ponta.
 
 ### 2.4 Pacote raiz e registro no ArchUnit
 
@@ -143,7 +143,7 @@ um teste unitário dentro do próprio módulo passa mesmo sem o índice Jandex.
 - [ ] **sem** `quarkus-maven-plugin`, **sem** `application.properties` e **sem** `<build><directory>` próprio
 - [ ] pacote raiz exclusivo, registrado em `MODULOS`, com regras de fronteira no `ArquiteturaModulosTest`
 - [ ] `mvn clean verify` verde na raiz, e nada de `biblioteca-notificacao/target/` criado
-- [ ] testes do módulo em `target/surefire-reports/` e as classes em `target/site/jacoco-aggregate/`
+- [ ] testes do módulo em `target/surefire-reports/` e cobertura em `target/site/jacoco/<artifactId>/`
 
 ## 3. Ao que atentar
 
@@ -227,10 +227,8 @@ Ao que atentar:
   pacote dele em `MODULOS` só se tiver classes em `src/main`).
 - Teste regra com JUnit puro e fakes dos ports (como `CirculacaoServiceTest` com `EmMemoria`): rápido e sem
   Quarkus nem banco.
-- Os testes de API (`*IT`, anotados com `@QuarkusTest`) ficam no `biblioteca-app` e rodam na fase `verify`
-  (failsafe), com a aplicação inteira e Oracle do Dev Services (Docker) — `mvn test` não os executa. Não use
-  `@QuarkusIntegrationTest`: a cobertura dele não casa com as classes que o Quarkus transforma
-  ([3.12](#312-relatórios-de-teste-e-cobertura-sonar)).
+- `@QuarkusIntegrationTest` fica no `biblioteca-app` e roda na fase `verify` (failsafe) contra o
+  `target/biblioteca.jar`, com Oracle do Dev Services (Docker) — `mvn test` não os executa.
 
 ### 3.9 Rotas REST de vários módulos no mesmo app
 
@@ -243,10 +241,9 @@ primeiro a classe raiz mais específica e não volta atrás: com `@Path("/leitor
 ```
 target/
 ├─ biblioteca.jar                     a entrega: java -jar target/biblioteca.jar
-├─ <artifactId>/                      saída de compilação de cada módulo (classes, jar intermediário)
+├─ <artifactId>/                      saída de compilação de cada módulo (classes, jar intermediário, jacoco.exec)
 ├─ surefire-reports/  failsafe-reports/
-├─ jacoco/jacoco.exec                 dados de cobertura de todos os testes
-└─ site/jacoco-aggregate/             cobertura (jacoco.xml para o Sonar, index.html para pessoas)
+└─ site/jacoco/<artifactId>/          cobertura do módulo (jacoco.xml para o Sonar, index.html para pessoas)
 ```
 
 Como funciona, para não quebrar sem perceber:
@@ -257,8 +254,8 @@ Como funciona, para não quebrar sem perceber:
   o build volta a criar `target/` dentro dele.
 - Nunca escreva `target/...` literal em configuração de plugin: use `${project.build.directory}` (pasta do
   módulo) ou `${target.raiz}` (raiz). É o que o `jpa-core` faz ao copiar o índice de entidades do Hibernate
-  Processor. Plugin que assume o padrão cria `<módulo>/target/` de novo — o `@QuarkusTest` faz isso com o que
-  não tiver caminho absoluto (por isso a configuração da `quarkus-jacoco` usa `${target.raiz}`).
+  Processor. Plugin que assume o padrão cria `<módulo>/target/` de novo — foi o que o `@QuarkusIntegrationTest`
+  fez com o `quarkus.log` até o failsafe receber `quarkus.log.file.path`.
 - O `clean` da raiz apaga o `target/` inteiro e **não é herdado** (`<inherited>false</inherited>`): se fosse,
   cada módulo apagaria o que os anteriores construíram no mesmo `mvn clean verify`. Ao rodar só um módulo, use
   `mvn clean -pl <módulo> -am ...` (o `-am` inclui a raiz, que limpa tudo).
@@ -289,22 +286,22 @@ um diretório `quarkus-app/`) aproveita melhor o cache de camadas da imagem.
 - Um módulo **não** deve configurar `<reportsDirectory>` nem `<argLine>` próprios no Surefire/Failsafe: isso
   tira os relatórios da raiz ou desliga o agente do JaCoCo. Para argumentos de JVM nos testes, mantenha o
   `@{argLine}`: `<argLine>@{argLine} -Xmx1g</argLine>`.
-- Só plugins Maven padrão (jacoco, surefire, failsafe) e uma extensão do Quarkus: sem antrun nem exec.
-- Todos os testes gravam no mesmo `target/jacoco/jacoco.exec`: os unitários pelo agente do JaCoCo (`prepare-agent`
-  no POM pai, propriedade `jacoco.dados`) e os `*IT` pela extensão `quarkus-jacoco` (test scope no
-  `biblioteca-app`, configurada no failsafe dele com `reuse-data-file=true` para não apagar o que os unitários
-  gravaram).
-- O relatório é gerado pela extensão quando os `*IT` terminam, em `target/site/jacoco-aggregate/`. Ela acha os
-  módulos sozinha: todo módulo do repositório de que o app depende entra com suas classes e fontes. Não há lista
-  de módulos para manter.
-- Por que não o agente do JaCoCo também nos ITs: o Quarkus transforma entidades, repositórios e recursos REST, e
-  a cobertura medida nessa versão não casa com os `.class` originais (armadilha 10 de [`design.md`](design.md)).
-  A extensão instrumenta antes da transformação. Pelo mesmo motivo, o app tem `jacoco.skip=true`: agente e
-  extensão juntos instrumentariam a mesma classe duas vezes.
-- A extensão só instrumenta módulos com índice Jandex. Um módulo Java puro (como o `string-generator`) aparece no
-  relatório com a cobertura dos próprios testes unitários, sem a dos `*IT`.
-- O `report-aggregate` do plugin Maven não serve aqui: ele só procura os `.exec` dentro da pasta de cada módulo.
-- O POM pai declara `sonar.junit.reportPaths` e `sonar.coverage.jacoco.xmlReportPaths` com esses caminhos.
+- A cobertura mede **só os testes unitários**, módulo a módulo: o `prepare-agent` grava
+  `target/<artifactId>/jacoco.exec` e o `jacoco:report` (fase `test`) gera `target/site/jacoco/<artifactId>/`.
+  Tudo vem do POM pai: o módulo novo não configura nada. Só plugins Maven padrão, sem antrun.
+- Cada módulo é medido pelos **próprios** testes: um teste do command que passe por uma classe do `jpa-core`
+  não conta para o `jpa-core`. Quer cobertura num módulo? Escreva testes unitários nele.
+- Módulo sem teste unitário não gera relatório (`Skipping JaCoCo execution due to missing execution data file`)
+  e aparece sem cobertura no Sonar. O `biblioteca-app` tem `jacoco.skip`, porque não tem classes de produção.
+- Os `@QuarkusIntegrationTest` ficam fora da cobertura: rodam contra o jar fechado, e as classes que o Quarkus
+  transforma no build não casariam com os `.class` dos módulos (armadilha 10 de [`design.md`](design.md)).
+- No POM pai, o `jacoco-maven-plugin` vem **depois** do `maven-surefire-plugin`: o `report` roda na mesma fase
+  (`test`) e o Maven executa na ordem de declaração. Invertidos, o relatório sairia antes dos testes.
+- O `report-aggregate` do plugin não serve com o `target/` único: ele só procura os `.exec` dentro da pasta de
+  cada módulo.
+- O POM pai declara `sonar.junit.reportPaths` e `sonar.coverage.jacoco.xmlReportPaths`; esta última, herdada,
+  aponta cada módulo para `target/site/jacoco/<artifactId>/jacoco.xml` (scanner do Maven). Com outro scanner,
+  use `target/site/jacoco/*/jacoco.xml`.
 
 ### 3.13 Se o módulo novo tiver JPA / Jakarta Data
 

@@ -1,6 +1,6 @@
 package com.example.biblioteca;
 
-import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusIntegrationTest;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -13,7 +13,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 
-@QuarkusTest
+@QuarkusIntegrationTest
 class AcervoIT {
 
     @Test

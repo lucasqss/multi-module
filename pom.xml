@@ -42,14 +42,13 @@
              relatórios de teste/cobertura e o jar final ficam direto em target/.
              maven.multiModuleProjectDirectory é a pasta que contém o .mvn/ (por isso ele não pode ser removido). -->
         <target.raiz>${maven.multiModuleProjectDirectory}/target</target.raiz>
-        <!-- Dados de cobertura de todos os testes, de todos os módulos -->
-        <jacoco.dados>${target.raiz}/jacoco/jacoco.exec</jacoco.dados>
         <!-- Preenchido pelo jacoco:prepare-agent; o valor vazio evita erro se o JaCoCo for pulado -->
         <argLine/>
 
-        <!-- Onde o Sonar procura resultados de testes e cobertura -->
+        <!-- Onde o Sonar procura resultados de testes e cobertura. A cobertura é um relatório por módulo
+             (target/site/jacoco/<artifactId>/); herdada, a propriedade aponta cada módulo para o seu. -->
         <sonar.junit.reportPaths>${target.raiz}/surefire-reports,${target.raiz}/failsafe-reports</sonar.junit.reportPaths>
-        <sonar.coverage.jacoco.xmlReportPaths>${target.raiz}/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.coverage.jacoco.xmlReportPaths>${target.raiz}/site/jacoco/${project.artifactId}/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
     <dependencyManagement>
@@ -137,8 +136,8 @@
                     <artifactId>jacoco-maven-plugin</artifactId>
                     <version>${jacoco-plugin.version}</version>
                 </plugin>
-                <!-- Testes *IT (que sobem o Quarkus e o Oracle do Dev Services) rodam na fase verify, depois do
-                     package; assim "mvn test" continua rápido e sem Docker -->
+                <!-- @QuarkusIntegrationTest (*IT): testes ponta a ponta contra o jar fechado, na fase verify.
+                     Ficam FORA da cobertura: nenhum agente do JaCoCo vai para o processo do jar. -->
                 <plugin>
                     <artifactId>maven-failsafe-plugin</artifactId>
                     <version>${surefire-plugin.version}</version>
@@ -154,6 +153,8 @@
                         <reportsDirectory>${target.raiz}/failsafe-reports</reportsDirectory>
                         <systemPropertyVariables>
                             <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                            <!-- Log do jar iniciado pelo @QuarkusIntegrationTest; o padrão criaria <módulo>/target/ -->
+                            <quarkus.log.file.path>${project.build.directory}/quarkus.log</quarkus.log.file.path>
                         </systemPropertyVariables>
                     </configuration>
                 </plugin>
@@ -216,24 +217,6 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            <!-- Agente de cobertura nos testes unitários de todos os módulos. Todos acumulam no MESMO arquivo,
-                 target/jacoco/jacoco.exec, que a extensão quarkus-jacoco completa com os *IT e usa para gerar o
-                 relatório agregado (biblioteca-app). -->
-            <plugin>
-                <groupId>org.jacoco</groupId>
-                <artifactId>jacoco-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>prepare-agent</id>
-                        <goals>
-                            <goal>prepare-agent</goal>
-                        </goals>
-                        <configuration>
-                            <destFile>${jacoco.dados}</destFile>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire-plugin.version}</version>
@@ -246,6 +229,37 @@
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>
                 </configuration>
+            </plugin>
+            <!-- Cobertura dos testes unitários, um relatório por módulo: o agente grava
+                 target/<artifactId>/jacoco.exec e o report gera target/site/jacoco/<artifactId>/ (jacoco.xml para o
+                 Sonar, index.html para pessoas). Cada módulo é medido pelos próprios testes; os *IT não entram.
+                 Declarado DEPOIS do surefire: o report também roda na fase test e precisa vir depois dos testes.
+                 Módulo sem testes (ou sem classes) não gera relatório. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${target.raiz}/site/jacoco/${project.artifactId}</outputDirectory>
+                            <!-- Metamodel e repositórios gerados pelo Hibernate Processor (LivroEntity_, Livros_) -->
+                            <excludes>
+                                <exclude>**/*_.class</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

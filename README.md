@@ -23,8 +23,8 @@ Os módulos existem para **separar o design e limitar o acoplamento**, não para
 ```
             ┌──────────────────────┐
             │    biblioteca-app    │  sem classes Java: junta tudo no jar único e abriga
-            │ (ITs + ArchUnit +    │  os testes de API (*IT), as regras entre módulos
-            │  cobertura agregada) │  e a cobertura agregada
+            │   (ITs + ArchUnit)   │  os @QuarkusIntegrationTest (contra o jar) e as
+            │                      │  regras entre módulos
             └──────────┬───────────┘
           ┌────────────┴────────────┐
 ┌─────────▼──────────┐   ┌──────────▼─────────┐
@@ -45,7 +45,7 @@ Os módulos existem para **separar o design e limitar o acoplamento**, não para
 | `string-generator` | Referência e citação ABNT a partir de records próprios — não conhece JPA nem domínio |
 | `biblioteca-command` | Domínio (agregados, Specifications, ports), casos de uso, adapters Jakarta Data e REST de escrita |
 | `biblioteca-query` | Consultas Jakarta Data somente-leitura e REST de leitura |
-| `biblioteca-app` | Montagem do jar único, testes de integração, regras de arquitetura entre módulos e cobertura agregada |
+| `biblioteca-app` | Montagem do jar único, testes ponta a ponta contra o jar e regras de arquitetura entre módulos |
 
 `biblioteca-query` não depende de `biblioteca-command`: o Maven impede o lado de leitura de importar o domínio.
 Como no jar único as classes convivem no mesmo classpath, o `ArquiteturaModulosTest` (no `biblioteca-app`)
@@ -101,18 +101,20 @@ target/
 ├─ jpa-core/  string-generator/  biblioteca-command/  biblioteca-query/  biblioteca-app/
 │                                     saída de compilação de cada módulo
 ├─ surefire-reports/TEST-*.xml        testes unitários e de arquitetura de todos os módulos
-├─ failsafe-reports/TEST-*.xml        testes de API (*IT, @QuarkusTest com Oracle do Dev Services)
-├─ jacoco/jacoco.exec                 dados de cobertura de todos os testes
-└─ site/jacoco-aggregate/jacoco.xml   cobertura de todos os módulos, unitários + *IT (também index.html)
+├─ failsafe-reports/TEST-*.xml        @QuarkusIntegrationTest (ponta a ponta contra o biblioteca.jar)
+└─ site/jacoco/<artifactId>/jacoco.xml
+                                      cobertura dos testes unitários, um relatório por módulo (também index.html)
 ```
 
-O POM pai declara `sonar.junit.reportPaths` e `sonar.coverage.jacoco.xmlReportPaths` apontando para esses
-caminhos (`mvn clean verify sonar:sonar`, com `sonar.host.url`/`sonar.token` configurados). Use sempre
-`clean`: o da raiz apaga o `target/` inteiro, inclusive relatórios e dados de cobertura de execuções anteriores
-(que, sem ele, se acumulariam no `jacoco.exec`).
+A cobertura mede só os testes unitários: os `@QuarkusIntegrationTest` validam o jar fechado e ficam fora dela.
+Módulo sem teste unitário (hoje `jpa-core` e `biblioteca-query`) não gera relatório e aparece sem cobertura no
+Sonar. O build usa só plugins Maven padrão (sem antrun).
 
-A cobertura usa só plugins Maven padrão e a extensão `quarkus-jacoco` (sem antrun); os detalhes estão em
-[`docs/adicionando-modulos.md`](docs/adicionando-modulos.md#312-relatórios-de-teste-e-cobertura-sonar).
+O POM pai declara `sonar.junit.reportPaths` e `sonar.coverage.jacoco.xmlReportPaths` apontando para esses
+caminhos; a de cobertura é herdada e aponta cada módulo para o próprio relatório (`mvn clean verify
+sonar:sonar`, com `sonar.host.url`/`sonar.token` configurados). Com um scanner que não seja o do Maven, use
+`target/site/jacoco/*/jacoco.xml`. Use sempre
+`clean`: o da raiz apaga o `target/` inteiro, inclusive relatórios de execuções anteriores.
 
 ## Mais detalhes
 

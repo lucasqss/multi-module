@@ -12,19 +12,18 @@
 
     <!-- Módulo de montagem: nenhuma classe Java. Junta command + query no ÚNICO artefato de deploy,
          target/biblioteca.jar (uber-jar; veja application.properties), e abriga o que precisa enxergar todos os
-         módulos: os testes de API (*IT), as regras de arquitetura entre módulos (ArchUnit) e a cobertura
-         agregada. -->
+         módulos: os testes ponta a ponta contra o jar (*IT) e as regras de arquitetura entre módulos (ArchUnit).
+         Não tem classes de produção, então não tem relatório de cobertura. -->
     <artifactId>biblioteca-app</artifactId>
 
     <properties>
-        <!-- Sem agente do JaCoCo aqui: nos *IT a cobertura vem da extensão quarkus-jacoco, e os dois juntos
-             instrumentariam a mesma classe duas vezes. Os testes do ArchUnit não executam código de produção. -->
+        <!-- Sem classes de produção: nada a medir (sem isso sairia um relatório vazio em target/site/jacoco/) -->
         <jacoco.skip>true</jacoco.skip>
     </properties>
 
     <dependencies>
         <!-- Módulos internos: sem versão, gerenciada no POM pai. Todo módulo precisa chegar até aqui (direta ou
-             transitivamente): é o que o coloca no jar, nas regras do ArchUnit e na cobertura. -->
+             transitivamente): é o que o coloca no jar e nas regras do ArchUnit. -->
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>biblioteca-command</artifactId>
@@ -53,12 +52,6 @@
             <artifactId>archunit</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- Cobertura dos *IT e relatório agregado (veja o failsafe abaixo) -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-jacoco</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>
@@ -67,27 +60,9 @@
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
             </plugin>
-            <!-- Cobertura agregada de TODOS os módulos (unitários + *IT) em target/site/jacoco-aggregate/, o que o
-                 Sonar lê. Quem gera é a extensão quarkus-jacoco, ao fim dos *IT: ela instrumenta as classes ANTES
-                 das transformações do Quarkus (entidades, repositórios Jakarta Data, recursos REST), então a
-                 cobertura delas casa com os .class de target/*/classes. O relatório inclui as classes e os fontes
-                 de todos os módulos do workspace de que o app depende.
-
-                 Todos os caminhos são absolutos: dentro do @QuarkusTest, o Quarkus considera que o build do módulo
-                 está em <módulo>/target/ e gravaria lá o que não tivesse caminho explícito. -->
+            <!-- Ativa os *IT (configurados no POM pai): ponta a ponta contra target/biblioteca.jar, fora da cobertura -->
             <plugin>
                 <artifactId>maven-failsafe-plugin</artifactId>
-                <configuration>
-                    <systemPropertyVariables>
-                        <!-- O mesmo arquivo dos testes unitários (POM pai), sem apagá-lo ao começar -->
-                        <quarkus.jacoco.data-file>${jacoco.dados}</quarkus.jacoco.data-file>
-                        <quarkus.jacoco.reuse-data-file>true</quarkus.jacoco.reuse-data-file>
-                        <quarkus.jacoco.report-location>${target.raiz}/site/jacoco-aggregate</quarkus.jacoco.report-location>
-                        <quarkus.jacoco.title>${project.parent.artifactId}</quarkus.jacoco.title>
-                        <!-- Metamodel e repositórios gerados pelo Hibernate Processor (LivroEntity_, Livros_) -->
-                        <quarkus.jacoco.excludes>**/*_.class</quarkus.jacoco.excludes>
-                    </systemPropertyVariables>
-                </configuration>
             </plugin>
         </plugins>
     </build>

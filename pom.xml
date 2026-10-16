@@ -6,17 +6,20 @@
 
     <!-- POM pai: agrega os módulos e centraliza versões e plugins. Não tem código.
          Os módulos existem para separar o design e limitar o acoplamento (Maven + ArchUnit); a entrega é
-         UM jar (modelo-app) e o build usa UM target/, na raiz. Para adicionar um módulo, veja
+         UM jar (biblioteca-app) e o build usa UM target/, na raiz. Para adicionar um módulo, veja
          docs/adicionando-modulos.md -->
     <groupId>com.example</groupId>
-    <artifactId>modelo-parent</artifactId>
+    <artifactId>multi-module-parent</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <!-- A ordem aqui não importa: o reactor ordena pelas dependências entre os módulos -->
     <modules>
-        <module>modelo-core</module>
-        <module>modelo-app</module>
+        <module>jpa-core</module>
+        <module>string-generator</module>
+        <module>biblioteca-command</module>
+        <module>biblioteca-query</module>
+        <module>biblioteca-app</module>
     </modules>
 
     <properties>
@@ -30,6 +33,7 @@
         <surefire-plugin.version>3.5.3</surefire-plugin.version>
         <enforcer-plugin.version>3.6.2</enforcer-plugin.version>
         <jandex-plugin.version>3.3.1</jandex-plugin.version>
+        <resources-plugin.version>3.3.1</resources-plugin.version>
         <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
         <antrun-plugin.version>3.2.0</antrun-plugin.version>
         <clean-plugin.version>3.5.0</clean-plugin.version>
@@ -57,7 +61,7 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <!-- Testes de arquitetura (regras de acoplamento entre módulos), no modelo-app -->
+            <!-- Testes de arquitetura: regras entre módulos (biblioteca-app) e dentro do command -->
             <dependency>
                 <groupId>com.tngtech.archunit</groupId>
                 <artifactId>archunit</artifactId>
@@ -66,7 +70,22 @@
             <!-- Módulos internos: a versão fica só aqui, os módulos declaram sem <version> -->
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>modelo-core</artifactId>
+                <artifactId>jpa-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>string-generator</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>biblioteca-command</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>biblioteca-query</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>
@@ -78,7 +97,7 @@
 
         <pluginManagement>
             <plugins>
-                <!-- Só o módulo que gera o executável (modelo-app) ativa este plugin -->
+                <!-- Só o módulo que gera o executável (biblioteca-app) ativa este plugin -->
                 <plugin>
                     <groupId>${quarkus.platform.group-id}</groupId>
                     <artifactId>quarkus-maven-plugin</artifactId>
@@ -109,11 +128,15 @@
                     </executions>
                 </plugin>
                 <plugin>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>${resources-plugin.version}</version>
+                </plugin>
+                <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
                     <version>${jacoco-plugin.version}</version>
                 </plugin>
-                <!-- Relatório de cobertura agregado (tarefa Ant do JaCoCo), usado pelo modelo-app -->
+                <!-- Relatório de cobertura agregado (tarefa Ant do JaCoCo), usado pelo biblioteca-app -->
                 <plugin>
                     <artifactId>maven-antrun-plugin</artifactId>
                     <version>${antrun-plugin.version}</version>
@@ -195,6 +218,15 @@
                 <configuration>
                     <!-- Mantém o nome dos parâmetros no bytecode (usado pelo REST para @PathParam/@QueryParam sem valor) -->
                     <parameters>true</parameters>
+                    <!-- Hibernate Processor: gera o metamodel (LivroEntity_) e as implementações dos
+                         repositórios Jakarta Data, validando o HQL de @Query em tempo de compilação -->
+                    <annotationProcessorPathsUseDepMgmt>true</annotationProcessorPathsUseDepMgmt>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.hibernate.orm</groupId>
+                            <artifactId>hibernate-processor</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <!-- Agente de cobertura em todos os módulos: grava target/<artifactId>/jacoco.exec durante os testes -->

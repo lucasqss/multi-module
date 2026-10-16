@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>multi-module-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <!-- Módulo de montagem: nenhuma classe Java. Junta command + query no ÚNICO artefato de deploy,
+         target/biblioteca.jar (uber-jar; veja application.properties), e abriga o que precisa enxergar todos os
+         módulos: os testes de integração caixa preta, as regras de arquitetura entre módulos (ArchUnit) e a
+         cobertura agregada. -->
+    <artifactId>biblioteca-app</artifactId>
+
+    <dependencies>
+        <!-- Módulos internos: sem versão, gerenciada no POM pai. Todo módulo precisa chegar até aqui (direta ou
+             transitivamente): é o que o coloca no jar, nas regras do ArchUnit e na cobertura. -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>biblioteca-command</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>biblioteca-query</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-oracle</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>${quarkus.platform.group-id}</groupId>
+                <artifactId>quarkus-maven-plugin</artifactId>
+            </plugin>
+            <!-- Cobertura dos testes de integração: a API da biblioteca só é exercitada pelos *IT, que rodam o
+                 jar em outro processo. Este agente vai para esse processo (quarkus.test.arg-line, no failsafe)
+                 e grava target/biblioteca-app/jacoco-it.exec. Só as classes do projeto são instrumentadas. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>prepare-agent-integration</id>
+                        <goals>
+                            <goal>prepare-agent-integration</goal>
+                        </goals>
+                        <configuration>
+                            <propertyName>jacoco.it.argLine</propertyName>
+                            <includes>
+                                <include>com/example/**</include>
+                            </includes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <!-- Não declare jacoco.it.argLine em <properties>: ele precisa ser resolvido na execução,
+                             depois que o prepare-agent-integration o preenche -->
+                        <quarkus.test.arg-line>${jacoco.it.argLine}</quarkus.test.arg-line>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <!-- Cobertura agregada de TODOS os módulos (testes unitários + ITs) em target/site/jacoco-aggregate/,
+                 o que o Sonar lê. Roda aqui porque o app depende de todos os módulos e é o último do reactor; o
+                 POM pai é construído antes de qualquer teste. Usa a tarefa Ant do JaCoCo, e não o
+                 report-aggregate, porque este só procura os .exec dentro da pasta de cada módulo, e o build usa
+                 um target/ único. Acha os módulos por convenção de diretório: target/*/classes e */src/main/java.
+
+                 Os bytes das classes vêm do jar entregue, não de target/*/classes: o Quarkus transforma algumas
+                 classes no build (entidades, repositórios Jakarta Data, recursos REST) e é essa versão que roda nos
+                 ITs; com os .class originais o JaCoCo descarta a cobertura delas ("does not match"). As demais são
+                 idênticas nos dois lugares. A lista de classes é a de target/*/classes, então as que o Quarkus gera
+                 (_Bean, _Subclass...) e as do Hibernate Processor (*_) ficam de fora. -->
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>cobertura-agregada</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml"
+                                         classpathref="maven.plugin.classpath"/>
+                                <!-- Caminho relativo (com/example/...) de cada classe compilada pelos módulos -->
+                                <pathconvert property="cobertura.classes" pathsep="${line.separator}">
+                                    <fileset dir="${target.raiz}" includes="*/classes/**/*.class" excludes="**/*_.class"/>
+                                    <chainedmapper>
+                                        <filtermapper>
+                                            <replacestring from="\" to="/"/>
+                                        </filtermapper>
+                                        <regexpmapper from="^.*/classes/(.*)$" to="\1"/>
+                                    </chainedmapper>
+                                </pathconvert>
+                                <echo file="${project.build.directory}/cobertura-classes.txt" message="${cobertura.classes}"/>
+                                <jacoco:report xmlns:jacoco="antlib:org.jacoco.ant">
+                                    <executiondata>
+                                        <fileset dir="${target.raiz}" includes="*/jacoco*.exec"/>
+                                    </executiondata>
+                                    <structure name="${project.parent.artifactId}">
+                                        <classfiles>
+                                            <!-- Mesmo nome de jar de quarkus.package.output-name -->
+                                            <zipfileset src="${target.raiz}/biblioteca.jar"
+                                                        includesfile="${project.build.directory}/cobertura-classes.txt"/>
+                                        </classfiles>
+                                        <sourcefiles encoding="${project.build.sourceEncoding}">
+                                            <dirset dir="${maven.multiModuleProjectDirectory}" includes="*/src/main/java"/>
+                                        </sourcefiles>
+                                    </structure>
+                                    <html destdir="${target.raiz}/site/jacoco-aggregate"/>
+                                    <xml destfile="${target.raiz}/site/jacoco-aggregate/jacoco.xml"/>
+                                </jacoco:report>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

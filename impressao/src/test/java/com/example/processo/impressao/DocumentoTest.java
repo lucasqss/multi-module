@@ -1,9 +1,9 @@
 package com.example.processo.impressao;
 
-import com.example.processo.motor.domain.DadosDoSegmento;
-import com.example.processo.motor.domain.Processo;
-import com.example.processo.motor.domain.Proponente;
-import com.example.processo.motor.domain.Solicitacao;
+import com.example.processo.core.motor.domain.DadosDoSegmento;
+import com.example.processo.core.motor.domain.Processo;
+import com.example.processo.core.motor.domain.Proponente;
+import com.example.processo.core.motor.domain.Solicitacao;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

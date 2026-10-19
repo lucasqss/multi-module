@@ -1,6 +1,6 @@
 package com.example.processo.impressao;
 
-import com.example.processo.motor.domain.ProcessoCriado;
+import com.example.processo.core.motor.domain.ProcessoCriado;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.event.TransactionPhase;

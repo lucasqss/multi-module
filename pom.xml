@@ -12,8 +12,8 @@
 
     <modules>
         <module>jpa-core</module>
-        <module>processo-motor</module>
-        <module>segmento-imobiliario</module>
+        <module>processo-core</module>
+        <module>processo-query</module>
         <module>impressao</module>
         <module>processo-app</module>
     </modules>
@@ -67,12 +67,12 @@
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>processo-motor</artifactId>
+                <artifactId>processo-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>segmento-imobiliario</artifactId>
+                <artifactId>processo-query</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -1,6 +1,6 @@
 package com.example.processo.impressao;
 
-import com.example.processo.motor.domain.Processo;
+import com.example.processo.core.motor.domain.Processo;
 
 /**
  * Pedido ao sistema de PDF: qual modelo usar, a referência do documento e os dados que preenchem o modelo.

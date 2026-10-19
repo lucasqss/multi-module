@@ -1,18 +1,23 @@
-# Design — Criar processo imobiliário (Quarkus 3.33 · Java 25 · Oracle)
+# Design — Processo imobiliário (Quarkus 3.33 · Java 25 · Oracle)
 
 ## Objetivo
 
-Exemplo mínimo, só com o **criar processo imobiliário**, para validar três requisitos:
+Exemplo mínimo, com o **criar e consultar processo imobiliário**, para validar quatro requisitos:
 
 1. **Processo imobiliário é filho do processo.** Os dados comuns ficam no pai e os do imóvel na filha.
 2. **O motor de processamento é único para todos os segmentos.** Segmento novo não altera o motor.
 3. **A impressão (ponte para o sistema de PDF) é descartável.** Ela fica num módulo próprio que pode ser apagado.
+4. **Toda a lógica de negócio fica num `processo-core`, sem HTTP.** O REST fica no app e as consultas num módulo
+   à parte.
 
 ## Decisões
 
 | Tema | Decisão |
 |---|---|
-| Módulos | `jpa-core`, `processo-motor`, `segmento-imobiliario`, `impressao`, `processo-app` |
+| Módulos | `jpa-core`, `processo-core`, `processo-query`, `impressao`, `processo-app` |
+| Motor e segmentos | No mesmo módulo (`processo-core`), em pacotes `motor` e `segmento.<nome>`; ArchUnit garante que o motor não conhece segmentos e que segmentos não se enxergam |
+| REST | Todo no `processo-app`; o core não tem dependência de HTTP |
+| Consultas | `processo-query`: Jakarta Data somente leitura com projeções `select new`; não depende do core |
 | Pai e filha no banco | Herança JPA `JOINED`: `PROCESSO` (comum, com discriminador `SEGMENTO`) e `PROCESSO_IMOBILIARIO` (PK = FK para o pai) |
 | Pai e filha no domínio | `Processo<D extends DadosDoSegmento>`: um processo imobiliário é um `Processo<DadosImobiliarios>` |
 | Motor único | `MotorDeProcessamento` descobre os beans `Segmento<?>` (`@Any Instance`) e escolhe pela classe dos dados |
@@ -21,8 +26,33 @@ Exemplo mínimo, só com o **criar processo imobiliário**, para validar três r
 | Numeração | Sequence `SEQ_NUMERO_PROCESSO`, única para todos os segmentos: `<prefixo>-<ano>-<6 dígitos>` |
 | Impressão | Observa `ProcessoCriado` com `TransactionPhase.AFTER_SUCCESS` e chama o sistema de PDF por REST Client |
 | Persistência | Jakarta Data sobre `StatelessSession`, HQL validado em compilação pelo Hibernate Processor |
-| Deploy | Único, via `processo-app` sem classes Java |
-| Testes | Unitários sem Quarkus (motor com segmentos falsos; segmento plugado no motor real com fake do port); ArchUnit por módulo e entre módulos; `@QuarkusIntegrationTest` contra o jar com Oracle do Dev Services e um sistema de PDF falso |
+| Deploy | Único, via `processo-app` |
+| Testes | Unitários sem Quarkus (motor com segmentos falsos; segmento plugado no motor real com fake do port); ArchUnit no core e entre módulos; `@QuarkusIntegrationTest` contra o jar com Oracle do Dev Services e um sistema de PDF falso |
+
+### Por que motor e segmentos no mesmo módulo
+
+Tudo vai no mesmo jar e é mantido pelo mesmo time. Um módulo Maven por segmento daria a mesma garantia que as
+regras do ArchUnit já dão, mas cobraria mais um POM, mais um jandex e mais uma dependência direta no app por
+segmento. Um módulo por segmento só compensaria com times diferentes, dependências pesadas exclusivas de um
+segmento ou deploys com conjuntos diferentes de segmentos. A impressão continua em módulo próprio porque ali o
+módulo tem função: apagar a pasta remove a ponte.
+
+### Por que o REST fica no app
+
+O core fica só com regra e persistência, e não sabe que existe HTTP (o Maven garante: ele não tem a extensão
+REST). O app é a porta de entrada: traduz HTTP, cria pelo motor e lê pelo query. Outras entradas, como um
+consumidor de fila do mainframe, entram no mesmo lugar ou, se forem descartáveis, num módulo próprio como a
+impressão. Custo: segmento novo também ganha código no app (os endpoints).
+
+### Por que um módulo de consultas
+
+A leitura não precisa de domínio nem de regras, e o domínio não deve ganhar getters só para alimentar telas.
+O `processo-query` lê direto as entidades do `jpa-core` com projeções. Com a herança `JOINED`:
+
+- **Listagem de todos os segmentos:** consulta sobre o pai, `ProcessoEntity`, projetando só colunas de
+  `PROCESSO`. O discriminador está mapeado como atributo somente leitura (`segmento`), então a listagem diz o
+  segmento sem conhecer as filhas.
+- **Detalhe de um segmento:** consulta direto a filha, que já enxerga os campos herdados.
 
 ### Por que herança no banco e genéricos no domínio
 
@@ -36,7 +66,8 @@ segmento converte o próprio `Processo<D>` na própria entidade filha.
 
 O corpo da requisição é do segmento. Um `POST /processos` único exigiria que o motor ou o JSON polimórfico
 conhecessem todos os subtipos, e isso quebra a regra de que segmento novo não toca no motor. Todos os
-endpoints entregam a solicitação ao mesmo `MotorDeProcessamento.criar`.
+endpoints entregam a solicitação ao mesmo `MotorDeProcessamento.criar`. A listagem, por ser só dos campos
+comuns, é uma só: `GET /processos`.
 
 ### Por que evento e não port para a impressão
 
@@ -51,28 +82,37 @@ o próximo passo é uma tabela de saída (outbox) com reprocessamento, ainda den
 
 ```
 multi-module/
-├─ pom.xml                 agregador: BOM Quarkus, versões internas, hibernate-processor, jandex, failsafe, JaCoCo, Sonar
-├─ docker-compose.yml      Oracle para rodar o jar empacotado
-├─ jpa-core/               @Entity pai/filha + db/migration      → quarkus-hibernate-orm, quarkus-flyway(-oracle)
-├─ processo-motor/         domain · application · adapter        → jpa-core, jakarta.data-api, quarkus-rest-jackson
-├─ segmento-imobiliario/   domain · application · adapter        → processo-motor
-├─ impressao/              observer + REST Client                → processo-motor, quarkus-rest-client-jackson
-└─ processo-app/           montagem + ITs + ArchUnit             → segmento-imobiliario, impressao (+ diretas p/ cobertura), quarkus-jdbc-oracle
+├─ pom.xml            agregador: BOM Quarkus, versões internas, hibernate-processor, jandex, failsafe, JaCoCo, Sonar
+├─ docker-compose.yml Oracle para rodar o jar empacotado
+├─ jpa-core/          @Entity pai/filha + db/migration     → quarkus-hibernate-orm, quarkus-flyway(-oracle)
+├─ processo-core/     motor + segmento.*                   → jpa-core, jakarta.data-api
+├─ processo-query/    consultas somente leitura            → jpa-core, jakarta.data-api
+├─ impressao/         observer + REST Client               → processo-core, quarkus-rest-client-jackson
+└─ processo-app/      REST + montagem + ITs + ArchUnit     → processo-core, processo-query, impressao, jpa-core, quarkus-rest-jackson, quarkus-jdbc-oracle
 ```
 
-O `ArquiteturaModulosTest` (no `processo-app`) garante o que o Maven não garante:
+O `ArquiteturaTest` do core garante que:
 
-- o motor não depende de segmentos nem da impressão;
+- o motor não conhece os segmentos;
+- os segmentos não se enxergam;
+- os domínios só usam Java puro e o domínio do motor.
+
+O `ArquiteturaModulosTest` do app garante que:
+
+- core e query não se enxergam;
 - nenhuma classe fora da impressão depende dela;
-- segmentos não se enxergam;
+- ninguém depende do app;
 - o `jpa-core` não conhece o resto;
-- HTTP só nos adapters REST e na impressão;
+- HTTP só aparece no app e na impressão;
+- o app não usa entidades JPA nem adapters do core;
 - não há ciclos entre pacotes;
 - toda classe pertence a um módulo registrado.
 
-## Motor (`com.example.processo.motor`)
+## Core (`com.example.processo.core`)
 
-- `domain`, Java puro (ArchUnit):
+**Motor (`core.motor`)**
+
+- `domain`, Java puro:
   - `Processo<D>`, `Solicitacao<D>`, `Proponente`, `DadosDoSegmento`;
   - `RegrasComuns`: nome obrigatório, CPF com dígitos verificadores, valor > 0;
   - `Especificacao`, `RegraVioladaException`;
@@ -80,13 +120,9 @@ O `ArquiteturaModulosTest` (no `processo-app`) garante o que o Maven não garant
   - evento `ProcessoCriado`.
 - `application`: `MotorDeProcessamento`, `@Transactional`. Recusa dois segmentos com o mesmo código ou o mesmo
   tipo de dados.
-- `adapter`:
-  - `Relogio`, o `Clock` injetado;
-  - `persistence.NumeracaoJpa`, com `@SQL` na sequence;
-  - `rest.Criado`, o 201 comum;
-  - `rest.ErrosMapper`, que traduz `RegraVioladaException` em 422.
+- `adapter`: `Relogio`, o `Clock` injetado, e `persistence.NumeracaoJpa`, com `@SQL` na sequence.
 
-## Segmento imobiliário (`com.example.processo.imobiliario`)
+**Segmento imobiliário (`core.segmento.imobiliario`)**
 
 - `domain`:
   - `DadosImobiliarios(matricula, tipoImovel, valorAvaliacao, uf)`;
@@ -98,7 +134,23 @@ O `ArquiteturaModulosTest` (no `processo-app`) garante o que o Maven não garant
 - `adapter.persistence.ProcessosImobiliariosJpa`:
   - `@Insert` da `ProcessoImobiliarioEntity` grava as duas tabelas;
   - a contagem por matrícula filtra pela `situacao`, que está no pai, e o Hibernate faz o join sozinho.
-- `adapter.rest.ProcessoImobiliarioResource`, que expõe `POST /processos/imobiliarios`.
+
+## Query (`com.example.processo.query`)
+
+`ProcessoQueries` (`@Repository`):
+
+- `todos()` e `naSituacao(situacao)` devolvem `ResumoProcesso`;
+- `imobiliario(id)` devolve `DetalheImobiliario`.
+
+As projeções são records top-level e planos, porque o `select new` não instancia records aninhados.
+
+## App (`com.example.processo.app.rest`)
+
+- `ProcessoImobiliarioResource`: `POST /processos/imobiliarios` cria pelo motor; `GET /processos/imobiliarios/{id}`
+  lê pelo query.
+- `ProcessosResource`: `GET /processos?situacao=` faz a listagem.
+- `Criado`: o corpo do 201.
+- `ErrosMapper`: traduz `RegraVioladaException` em 422.
 
 ## Impressão (`com.example.processo.impressao`)
 
@@ -111,10 +163,9 @@ O `ArquiteturaModulosTest` (no `processo-app`) garante o que o Maven não garant
 
 | Onde | O quê | Docker |
 |---|---|---|
-| `processo-motor` | regras comuns, CPF; motor com dois segmentos falsos (mesmo fluxo, numeração única, regra violada não grava nem publica); ArchUnit | não |
-| `segmento-imobiliario` | segmento no motor real com port em memória: limites por tipo, matrícula aberta, dados inválidos; ArchUnit | não |
+| `processo-core` | regras comuns e CPF; motor com dois segmentos falsos (mesmo fluxo, numeração única, regra violada não grava nem publica); segmento imobiliário no motor real com port em memória; ArchUnit motor x segmentos | não |
 | `impressao` | montagem do `Documento` | não |
-| `processo-app` | ArchUnit entre módulos; `@QuarkusIntegrationTest` contra o jar, com Oracle e um sistema de PDF falso (`HttpServer` do JDK) | sim |
+| `processo-app` | ArchUnit entre módulos; `@QuarkusIntegrationTest` contra o jar, com Oracle e um sistema de PDF falso (`HttpServer` do JDK): criação, recusa por matrícula, numeração, regras, falha do PDF, detalhe e listagem | sim |
 
 ## Armadilhas
 
@@ -135,3 +186,7 @@ Novas:
 7. **Sistema externo nos `@QuarkusIntegrationTest`.** O test resource (`@WithTestResource`) roda na JVM do teste,
    e o mapa que `start()` devolve vira configuração do jar, que roda em outro processo. Assim o jar chama o
    servidor falso, e o teste lê o que o servidor recebeu.
+8. **`NUMBER` do Oracle não guarda zeros à direita.** `400000.00` volta do banco como `400000`, e é assim que sai
+   no JSON. Nos testes, compare valores numericamente. Se a API precisar de duas casas fixas, formate na borda.
+9. **`@QueryParam` com enum inválido responde 404**, não 400, como manda o JAX-RS para parâmetros que não
+   convertem.

@@ -9,7 +9,6 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -19,19 +18,18 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 
 /**
  * Regras de acoplamento ENTRE módulos que o Maven sozinho não garante. Ficam no processo-app porque é o único
- * módulo que tem todos os outros no classpath. Regras internas de um módulo ficam nele (camadas do motor e do
- * segmento).
+ * módulo que tem todos os outros no classpath. Regras internas de um módulo ficam nele (motor x segmentos e
+ * camadas, no {@code com.example.processo.core.ArquiteturaTest}).
  *
  * <p>Usa a API core do ArchUnit ({@code check}) dentro de um {@code @Test} comum: o engine
  * {@code archunit-junit5} não executa sob o JUnit 6 do BOM do Quarkus (rodaria 0 testes).
  */
 class ArquiteturaModulosTest {
 
-    private static final String MOTOR = "com.example.processo.motor";
+    private static final String CORE = "com.example.processo.core";
+    private static final String QUERY = "com.example.processo.query";
     private static final String IMPRESSAO = "com.example.processo.impressao";
-
-    /** Um pacote raiz por segmento. Segmento novo entra aqui e no {@link #MODULOS}. */
-    private static final List<String> SEGMENTOS = List.of("com.example.processo.imobiliario");
+    private static final String APP = "com.example.processo.app";
 
     /**
      * Pacote raiz de cada módulo. Módulo novo entra aqui: a regra {@link #todaClassePertenceAUmModulo()} falha
@@ -39,9 +37,10 @@ class ArquiteturaModulosTest {
      */
     private static final Map<String, String> MODULOS = Map.of(
             "jpa-core", "com.example.jpacore",
-            "processo-motor", MOTOR,
-            "segmento-imobiliario", "com.example.processo.imobiliario",
-            "impressao", IMPRESSAO);
+            "processo-core", CORE,
+            "processo-query", QUERY,
+            "impressao", IMPRESSAO,
+            "processo-app", APP);
 
     private static final JavaClasses CLASSES = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
@@ -58,10 +57,14 @@ class ArquiteturaModulosTest {
     }
 
     @Test
-    void motorNaoConheceSegmentosNemImpressao() {
-        // O motor é único: segmento novo ou impressão removida não podem exigir mudança nele
-        noClasses().that().resideInAPackage(MOTOR + "..")
-                .should().dependOnClassesThat().resideInAnyPackage(pacotes(SEGMENTOS, IMPRESSAO))
+    void escritaELeituraNaoSeEnxergam() {
+        // CQRS: no jar único as classes convivem, mas o core não usa consultas e as consultas não usam o domínio.
+        // Os dois lados só se encontram nos endpoints do processo-app.
+        noClasses().that().resideInAPackage(CORE + "..")
+                .should().dependOnClassesThat().resideInAPackage(QUERY + "..")
+                .check(CLASSES);
+        noClasses().that().resideInAPackage(QUERY + "..")
+                .should().dependOnClassesThat().resideInAPackage(CORE + "..")
                 .check(CLASSES);
     }
 
@@ -74,15 +77,10 @@ class ArquiteturaModulosTest {
     }
 
     @Test
-    void segmentosNaoSeEnxergam() {
-        for (var segmento : SEGMENTOS) {
-            var outros = SEGMENTOS.stream().filter(s -> !s.equals(segmento)).toList();
-            if (!outros.isEmpty()) {
-                noClasses().that().resideInAPackage(segmento + "..")
-                        .should().dependOnClassesThat().resideInAnyPackage(pacotes(outros))
-                        .check(CLASSES);
-            }
-        }
+    void ninguemDependeDoApp() {
+        noClasses().that().resideOutsideOfPackage(APP + "..")
+                .should().dependOnClassesThat().resideInAPackage(APP + "..")
+                .check(CLASSES);
     }
 
     @Test
@@ -93,19 +91,23 @@ class ArquiteturaModulosTest {
     }
 
     @Test
-    void restSoNasBordas() {
-        // Só os adapters REST e o cliente do sistema de PDF falam HTTP
+    void httpSoNoAppENaImpressao() {
+        // REST de entrada só no app; a impressão é cliente HTTP do sistema de PDF
         noClasses().that().resideInAPackage("com.example..")
-                .and().resideOutsideOfPackages("..adapter.rest..", IMPRESSAO + "..")
+                .and().resideOutsideOfPackages(APP + "..", IMPRESSAO + "..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "jakarta.ws.rs..", "org.jboss.resteasy..", "io.quarkus.rest..", "org.eclipse.microprofile.rest..")
                 .check(CLASSES);
     }
 
-    private static String[] pacotes(List<String> raizes, String... outras) {
-        return java.util.stream.Stream.concat(raizes.stream(), java.util.Arrays.stream(outras))
-                .map(raiz -> raiz + "..")
-                .toArray(String[]::new);
+    @Test
+    void appNaoUsaEntidadesNemRepositoriosDeEscrita() {
+        // O app traduz HTTP: cria pelo motor e lê pelas projeções do query. Entidades JPA e adapters do core ficam
+        // por trás (enums do jpa-core, usados nas projeções, são permitidos).
+        noClasses().that().resideInAPackage(APP + "..")
+                .should().dependOnClassesThat().areAnnotatedWith(jakarta.persistence.Entity.class)
+                .orShould().dependOnClassesThat().resideInAPackage(CORE + "..adapter..")
+                .check(CLASSES);
     }
 
     private static Optional<String> modulo(JavaClass classe) {

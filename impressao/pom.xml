@@ -11,14 +11,14 @@
     </parent>
 
     <!-- Ponte DESCARTÁVEL para o sistema de geração de PDF. Ninguém depende deste módulo: ele só observa o evento
-         ProcessoCriado do motor. Para removê-lo: apague a pasta, a linha <module> no POM pai, a dependência no
+         ProcessoCriado do processo-core. Para removê-lo: apague a pasta, a linha <module> no POM pai, a dependência no
          processo-app e o bloco quarkus.rest-client.sistema-pdf do application.properties. -->
     <artifactId>impressao</artifactId>
 
     <dependencies>
         <dependency>
             <groupId>com.example</groupId>
-            <artifactId>processo-motor</artifactId>
+            <artifactId>processo-core</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>

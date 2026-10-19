@@ -7,19 +7,23 @@ import io.restassured.path.json.JsonPath;
 import io.restassured.response.ValidatableResponse;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Ponta a ponta contra o jar: REST do segmento → motor → Oracle (PROCESSO + PROCESSO_IMOBILIARIO) → impressão.
+ * Ponta a ponta contra o jar: REST → motor → Oracle (PROCESSO + PROCESSO_IMOBILIARIO) → impressão, e a leitura
+ * pelo lado query.
  * Os testes compartilham o banco, então cada um usa uma matrícula própria.
  */
 @QuarkusIntegrationTest
@@ -54,7 +58,7 @@ class CriarProcessoImobiliarioIT {
         var matricula = matricula();
 
         var resposta = criar(matricula).statusCode(201)
-                .header("Location", matchesPattern(".*/processos/[0-9a-f-]{36}"))
+                .header("Location", matchesPattern(".*/processos/imobiliarios/[0-9a-f-]{36}"))
                 .body("id", notNullValue())
                 .body("numero", matchesPattern("IMO-" + LocalDate.now().getYear() + "-\\d{6}"))
                 .extract();
@@ -67,6 +71,42 @@ class CriarProcessoImobiliarioIT {
         assertEquals("52998224725", pedido.getString("processo.proponente.cpf"));
         assertEquals(matricula, pedido.getString("processo.dados.matricula"));
         assertEquals("RESIDENCIAL", pedido.getString("processo.dados.tipoImovel"));
+    }
+
+    @Test
+    void detalheTrazDadosDoPaiEDaFilha() {
+        var matricula = matricula();
+        var criado = criar(matricula).statusCode(201).extract();
+
+        var detalhe = given().get(criado.header("Location")).then()
+                .statusCode(200)
+                .body("numero", equalTo(criado.path("numero")))
+                .body("proponenteNome", equalTo("Ana Souza"))
+                .body("proponenteCpf", equalTo("52998224725"))
+                .body("situacao", equalTo("ABERTO"))
+                .body("dataAbertura", equalTo(LocalDate.now().toString()))
+                .body("matricula", equalTo(matricula))
+                .body("tipoImovel", equalTo("RESIDENCIAL"))
+                .body("uf", equalTo("SP"))
+                .extract().jsonPath();
+        // Comparação numérica: o NUMBER do Oracle não guarda zeros à direita e o JSON sai 400000, não 400000.00
+        assertEquals(0, new BigDecimal("400000.00").compareTo(new BigDecimal(detalhe.getString("valor"))));
+        assertEquals(0, new BigDecimal("500000.00").compareTo(new BigDecimal(detalhe.getString("valorAvaliacao"))));
+        given().get("/processos/imobiliarios/00000000-0000-0000-0000-000000000000").then().statusCode(404);
+    }
+
+    @Test
+    void listagemDeTodosOsSegmentosComFiltroPorSituacao() {
+        String numero = criar(matricula()).statusCode(201).extract().path("numero");
+
+        given().get("/processos").then().statusCode(200)
+                .body("find { it.numero == '%s' }.segmento".formatted(numero), equalTo("IMOBILIARIO"))
+                .body("find { it.numero == '%s' }.proponente".formatted(numero), equalTo("Ana Souza"));
+        given().queryParam("situacao", "ABERTO").get("/processos").then().statusCode(200)
+                .body("numero", hasItem(numero));
+        given().queryParam("situacao", "CANCELADO").get("/processos").then().statusCode(200)
+                .body("numero", not(hasItem(numero)));
+        given().queryParam("situacao", "QUALQUER").get("/processos").then().statusCode(404);
     }
 
     @Test

@@ -30,6 +30,10 @@ public abstract class ProcessoEntity {
     @Column(nullable = false, unique = true, length = 30)
     private String numero;
 
+    /** O discriminador, só para leitura (listagens): quem grava é o Hibernate, pelo @DiscriminatorValue da filha. */
+    @Column(name = "SEGMENTO", insertable = false, updatable = false)
+    private String segmento;
+
     @Column(name = "PROPONENTE_NOME", nullable = false)
     private String proponenteNome;
 
@@ -62,6 +66,7 @@ public abstract class ProcessoEntity {
 
     public UUID getId() { return id; }
     public String getNumero() { return numero; }
+    public String getSegmento() { return segmento; }
     public String getProponenteNome() { return proponenteNome; }
     public String getProponenteCpf() { return proponenteCpf; }
     public BigDecimal getValor() { return valor; }

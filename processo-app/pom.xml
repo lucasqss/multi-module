@@ -10,9 +10,9 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <!-- Módulo de montagem: nenhuma classe Java. Junta motor, segmentos e impressão num único deploy Quarkus e
-         abriga o que precisa enxergar todos os módulos: os testes ponta a ponta contra o jar (*IT) e as regras de
-         arquitetura entre módulos (ArchUnit). -->
+    <!-- Porta de entrada e montagem: todo o REST (criação via processo-core, consulta via processo-query) e o
+         deploy único Quarkus com core, query e impressão. Abriga também o que precisa enxergar todos os módulos:
+         os testes ponta a ponta contra o jar (*IT) e as regras de arquitetura entre módulos (ArchUnit). -->
     <artifactId>processo-app</artifactId>
 
     <properties>
@@ -21,25 +21,28 @@
     </properties>
 
     <dependencies>
-        <!-- Segmento novo = mais uma dependência aqui; o motor o descobre sozinho -->
         <dependency>
             <groupId>com.example</groupId>
-            <artifactId>segmento-imobiliario</artifactId>
+            <artifactId>processo-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>processo-query</artifactId>
         </dependency>
         <!-- Descartável: remover esta dependência tira a impressão do deploy sem tocar no resto -->
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>impressao</artifactId>
         </dependency>
-        <!-- Já chegam pelo segmento, mas são declarados aqui porque o report-aggregate do JaCoCo só considera as
+        <!-- Já chega pelo core/query, mas é declarado aqui porque o report-aggregate do JaCoCo só considera as
              dependências DIRETAS: módulo fora desta lista fica fora da cobertura agregada -->
         <dependency>
             <groupId>com.example</groupId>
-            <artifactId>processo-motor</artifactId>
+            <artifactId>jpa-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.example</groupId>
-            <artifactId>jpa-core</artifactId>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -87,7 +90,7 @@
                             <goal>report-aggregate</goal>
                         </goals>
                         <configuration>
-                            <!-- Metamodel e repositórios gerados pelo Hibernate Processor (ProcessoEntity_, NumeracaoJpa_) -->
+                            <!-- Metamodel e repositórios gerados pelo Hibernate Processor (ProcessoEntity_, NumeracaoJpa_, ProcessoQueries_) -->
                             <excludes>
                                 <exclude>**/*_.class</exclude>
                             </excludes>

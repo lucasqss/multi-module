@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>multi-module-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <!-- Módulo de montagem: nenhuma classe Java. Junta motor, segmentos e impressão num único deploy Quarkus e
+         abriga o que precisa enxergar todos os módulos: os testes ponta a ponta contra o jar (*IT) e as regras de
+         arquitetura entre módulos (ArchUnit). -->
+    <artifactId>processo-app</artifactId>
+
+    <properties>
+        <!-- O Sonar lê só target/surefire-reports por padrão; os @QuarkusIntegrationTest ficam em failsafe-reports -->
+        <sonar.junit.reportPaths>${project.build.directory}/surefire-reports,${project.build.directory}/failsafe-reports</sonar.junit.reportPaths>
+    </properties>
+
+    <dependencies>
+        <!-- Segmento novo = mais uma dependência aqui; o motor o descobre sozinho -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>segmento-imobiliario</artifactId>
+        </dependency>
+        <!-- Descartável: remover esta dependência tira a impressão do deploy sem tocar no resto -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>impressao</artifactId>
+        </dependency>
+        <!-- Já chegam pelo segmento, mas são declarados aqui porque o report-aggregate do JaCoCo só considera as
+             dependências DIRETAS: módulo fora desta lista fica fora da cobertura agregada -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>processo-motor</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>jpa-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-oracle</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>${quarkus.platform.group-id}</groupId>
+                <artifactId>quarkus-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
+            <!-- Cobertura agregada dos testes unitários de todos os módulos em
+                 target/site/jacoco-aggregate/ (jacoco.xml para o Sonar, index.html para pessoas). Lê o
+                 <módulo>/target/jacoco.exec de cada dependência do reactor. Os *IT ficam de fora: rodam contra o
+                 jar em outro processo, sem agente. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>report-aggregate</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report-aggregate</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Metamodel e repositórios gerados pelo Hibernate Processor (ProcessoEntity_, NumeracaoJpa_) -->
+                            <excludes>
+                                <exclude>**/*_.class</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -6,8 +6,8 @@ services:
       - "1521:1521"
     environment:
       ORACLE_PASSWORD: oracle
-      APP_USER: biblioteca
-      APP_USER_PASSWORD: biblioteca
+      APP_USER: processo
+      APP_USER_PASSWORD: processo
     healthcheck:
       test: ["CMD", "healthcheck.sh"]
       interval: 5s

@@ -12,10 +12,10 @@
 
     <modules>
         <module>jpa-core</module>
-        <module>string-generator</module>
-        <module>biblioteca-command</module>
-        <module>biblioteca-query</module>
-        <module>biblioteca-app</module>
+        <module>processo-motor</module>
+        <module>segmento-imobiliario</module>
+        <module>impressao</module>
+        <module>processo-app</module>
     </modules>
 
     <properties>
@@ -39,9 +39,9 @@
         <!-- 1. Versão do Java para o analisador: o sonar-maven-plugin 3.6 não lê maven.compiler.release e,
                 sem isso, não reconhece records ("Parse error at line 1 column 1"). -->
         <sonar.java.source>${maven.compiler.release}</sonar.java.source>
-        <!-- 2. Cobertura agregada: um único relatório (report-aggregate no biblioteca-app), lido por todos os
+        <!-- 2. Cobertura agregada: um único relatório (report-aggregate no processo-app), lido por todos os
                 módulos; cada um importa só as linhas dos próprios arquivos. -->
-        <sonar.coverage.jacoco.xmlReportPaths>${maven.multiModuleProjectDirectory}/biblioteca-app/target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.coverage.jacoco.xmlReportPaths>${maven.multiModuleProjectDirectory}/processo-app/target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
     <dependencyManagement>
@@ -67,17 +67,17 @@
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>string-generator</artifactId>
+                <artifactId>processo-motor</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>biblioteca-command</artifactId>
+                <artifactId>segmento-imobiliario</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>biblioteca-query</artifactId>
+                <artifactId>impressao</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>
@@ -101,7 +101,7 @@
                         </execution>
                     </executions>
                 </plugin>
-                <!-- Gera META-INF/jandex.idx para que o Quarkus descubra beans/entidades em módulos-biblioteca -->
+                <!-- Gera META-INF/jandex.idx para que o Quarkus descubra beans/entidades nos módulos que não são o app -->
                 <plugin>
                     <groupId>io.smallrye</groupId>
                     <artifactId>jandex-maven-plugin</artifactId>
@@ -150,7 +150,7 @@
                 <version>${compiler-plugin.version}</version>
                 <configuration>
                     <parameters>true</parameters>
-                    <!-- Hibernate Processor: gera o metamodel (LivroEntity_) e as implementações dos
+                    <!-- Hibernate Processor: gera o metamodel (ProcessoEntity_) e as implementações dos
                          repositórios Jakarta Data, validando o HQL de @Query em tempo de compilação -->
                     <annotationProcessorPathsUseDepMgmt>true</annotationProcessorPathsUseDepMgmt>
                     <annotationProcessorPaths>

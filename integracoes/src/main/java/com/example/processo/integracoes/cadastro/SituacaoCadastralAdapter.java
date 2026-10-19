@@ -2,6 +2,7 @@ package com.example.processo.integracoes.cadastro;
 
 import com.example.processo.core.motor.domain.SituacaoCadastral;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 /**
  * Implementa o port do motor sobre o sistema de cadastro: chama o cliente e traduz a resposta externa para o
@@ -12,7 +13,7 @@ public class SituacaoCadastralAdapter implements SituacaoCadastral {
 
     private final CadastroClient cliente;
 
-    public SituacaoCadastralAdapter(CadastroClient cliente) {
+    public SituacaoCadastralAdapter(@RestClient CadastroClient cliente) {
         this.cliente = cliente;
     }
 

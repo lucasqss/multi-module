@@ -171,11 +171,22 @@ As projeções são records top-level e planos, porque o `select new` não insta
 
 ## Integrações (`com.example.processo.integracoes`)
 
-O pacote `cadastro` tem três classes:
+O pacote `cadastro` tem quatro classes:
 
-- `CadastroClient`: cliente simulado, que responde sempre `REGULAR`;
+- `CadastroClient`: o REST Client do sistema externo;
+- `CadastroClientSimulado`: a simulação do perfil dev, que responde sempre `REGULAR`;
 - `RespostaCadastro`: o modelo externo;
 - `SituacaoCadastralAdapter`: implementa o port `SituacaoCadastral`.
+
+A simulação ocupa o lugar do REST Client sem que nenhum outro código saiba:
+
+- `@IfBuildProfile("dev")` faz o bean existir só no build de dev;
+- `@RestClient` dá a ele o mesmo qualificador do REST Client gerado;
+- `@Alternative @Priority(1)` faz o ArC preferi-lo ao REST Client.
+
+No jar de produção o bean não existe, então só sobra o REST Client. Os ITs rodam esse jar contra um servidor
+HTTP falso (`CadastroFalso`), e assim a chamada real é testada: a resposta `SUSPENSA` para um CPF só pode vir
+de lá, porque a simulação responde sempre `REGULAR`.
 
 ## Impressão (`com.example.processo.impressao`)
 
@@ -216,3 +227,6 @@ Novas:
    no JSON. Nos testes, compare valores numericamente. Se a API precisar de duas casas fixas, formate na borda.
 9. **`@QueryParam` com enum inválido responde 404**, não 400, como manda o JAX-RS para parâmetros que não
    convertem.
+10. **Simulação de sistema externo por perfil.** Um bean `@IfBuildProfile("dev") @Alternative @Priority(1)
+    @RestClient` que implementa a interface do REST Client substitui o cliente gerado só no dev. A condição é de
+    build: o `quarkus:dev` monta com o perfil dev, e o jar (produção e ITs) com o prod.

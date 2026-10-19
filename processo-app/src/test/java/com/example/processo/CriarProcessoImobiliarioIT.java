@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @QuarkusIntegrationTest
 @WithTestResource(SistemaDePdfFalso.class)
+@WithTestResource(CadastroFalso.class)
 class CriarProcessoImobiliarioIT {
 
     /** Começa com 1: nunca cai no prefixo que faz o sistema de PDF falso falhar. */
@@ -133,6 +134,12 @@ class CriarProcessoImobiliarioIT {
                 .body("motivo", equalTo("CPF inválido: 12345678900"));
         criar("52998224725", "300000.01", matricula(), "COMERCIAL", "500000.00").statusCode(422)
                 .body("motivo", equalTo("Valor excede 60% da avaliação para imóvel comercial (máximo 300000.00)"));
+    }
+
+    @Test
+    void situacaoCadastralIrregularNoSistemaExternoRecusa() {
+        criar(CadastroFalso.CPF_IRREGULAR, "1000.00", matricula(), "RESIDENCIAL", "500000.00").statusCode(422)
+                .body("motivo", equalTo("Situação cadastral irregular para o CPF " + CadastroFalso.CPF_IRREGULAR));
     }
 
     @Test

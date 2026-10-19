@@ -92,13 +92,22 @@ Falha no sistema de PDF não desfaz o processo: fica no log.
 
 Como está o exemplo:
 
-- `CadastroClient` é o cliente do sistema externo. Por enquanto é simulado e responde sempre `REGULAR`.
+- `CadastroClient` é o REST Client do sistema externo (`GET /situacoes/{documento}`), com endereço em
+  `quarkus.rest-client.cadastro.url`.
+- `CadastroClientSimulado` é a simulação do perfil dev e responde sempre `REGULAR`, sem rede.
+  `@IfBuildProfile("dev")` faz o bean existir só no build de dev, e `@RestClient @Alternative @Priority` o
+  coloca no lugar do REST Client gerado. No jar de produção não há simulação.
 - `RespostaCadastro` é o modelo externo, e não sai do pacote.
-- `SituacaoCadastralAdapter` implementa o port do motor e converte a resposta.
+- `SituacaoCadastralAdapter` implementa o port do motor e converte a resposta. Ele injeta `@RestClient
+  CadastroClient` e não sabe se recebeu o real ou o simulado.
 - O motor só chama o sistema externo depois que todas as outras regras passaram.
 
-Para virar uma chamada real, troque o `CadastroClient` por uma interface `@RegisterRestClient` e descomente o
-`quarkus-rest-client-jackson` no POM do módulo. O adapter não muda.
+| Onde | O que responde |
+|---|---|
+| `quarkus:dev` | `CadastroClientSimulado`, sem rede |
+| jar de produção | REST Client, chamada HTTP para `CADASTRO_URL` |
+| ITs (`@QuarkusIntegrationTest`, rodam o jar) | REST Client contra o `CadastroFalso`, um servidor HTTP do teste que responde `SUSPENSA` para um CPF |
+| testes unitários | o adapter recebe um `CadastroClient` em lambda |
 
 Sistema externo novo é um pacote novo em `integracoes`. Se ele tiver ciclo de vida próprio ou for descartável,
 ganha um módulo próprio, como a `impressao`. Se o módulo de integração sair do deploy, o build do Quarkus falha
@@ -131,11 +140,14 @@ mvn -pl processo-core,integracoes,impressao -am test
 # Build completo + testes de integração (o Dev Services sobe um Oracle Free no Docker)
 mvn verify
 
+# Modo dev: Oracle via Dev Services e o sistema de cadastro simulado (CadastroClientSimulado)
+mvn install -DskipTests && mvn -pl processo-app quarkus:dev
+
 # Jar empacotado contra o Oracle do docker-compose
 docker compose up -d --wait
 QUARKUS_DATASOURCE_JDBC_URL=jdbc:oracle:thin:@localhost:1521/FREEPDB1 \
 QUARKUS_DATASOURCE_USERNAME=processo QUARKUS_DATASOURCE_PASSWORD=processo \
-SISTEMA_PDF_URL=http://localhost:8089 \
+SISTEMA_PDF_URL=http://localhost:8089 CADASTRO_URL=http://localhost:8090 \
 java -jar processo-app/target/quarkus-app/quarkus-run.jar
 ```
 

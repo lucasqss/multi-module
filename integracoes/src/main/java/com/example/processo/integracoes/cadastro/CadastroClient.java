@@ -1,16 +1,19 @@
 package com.example.processo.integracoes.cadastro;
 
-import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
 /**
- * Cliente do sistema externo de cadastro. Simulado: responde sempre REGULAR. Para a chamada real, troque esta
- * classe por uma interface {@code @RegisterRestClient(configKey = "cadastro")} com o mesmo método e configure
- * {@code quarkus.rest-client.cadastro.url}; o adapter não muda.
+ * Cliente do sistema externo de cadastro; o endereço vem de quarkus.rest-client.cadastro.url. Fora do perfil dev
+ * é sempre esta chamada HTTP; no dev, o {@link CadastroClientSimulado} toma o lugar dela.
  */
-@ApplicationScoped
-public class CadastroClient {
+@RegisterRestClient(configKey = "cadastro")
+@Path("/situacoes")
+public interface CadastroClient {
 
-    public RespostaCadastro consultar(String documento) {
-        return new RespostaCadastro(documento, RespostaCadastro.REGULAR);
-    }
+    @GET
+    @Path("{documento}")
+    RespostaCadastro consultar(@PathParam("documento") String documento);
 }

@@ -22,12 +22,10 @@
             <groupId>com.example</groupId>
             <artifactId>processo-core</artifactId>
         </dependency>
-        <!-- Quando o cliente simulado virar chamada real:
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-rest-client-jackson</artifactId>
         </dependency>
-        -->
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>

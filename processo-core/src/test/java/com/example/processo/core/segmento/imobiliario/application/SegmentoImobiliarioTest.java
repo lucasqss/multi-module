@@ -44,7 +44,7 @@ class SegmentoImobiliarioTest {
     final ProcessosEmMemoria processos = new ProcessosEmMemoria();
     final List<ProcessoCriado> publicados = new ArrayList<>();
     final MotorDeProcessamento motor = new MotorDeProcessamento(List.of(new SegmentoImobiliario(processos)),
-            new AtomicLong(41)::incrementAndGet, Clock.fixed(Instant.from(HOJE.atStartOfDay(ZoneOffset.UTC)),
+            cpf -> true, new AtomicLong(41)::incrementAndGet, Clock.fixed(Instant.from(HOJE.atStartOfDay(ZoneOffset.UTC)),
             ZoneOffset.UTC), publicados::add);
 
     static Solicitacao<DadosImobiliarios> solicitacao(String valor, TipoImovel tipo, String avaliacao) {

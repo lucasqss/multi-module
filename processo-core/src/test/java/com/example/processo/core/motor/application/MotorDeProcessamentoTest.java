@@ -7,6 +7,7 @@ import com.example.processo.core.motor.domain.ProcessoCriado;
 import com.example.processo.core.motor.domain.Proponente;
 import com.example.processo.core.motor.domain.RegraVioladaException;
 import com.example.processo.core.motor.domain.Segmento;
+import com.example.processo.core.motor.domain.SituacaoCadastral;
 import com.example.processo.core.motor.domain.Solicitacao;
 import org.junit.jupiter.api.Test;
 
@@ -63,7 +64,12 @@ class MotorDeProcessamentoTest {
             s -> java.util.Optional.empty());
     final AtomicLong sequencia = new AtomicLong();
     final List<ProcessoCriado> publicados = new ArrayList<>();
-    final MotorDeProcessamento motor = new MotorDeProcessamento(List.of(auto, servico), sequencia::incrementAndGet,
+    /** CPF que o sistema externo falso considera irregular. */
+    static final String CPF_IRREGULAR = "11144477735";
+    final List<String> consultados = new ArrayList<>();
+    final SituacaoCadastral situacaoCadastral = cpf -> consultados.add(cpf) && !cpf.equals(CPF_IRREGULAR);
+    final MotorDeProcessamento motor = new MotorDeProcessamento(List.of(auto, servico), situacaoCadastral,
+            sequencia::incrementAndGet,
             Clock.fixed(Instant.from(HOJE.atStartOfDay(ZoneOffset.UTC)), ZoneOffset.UTC), publicados::add);
 
     @Test
@@ -101,6 +107,28 @@ class MotorDeProcessamentoTest {
     }
 
     @Test
+    void situacaoCadastralIrregularRecusaSemGerarNumero() {
+        var irregular = new Proponente("Bruno Lima", CPF_IRREGULAR);
+        var erro = assertThrows(RegraVioladaException.class,
+                () -> motor.criar(new Solicitacao<>(irregular, new BigDecimal("50000"), new DadosAuto("ABC1D23"))));
+
+        assertEquals("Situação cadastral irregular para o CPF " + CPF_IRREGULAR, erro.getMessage());
+        assertTrue(auto.gravados.isEmpty());
+        assertTrue(publicados.isEmpty());
+        assertEquals(0, sequencia.get());
+    }
+
+    @Test
+    void sistemaExternoSoEhConsultadoSeAsOutrasRegrasPassarem() {
+        assertThrows(RegraVioladaException.class,
+                () -> motor.criar(new Solicitacao<>(ANA, new BigDecimal("50000"), new DadosAuto("placa"))));
+        assertTrue(consultados.isEmpty());
+
+        motor.criar(new Solicitacao<>(ANA, new BigDecimal("50000"), new DadosAuto("ABC1D23")));
+        assertEquals(List.of(ANA.cpf()), consultados);
+    }
+
+    @Test
     void regrasComunsVemAntesDasDoSegmento() {
         var semNome = new Proponente("", "52998224725");
         var erro = assertThrows(RegraVioladaException.class,
@@ -121,6 +149,6 @@ class MotorDeProcessamentoTest {
     void segmentoRegistradoDuasVezes() {
         var outroAuto = new SegmentoEmMemoria<>("AUTO", "AUT", DadosServico.class, s -> java.util.Optional.empty());
         assertThrows(IllegalStateException.class, () -> new MotorDeProcessamento(List.of(auto, outroAuto),
-                sequencia::incrementAndGet, Clock.systemUTC(), publicados::add));
+                situacaoCadastral, sequencia::incrementAndGet, Clock.systemUTC(), publicados::add));
     }
 }

@@ -29,6 +29,11 @@
             <groupId>com.example</groupId>
             <artifactId>processo-query</artifactId>
         </dependency>
+        <!-- Implementa ports do core (ex.: SituacaoCadastral): sem ela o build do Quarkus falha por bean ausente -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>integracoes</artifactId>
+        </dependency>
         <!-- Descartável: remover esta dependência tira a impressão do deploy sem tocar no resto -->
         <dependency>
             <groupId>com.example</groupId>

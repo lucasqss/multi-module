@@ -14,6 +14,7 @@
         <module>jpa-core</module>
         <module>processo-core</module>
         <module>processo-query</module>
+        <module>integracoes</module>
         <module>impressao</module>
         <module>processo-app</module>
     </modules>
@@ -73,6 +74,11 @@
             <dependency>
                 <groupId>com.example</groupId>
                 <artifactId>processo-query</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>integracoes</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

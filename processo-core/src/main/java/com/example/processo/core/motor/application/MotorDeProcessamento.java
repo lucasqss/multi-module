@@ -6,6 +6,7 @@ import com.example.processo.core.motor.domain.Processo;
 import com.example.processo.core.motor.domain.ProcessoCriado;
 import com.example.processo.core.motor.domain.RegrasComuns;
 import com.example.processo.core.motor.domain.Segmento;
+import com.example.processo.core.motor.domain.SituacaoCadastral;
 import com.example.processo.core.motor.domain.Solicitacao;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
@@ -19,6 +20,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -26,32 +28,35 @@ import java.util.function.Consumer;
  * gravação dos dados próprios) vem do {@link Segmento} escolhido pela classe dos dados da solicitação.
  *
  * <pre>
- * regras comuns → regras do segmento → número → abrir → segmento grava → publica ProcessoCriado
+ * regras comuns → regras do segmento → situação cadastral (sistema externo) → número → abrir → segmento grava
+ *   → publica ProcessoCriado
  * </pre>
  */
 @ApplicationScoped
 public class MotorDeProcessamento {
 
     private final Map<Class<?>, Segmento<?>> segmentos = new HashMap<>();
+    private final SituacaoCadastral situacaoCadastral;
     private final Numeracao numeracao;
     private final Clock relogio;
     private final Consumer<ProcessoCriado> publicar;
 
     @Inject
-    MotorDeProcessamento(@Any Instance<Segmento<?>> segmentos, Numeracao numeracao, Clock relogio,
-                         Event<ProcessoCriado> eventos) {
-        this(segmentos, numeracao, relogio, eventos::fire);
+    MotorDeProcessamento(@Any Instance<Segmento<?>> segmentos, SituacaoCadastral situacaoCadastral,
+                         Numeracao numeracao, Clock relogio, Event<ProcessoCriado> eventos) {
+        this(segmentos, situacaoCadastral, numeracao, relogio, eventos::fire);
     }
 
     /** Sem CDI, para os testes: segmentos e publicação passados diretamente. */
-    public MotorDeProcessamento(Iterable<? extends Segmento<?>> segmentos, Numeracao numeracao, Clock relogio,
-                                Consumer<ProcessoCriado> publicar) {
+    public MotorDeProcessamento(Iterable<? extends Segmento<?>> segmentos, SituacaoCadastral situacaoCadastral,
+                                Numeracao numeracao, Clock relogio, Consumer<ProcessoCriado> publicar) {
         var codigos = new HashSet<String>();
         for (var segmento : segmentos) {
             if (!codigos.add(segmento.codigo()) || this.segmentos.put(segmento.tipoDosDados(), segmento) != null) {
                 throw new IllegalStateException("Segmento registrado duas vezes: " + segmento.codigo());
             }
         }
+        this.situacaoCadastral = situacaoCadastral;
         this.numeracao = numeracao;
         this.relogio = relogio;
         this.publicar = publicar;
@@ -60,12 +65,19 @@ public class MotorDeProcessamento {
     @Transactional
     public <D extends DadosDoSegmento> Processo<D> criar(Solicitacao<D> solicitacao) {
         var segmento = segmentoDe(solicitacao.dados());
-        RegrasComuns.<D>todas().e(segmento.regras()).exigir(solicitacao);
+        // A chamada ao sistema externo vem por último: só acontece se a solicitação passou em todas as outras regras
+        RegrasComuns.<D>todas().e(segmento.regras()).e(this::cadastroRegular).exigir(solicitacao);
 
         var processo = Processo.abrir(numero(segmento), segmento.codigo(), solicitacao, LocalDate.now(relogio));
         segmento.salvar(processo);
         publicar.accept(new ProcessoCriado(processo));
         return processo;
+    }
+
+    private Optional<String> cadastroRegular(Solicitacao<?> solicitacao) {
+        return situacaoCadastral.regular(solicitacao.proponente().cpf())
+                ? Optional.empty()
+                : Optional.of("Situação cadastral irregular para o CPF " + solicitacao.proponente().cpf());
     }
 
     @SuppressWarnings("unchecked") // o mapa é indexado por tipoDosDados(): a chave garante o tipo do valor

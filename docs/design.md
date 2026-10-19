@@ -9,12 +9,15 @@ Exemplo mínimo, com o **criar e consultar processo imobiliário**, para validar
 3. **A impressão (ponte para o sistema de PDF) é descartável.** Ela fica num módulo próprio que pode ser apagado.
 4. **Toda a lógica de negócio fica num `processo-core`, sem HTTP.** O REST fica no app e as consultas num módulo
    à parte.
+5. **Integrações de saída não contaminam o core.** O core declara o que precisa (port) e o módulo `integracoes`
+   implementa.
 
 ## Decisões
 
 | Tema | Decisão |
 |---|---|
-| Módulos | `jpa-core`, `processo-core`, `processo-query`, `impressao`, `processo-app` |
+| Módulos | `jpa-core`, `processo-core`, `processo-query`, `integracoes`, `impressao`, `processo-app` |
+| Integrações de saída | Port no domínio do core, implementação em `integracoes.<sistema>` (um pacote por sistema), com tradução do modelo externo; o app liga pela dependência |
 | Motor e segmentos | No mesmo módulo (`processo-core`), em pacotes `motor` e `segmento.<nome>`; ArchUnit garante que o motor não conhece segmentos e que segmentos não se enxergam |
 | REST | Todo no `processo-app`; o core não tem dependência de HTTP |
 | Consultas | `processo-query`: Jakarta Data somente leitura com projeções `select new`; não depende do core |
@@ -43,6 +46,17 @@ O core fica só com regra e persistência, e não sabe que existe HTTP (o Maven 
 REST). O app é a porta de entrada: traduz HTTP, cria pelo motor e lê pelo query. Outras entradas, como um
 consumidor de fila do mainframe, entram no mesmo lugar ou, se forem descartáveis, num módulo próprio como a
 impressão. Custo: segmento novo também ganha código no app (os endpoints).
+
+### Por que integrações num módulo à parte, e não no app nem no core
+
+- **No core**, a integração traria HTTP e os modelos dos sistemas externos para dentro da regra de negócio.
+- **No app**, ele viraria depósito de entrada e saída, juntando as dependências e a configuração de todos os
+  sistemas, e remover uma integração viraria cirurgia.
+- **Em `integracoes`**, o core declara o port (`SituacaoCadastral`) e testa com fakes, e o módulo implementa e
+  traduz. Um pacote por sistema mantém um módulo só enquanto os sistemas forem pequenos e estáveis.
+
+Sistema com ciclo de vida próprio, dependências pesadas (SOAP, MQ, código gerado) ou descartável ganha módulo
+próprio. O motor consulta o sistema externo por último, só quando a solicitação já passou nas outras regras.
 
 ### Por que um módulo de consultas
 
@@ -87,8 +101,9 @@ multi-module/
 ├─ jpa-core/          @Entity pai/filha + db/migration     → quarkus-hibernate-orm, quarkus-flyway(-oracle)
 ├─ processo-core/     motor + segmento.*                   → jpa-core, jakarta.data-api
 ├─ processo-query/    consultas somente leitura            → jpa-core, jakarta.data-api
+├─ integracoes/       um pacote por sistema externo        → processo-core
 ├─ impressao/         observer + REST Client               → processo-core, quarkus-rest-client-jackson
-└─ processo-app/      REST + montagem + ITs + ArchUnit     → processo-core, processo-query, impressao, jpa-core, quarkus-rest-jackson, quarkus-jdbc-oracle
+└─ processo-app/      REST + montagem + ITs + ArchUnit     → processo-core, processo-query, integracoes, impressao, jpa-core, quarkus-rest-jackson, quarkus-jdbc-oracle
 ```
 
 O `ArquiteturaTest` do core garante que:
@@ -101,9 +116,11 @@ O `ArquiteturaModulosTest` do app garante que:
 
 - core e query não se enxergam;
 - nenhuma classe fora da impressão depende dela;
+- ninguém depende das integrações; elas só enxergam os `domain` do core, e os pacotes de sistemas diferentes não
+  se enxergam;
 - ninguém depende do app;
 - o `jpa-core` não conhece o resto;
-- HTTP só aparece no app e na impressão;
+- HTTP só aparece no app, na impressão e nas integrações;
 - o app não usa entidades JPA nem adapters do core;
 - não há ciclos entre pacotes;
 - toda classe pertence a um módulo registrado.
@@ -116,7 +133,7 @@ O `ArquiteturaModulosTest` do app garante que:
   - `Processo<D>`, `Solicitacao<D>`, `Proponente`, `DadosDoSegmento`;
   - `RegrasComuns`: nome obrigatório, CPF com dígitos verificadores, valor > 0;
   - `Especificacao`, `RegraVioladaException`;
-  - ports `Segmento<D>` e `Numeracao`;
+  - ports `Segmento<D>`, `Numeracao` e `SituacaoCadastral` (sistema externo, implementado em `integracoes`);
   - evento `ProcessoCriado`.
 - `application`: `MotorDeProcessamento`, `@Transactional`. Recusa dois segmentos com o mesmo código ou o mesmo
   tipo de dados.
@@ -152,6 +169,14 @@ As projeções são records top-level e planos, porque o `select new` não insta
 - `Criado`: o corpo do 201.
 - `ErrosMapper`: traduz `RegraVioladaException` em 422.
 
+## Integrações (`com.example.processo.integracoes`)
+
+O pacote `cadastro` tem três classes:
+
+- `CadastroClient`: cliente simulado, que responde sempre `REGULAR`;
+- `RespostaCadastro`: o modelo externo;
+- `SituacaoCadastralAdapter`: implementa o port `SituacaoCadastral`.
+
 ## Impressão (`com.example.processo.impressao`)
 
 - `ImpressaoDeProcessos`: o observer do evento.
@@ -163,7 +188,8 @@ As projeções são records top-level e planos, porque o `select new` não insta
 
 | Onde | O quê | Docker |
 |---|---|---|
-| `processo-core` | regras comuns e CPF; motor com dois segmentos falsos (mesmo fluxo, numeração única, regra violada não grava nem publica); segmento imobiliário no motor real com port em memória; ArchUnit motor x segmentos | não |
+| `processo-core` | regras comuns e CPF; motor com dois segmentos falsos (mesmo fluxo, numeração única, regra violada não grava nem publica, situação cadastral irregular, sistema externo só consultado no fim); segmento imobiliário no motor real com port em memória; ArchUnit motor x segmentos | não |
+| `integracoes` | tradução da resposta externa no adapter | não |
 | `impressao` | montagem do `Documento` | não |
 | `processo-app` | ArchUnit entre módulos; `@QuarkusIntegrationTest` contra o jar, com Oracle e um sistema de PDF falso (`HttpServer` do JDK): criação, recusa por matrícula, numeração, regras, falha do PDF, detalhe e listagem | sim |
 

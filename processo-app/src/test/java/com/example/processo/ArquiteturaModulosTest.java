@@ -29,6 +29,7 @@ class ArquiteturaModulosTest {
     private static final String CORE = "com.example.processo.core";
     private static final String QUERY = "com.example.processo.query";
     private static final String IMPRESSAO = "com.example.processo.impressao";
+    private static final String INTEGRACOES = "com.example.processo.integracoes";
     private static final String APP = "com.example.processo.app";
 
     /**
@@ -39,6 +40,7 @@ class ArquiteturaModulosTest {
             "jpa-core", "com.example.jpacore",
             "processo-core", CORE,
             "processo-query", QUERY,
+            "integracoes", INTEGRACOES,
             "impressao", IMPRESSAO,
             "processo-app", APP);
 
@@ -77,6 +79,20 @@ class ArquiteturaModulosTest {
     }
 
     @Test
+    void integracoesSoImplementamPortsDoCore() {
+        // Ninguém chama a integração diretamente: o core define o port e a integração o implementa (o CDI liga).
+        noClasses().that().resideOutsideOfPackage(INTEGRACOES + "..")
+                .should().dependOnClassesThat().resideInAPackage(INTEGRACOES + "..")
+                .check(CLASSES);
+        // Do core, a integração só enxerga os domains (ports e tipos), nunca casos de uso nem adapters
+        noClasses().that().resideInAPackage(INTEGRACOES + "..")
+                .should().dependOnClassesThat().resideInAnyPackage(CORE + "..application..", CORE + "..adapter..")
+                .check(CLASSES);
+        // Um sistema externo por pacote, sem um enxergar o outro
+        slices().matching(INTEGRACOES + ".(*)..").should().notDependOnEachOther().check(CLASSES);
+    }
+
+    @Test
     void ninguemDependeDoApp() {
         noClasses().that().resideOutsideOfPackage(APP + "..")
                 .should().dependOnClassesThat().resideInAPackage(APP + "..")
@@ -91,10 +107,10 @@ class ArquiteturaModulosTest {
     }
 
     @Test
-    void httpSoNoAppENaImpressao() {
-        // REST de entrada só no app; a impressão é cliente HTTP do sistema de PDF
+    void httpSoNasBordas() {
+        // REST de entrada só no app; impressão e integrações são clientes HTTP de sistemas externos
         noClasses().that().resideInAPackage("com.example..")
-                .and().resideOutsideOfPackages(APP + "..", IMPRESSAO + "..")
+                .and().resideOutsideOfPackages(APP + "..", IMPRESSAO + "..", INTEGRACOES + "..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "jakarta.ws.rs..", "org.jboss.resteasy..", "io.quarkus.rest..", "org.eclipse.microprofile.rest..")
                 .check(CLASSES);

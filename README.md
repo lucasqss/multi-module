@@ -8,27 +8,30 @@ Exemplo do **criar e consultar processo imobiliário**, para mostrar:
   `PROCESSO_IMOBILIARIO`).
 - **CQRS**: o `processo-core` (escrita) e o `processo-query` (leitura) não se enxergam. Os dois só se encontram
   no REST do `processo-app`.
+- **Integrações de saída** no módulo `integracoes`: o core define o port e a integração o implementa, sem que
+  o core conheça o sistema externo.
 - **Um módulo de impressão descartável**: a ponte para o sistema de geração de PDF. Ninguém depende dele, então
   removê-lo é apagar o módulo.
 
 ## Módulos
 
 ```
-                      ┌────────────────────────────┐
-                      │        processo-app        │  todo o REST (criação e consulta),
-                      │  REST · ITs · ArchUnit     │  montagem do deploy, ITs e regras entre módulos
-                      └──┬──────────┬───────────┬──┘
-                         │          │           │
-     ┌───────────────────▼──┐  ┌────▼───────┐  ┌▼─────────────────┐
-     │    processo-core     │◄─┤ impressao  │  │  processo-query  │  leitura: projeções,
-     │ motor (único)        │  │ observa    │  │  Jakarta Data    │  não enxerga o core
-     │ segmento.imobiliario │  │ Processo-  │  │  somente leitura │
-     │ sem HTTP             │  │ Criado→PDF │  └────────┬─────────┘
-     └──────────┬───────────┘  └────────────┘           │
-                └─────────────────┬─────────────────────┘
-                       ┌──────────▼──────────┐
-                       │      jpa-core       │  @Entity pai/filhas e Flyway
-                       └─────────────────────┘
+                                ┌───────────────────────────┐
+                                │       processo-app        │  todo o REST, montagem,
+                                │   REST · ITs · ArchUnit   │  ITs e regras entre módulos
+                                └─────────────┬─────────────┘
+              ┌───────────────────┬───────────┴───────┬──────────────────────┐
+     ┌────────▼───────┐  ┌────────▼──────┐  ┌─────────▼──────┐  ┌────────────▼─────┐
+     │  integracoes   │  │   impressao   │  │ processo-core  │  │  processo-query  │
+     │ implementa     │  │ observa       │  │ motor (único)  │  │ projeções,       │
+     │ ports do core  │  │ ProcessoCriado│  │ segmento.*     │  │ somente leitura  │
+     │ (cadastro)     │  │ → sistema PDF │  │ sem HTTP       │  │ não vê o core    │
+     └────────┬───────┘  └───────┬───────┘  └──▲──────┬──────┘  └─────────┬────────┘
+              └──────────────────┴─────────────┘      │                   │
+                     dependem do core                 └─────────┬─────────┘
+                                                      ┌─────────▼─────────┐
+                                                      │     jpa-core      │  @Entity pai/filhas e Flyway
+                                                      └───────────────────┘
 ```
 
 | Módulo | Responsabilidade |
@@ -36,6 +39,7 @@ Exemplo do **criar e consultar processo imobiliário**, para mostrar:
 | `jpa-core` | Única "verdade" do schema: `ProcessoEntity` (pai, abstrata), `ProcessoImobiliarioEntity` (filha) e migrations |
 | `processo-core` | Toda a lógica de negócio da escrita, sem HTTP: o `motor` (fluxo único do criar, regras comuns, numeração, SPI `Segmento`, evento `ProcessoCriado`) e os segmentos (`segmento.imobiliario`: dados, regras e gravação da filha) |
 | `processo-query` | Consultas somente leitura que devolvem projeções: listagem de todos os segmentos e detalhe do imobiliário |
+| `integracoes` | Integrações de saída, um pacote por sistema externo: implementam ports do core e traduzem o modelo externo (anticorrupção). Exemplo: `cadastro`, consultado no ato da criação |
 | `impressao` | Ponte para o sistema de PDF: pede o documento de abertura de todo processo criado, de qualquer segmento |
 | `processo-app` | Todo o REST, o mapeamento de erros, a montagem do deploy único, os ITs e o ArchUnit entre módulos |
 
@@ -68,6 +72,7 @@ POST /processos/imobiliarios                                     (processo-app)
       1. escolhe o Segmento pela classe dos dados
       2. regras comuns (nome, CPF, valor > 0)
       3. regras do segmento (matrícula, UF, tipo, avaliação, limite de 80%/60%, matrícula sem processo aberto)
+      3b. situação cadastral do CPF no sistema externo (port SituacaoCadastral → integracoes.cadastro)
       4. número IMO-2026-000042 (prefixo do segmento + sequence única)
       5. segmento grava PROCESSO + PROCESSO_IMOBILIARIO
       6. publica ProcessoCriado
@@ -76,6 +81,28 @@ POST /processos/imobiliarios                                     (processo-app)
 ```
 
 Falha no sistema de PDF não desfaz o processo: fica no log.
+
+## Integrações com sistemas externos
+
+| Tipo | Onde fica | Exemplo aqui |
+|---|---|---|
+| O negócio precisa da resposta no meio do fluxo | port no domínio do core, implementado em `integracoes.<sistema>` | `SituacaoCadastral` → `integracoes.cadastro` |
+| Reação a um fato, sem resposta para o fluxo | módulo que observa o evento; o core nem sabe que existe | `impressao` |
+| O sistema externo nos chama | entrada no `processo-app`, ou módulo próprio se for descartável | REST do app |
+
+Como está o exemplo:
+
+- `CadastroClient` é o cliente do sistema externo. Por enquanto é simulado e responde sempre `REGULAR`.
+- `RespostaCadastro` é o modelo externo, e não sai do pacote.
+- `SituacaoCadastralAdapter` implementa o port do motor e converte a resposta.
+- O motor só chama o sistema externo depois que todas as outras regras passaram.
+
+Para virar uma chamada real, troque o `CadastroClient` por uma interface `@RegisterRestClient` e descomente o
+`quarkus-rest-client-jackson` no POM do módulo. O adapter não muda.
+
+Sistema externo novo é um pacote novo em `integracoes`. Se ele tiver ciclo de vida próprio ou for descartável,
+ganha um módulo próprio, como a `impressao`. Se o módulo de integração sair do deploy, o build do Quarkus falha
+com `Unsatisfied dependency for type ...SituacaoCadastral`, em vez de falhar em produção.
 
 ## Adicionar um segmento
 
@@ -99,7 +126,7 @@ Pré-requisitos: Java 25, Maven 3.9+, Docker.
 
 ```bash
 # Testes unitários (sem Docker)
-mvn -pl processo-core,impressao -am test
+mvn -pl processo-core,integracoes,impressao -am test
 
 # Build completo + testes de integração (o Dev Services sobe um Oracle Free no Docker)
 mvn verify

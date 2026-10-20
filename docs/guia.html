@@ -384,7 +384,8 @@
       segmento pelo código. O segmento carrega o processo inteiro.</li>
     <li><strong>ABERTO → EM_PROCESSAMENTO:</strong> o State valida e a troca é gravada numa transação curta por
       compare-and-set: <code>update PROCESSO ... where ID = ? and SITUACAO = 'ABERTO'</code>. Se nenhuma linha mudou,
-      outra requisição chegou antes, e a resposta é <code>409</code>.</li>
+      outra requisição chegou antes, e a resposta é <code>409</code>. Não há lock pessimista: ele prenderia a
+      conexão durante a avaliação, que pode chamar sistemas externos.</li>
     <li><strong>Avaliação do tipo, fora de transação:</strong> <code>segmento.avaliar(processo)</code> devolve aprovado
       ou recusado com motivo. O imobiliário recusa acima de R$ 1.000.000; o veicular recusa veículo com mais de 10
       anos.</li>
@@ -649,7 +650,7 @@ public class CadastroClientSimulado implements CadastroClient { ... }   // sempr
       <tr><td><code>processo-core</code></td><td>Tabela do State (estados × eventos). Regras comuns e CPF. Motor com dois segmentos falsos: mesmo fluxo e mesmo ciclo de vida, numeração única, regra violada não grava nem publica, situação cadastral irregular, transição inválida, conflito (409), processo inexistente. Segmentos imobiliário e veicular no motor real, com o <code>avaliar</code> de cada um. ArchUnit.</td><td>não</td></tr>
       <tr><td><code>integracoes</code></td><td>Conversão da resposta externa pelo adapter; falha do cliente vira indisponibilidade; simulação do dev.</td><td>não</td></tr>
       <tr><td><code>impressao</code></td><td>Montagem do <code>Documento</code>.</td><td>não</td></tr>
-      <tr><td><code>processo-app</code></td><td>ArchUnit entre módulos. <code>@QuarkusIntegrationTest</code> contra o jar, com Oracle do Dev Services, cadastro falso e PDF falso. <code>CicloDeVidaPorTipoIT</code> roda o mesmo cenário (aprovar, recusar, cancelar, transições inválidas, listagem) para cada tipo. <code>CriarProcessoImobiliarioIT</code> cobre recusa por matrícula, numeração, regras, cadastro irregular, cadastro fora do ar (503), falha do PDF e detalhe.</td><td>sim</td></tr>
+      <tr><td><code>processo-app</code></td><td>ArchUnit entre módulos. <code>@QuarkusIntegrationTest</code> contra o jar, com Oracle do Dev Services, cadastro falso e PDF falso. <code>CicloDeVidaPorTipoIT</code> roda o mesmo cenário (aprovar, recusar, cancelar, transições inválidas, listagem e 8 processamentos simultâneos do mesmo processo, dos quais exatamente um processa e os outros recebem 409 ou 422) para cada tipo. <code>CriarProcessoImobiliarioIT</code> cobre recusa por matrícula, numeração, regras, cadastro irregular, cadastro fora do ar (503), falha do PDF e detalhe.</td><td>sim</td></tr>
     </tbody>
   </table></div>
 <pre><code># unitários (sem Docker)

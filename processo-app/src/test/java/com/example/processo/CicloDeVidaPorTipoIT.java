@@ -8,14 +8,21 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * O mesmo cenário para cada tipo de processo: a máquina de estados é do motor e vale igual para todos. Tipo novo
@@ -108,6 +115,40 @@ class CicloDeVidaPorTipoIT {
         given().get(tipo.caminho() + "/" + id).then().body("situacao", equalTo("CANCELADO"));
         given().post("/processos/" + id + "/processamento").then().statusCode(422)
                 .body("motivo", equalTo("Processo CANCELADO não pode ser processado"));
+    }
+
+    /**
+     * Várias requisições de processamento para o mesmo processo, soltas ao mesmo tempo. Só uma pode ganhar a troca
+     * ABERTO → EM_PROCESSAMENTO (update condicional no Oracle). As outras recebem 409, se tentaram o update
+     * junto com a vencedora, ou 422, se já leram o processo em EM_PROCESSAMENTO ou CONCLUIDO.
+     */
+    @ParameterizedTest
+    @MethodSource("tipos")
+    void processamentoSimultaneoSoAconteceUmaVez(Tipo tipo) throws Exception {
+        int requisicoes = 8;
+        var id = criar(tipo, tipo.aprovavel().get());
+        var largada = new CountDownLatch(1);
+        var respostas = new ArrayList<Future<Integer>>();
+
+        try (var executor = Executors.newFixedThreadPool(requisicoes)) {
+            for (int i = 0; i < requisicoes; i++) {
+                respostas.add(executor.submit(() -> {
+                    largada.await();
+                    return given().post("/processos/" + id + "/processamento").then().extract().statusCode();
+                }));
+            }
+            largada.countDown();
+            var status = new ArrayList<Integer>();
+            for (var resposta : respostas) {
+                status.add(resposta.get(30, TimeUnit.SECONDS));
+            }
+
+            var resumo = tipo + " " + status;
+            System.out.println("Processamento simultâneo: " + resumo);
+            assertEquals(1, status.stream().filter(s -> s == 200).count(), "exatamente um 200: " + resumo);
+            assertTrue(status.stream().allMatch(s -> s == 200 || s == 409 || s == 422), "só 200, 409 ou 422: " + resumo);
+        }
+        given().get(tipo.caminho() + "/" + id).then().body("situacao", equalTo("CONCLUIDO"));
     }
 
     @ParameterizedTest

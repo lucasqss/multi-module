@@ -163,6 +163,8 @@ Mesmo arranjo validado na branch `sonar-multi-module`: `target/` padrão em cada
   0% no Sonar, porque só os ITs os exercitam.
 - Módulo novo precisa ser dependência direta do `processo-app` para entrar no relatório agregado.
 
-## Decisões e armadilhas
+## Documentação
 
-Estão em [`docs/design.md`](docs/design.md).
+- [`docs/guia.html`](docs/guia.html): guia completo da estrutura (módulos, fluxos, modelo de dados, integrações,
+  regras de arquitetura, receitas e pontos em aberto). Abra no navegador.
+- [`docs/design.md`](docs/design.md): decisões e armadilhas.

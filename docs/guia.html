@@ -175,7 +175,7 @@
   <ol>
     <li><a href="#visao">Visão geral</a></li>
     <li><a href="#modulos">Módulos e dependências</a></li>
-    <li><a href="#pacotes">Pacotes e arquivos</a></li>
+    <li><a href="#pacotes">Pastas e pacotes</a></li>
     <li><a href="#criar">Fluxos de escrita</a></li>
     <li><a href="#consultar">Fluxo da consulta</a></li>
     <li><a href="#dados">Modelo de dados</a></li>
@@ -301,9 +301,26 @@
 
 <!-- 3 -->
 <section id="pacotes">
-  <h2>Pacotes e arquivos</h2>
-  <p>Dentro de cada módulo, as camadas seguem o mesmo padrão: <code>domain</code> (Java puro), <code>application</code>
-    (casos de uso, <code>@Transactional</code>) e <code>adapter</code> (persistência, relógio).</p>
+  <h2>Pastas e pacotes</h2>
+  <p>Cada contexto (o motor e cada segmento) segue a mesma estrutura hexagonal. As pastas estruturais têm nomes em
+    inglês e as classes, em português. A dependência vai sempre <code>adapter → application → domain</code>, e o
+    ArchUnit garante isso.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Pasta</th><th>O que vai lá</th></tr></thead>
+    <tbody>
+      <tr><td><code>domain/model</code></td><td>Entidades e value objects do domínio (records), sem framework.</td></tr>
+      <tr><td><code>domain/state</code></td><td>A máquina de estados (padrão State).</td></tr>
+      <tr><td><code>domain/rule</code></td><td><code>Especificacao</code> e as regras de negócio.</td></tr>
+      <tr><td><code>domain/exception</code>, <code>domain/event</code></td><td>Exceções de negócio e eventos de domínio.</td></tr>
+      <tr><td><code>application/port/in</code></td><td>Use cases de entrada, chamados pelo REST (<code>CriarProcessoUseCase</code>...).</td></tr>
+      <tr><td><code>application/port/out</code></td><td>O que a aplicação precisa de fora: persistência, sistemas externos, transação.</td></tr>
+      <tr><td><code>application/port/spi</code></td><td>Ponto de extensão do motor (<code>Segmento</code>).</td></tr>
+      <tr><td><code>application/service</code></td><td>Implementação dos use cases e do SPI.</td></tr>
+      <tr><td><code>adapter/inbound/rest</code></td><td><code>resource/</code> (endpoints), <code>dto/</code> (contratos de request e response), <code>mapper/</code> (dto ↔ domínio), <code>exception/</code> (exceção → HTTP). Fica no <code>processo-app</code>.</td></tr>
+      <tr><td><code>adapter/outbound/persistence</code></td><td>O adapter que implementa o port, <code>repository/</code> (Jakarta Data puro) e <code>mapper/</code> (entidade ↔ domínio).</td></tr>
+      <tr><td><code>config</code></td><td>Producers CDI (ex.: <code>Clock</code>).</td></tr>
+    </tbody>
+  </table></div>
 <pre><code>multi-module/
 ├─ pom.xml                     agregador: BOM Quarkus, versões, hibernate-processor, jandex, JaCoCo, Sonar
 ├─ docker-compose.yml          Oracle para rodar o jar fora dos testes
@@ -315,30 +332,51 @@
 │  ├─ jpacore/SituacaoProcesso, TipoImovel enums das colunas
 │  └─ db/migration/                        V1 schema, V2 máquina de estados, V3 tabela veicular
 ├─ processo-core/  (com.example.processo.core)
-│  ├─ motor/domain        Processo&lt;D&gt; (Context do State), Solicitacao&lt;D&gt;, Proponente, DadosDoSegmento,
-│  │                      Avaliacao, RegrasComuns, Especificacao, exceções,
-│  │                      ports Segmento&lt;D&gt;, Processos, Numeracao, SituacaoCadastral; evento ProcessoCriado
-│  ├─ motor/domain/estado Situacao, EstadoDoProcesso (State), Aberto, EmProcessamento, Concluido,
-│  │                      Recusado, Cancelado (ConcreteStates), TransicaoInvalidaException
-│  ├─ motor/application   MotorDeProcessamento, port Transacoes
-│  ├─ motor/adapter       Relogio, TransacoesQuarkus, persistence/NumeracaoJpa, persistence/ProcessosJpa
+│  ├─ motor/
+│  │  ├─ domain/
+│  │  │  ├─ model/       Processo&lt;D&gt; (Context do State), Solicitacao&lt;D&gt;, Proponente, DadosDoSegmento, Avaliacao
+│  │  │  ├─ state/       Situacao, EstadoDoProcesso (State), Aberto, EmProcessamento, Concluido, Recusado,
+│  │  │  │               Cancelado (ConcreteStates), TransicaoInvalidaException
+│  │  │  ├─ rule/        Especificacao, RegrasComuns
+│  │  │  ├─ exception/   RegraViolada, ProcessoNaoEncontrado, ConflitoDeSituacao, SistemaExternoIndisponivel
+│  │  │  └─ event/       ProcessoCriado
+│  │  ├─ application/
+│  │  │  ├─ port/in/     CriarProcessoUseCase, ProcessarProcessoUseCase, CancelarProcessoUseCase
+│  │  │  ├─ port/out/    Processos, Numeracao, SituacaoCadastral, Transacoes
+│  │  │  ├─ port/spi/    Segmento
+│  │  │  └─ service/     MotorDeProcessamento (implementa os use cases)
+│  │  ├─ adapter/outbound/
+│  │  │  ├─ persistence/ ProcessosAdapter, NumeracaoAdapter · repository/ ProcessoRepository, NumeracaoRepository
+│  │  │  └─ transaction/ TransacoesQuarkus
+│  │  └─ config/         Relogio
 │  └─ segmento/
-│     ├─ imobiliario/     domain (DadosImobiliarios, RegrasImobiliarias, port) · application (SegmentoImobiliario)
-│     │                   · adapter/persistence
-│     └─ veicular/        domain (DadosVeiculares, RegrasVeiculares, port) · application (SegmentoVeicular)
-│                         · adapter/persistence
+│     ├─ imobiliario/
+│     │  ├─ domain/      model/ DadosImobiliarios · rule/ RegrasImobiliarias
+│     │  ├─ application/ port/out/ ProcessosImobiliarios · service/ SegmentoImobiliario
+│     │  └─ adapter/outbound/persistence/
+│     │                  ProcessosImobiliariosAdapter · repository/ ProcessoImobiliarioRepository
+│     │                  · mapper/ ProcessoImobiliarioMapper
+│     └─ veicular/       mesma estrutura (DadosVeiculares, RegrasVeiculares, SegmentoVeicular...)
 ├─ processo-query/  (com.example.processo.query)
-│  └─ ProcessoQueries, ResumoProcesso, DetalheImobiliario, DetalheVeicular
+│  ├─ repository/        ProcessoQueries
+│  └─ dto/               ResumoProcesso, DetalheImobiliario, DetalheVeicular
 ├─ integracoes/  (com.example.processo.integracoes)
-│  └─ cadastro/           CadastroClient, CadastroClientSimulado, RespostaCadastro, SituacaoCadastralAdapter
+│  └─ cadastro/          client/ CadastroClient, CadastroClientSimulado · dto/ RespostaCadastro
+│                        · mapper/ CadastroMapper · adapter/ SituacaoCadastralAdapter
 ├─ impressao/  (com.example.processo.impressao)
-│  └─ ImpressaoDeProcessos, SistemaDePdf, Documento
+│  └─ listener/ ImpressaoDeProcessos · client/ SistemaDePdf · dto/ Documento · mapper/ DocumentoMapper
 └─ processo-app/  (com.example.processo.app)
-   ├─ rest/               ProcessoImobiliarioResource, ProcessoVeicularResource, ProcessosResource,
-   │                      Criado, ErrosMapper
+   ├─ adapter/inbound/rest/
+   │  ├─ resource/       ProcessoImobiliarioResource, ProcessoVeicularResource, ProcessosResource
+   │  ├─ dto/            NovoProcessoImobiliarioRequest, ImovelRequest, NovoProcessoVeicularRequest, VeiculoRequest,
+   │  │                  ProponenteRequest, ProcessoCriadoResponse, SituacaoResponse, ErroResponse
+   │  ├─ mapper/         ProcessoImobiliarioRestMapper, ProcessoVeicularRestMapper, ProcessoRestMapper
+   │  └─ exception/      TratadorDeErros
    ├─ application.properties
-   └─ test/               ArquiteturaModulosTest, CicloDeVidaPorTipoIT, CriarProcessoImobiliarioIT,
-                          CadastroFalso, SistemaDePdfFalso</code></pre>
+   └─ test/              ArquiteturaModulosTest, CicloDeVidaPorTipoIT, CriarProcessoImobiliarioIT,
+                         CadastroFalso, SistemaDePdfFalso</code></pre>
+  <p>Os GETs devolvem direto as projeções do <code>processo-query</code> (<code>query/dto</code>): elas já são o contrato de
+    leitura, e um response espelhado com mapper só duplicaria código.</p>
 </section>
 
 <!-- 4 -->
@@ -487,7 +525,7 @@ SEQ_NUMERO_PROCESSO   sequence única de numeração</code></pre>
 <pre><code>ABERTO ──iniciarProcessamento──► EM_PROCESSAMENTO ──concluir──► CONCLUIDO
    │                                    └───recusar───► RECUSADO
    └──cancelar──► CANCELADO</code></pre>
-  <p>A máquina é a mesma para todos os tipos e mora em <code>core.motor.domain.estado</code>. Os papéis do GoF:</p>
+  <p>A máquina é a mesma para todos os tipos e mora em <code>core.motor.domain.state</code>. Os papéis do GoF:</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Papel</th><th>Classe</th><th>O que faz</th></tr></thead>
     <tbody>
@@ -543,7 +581,7 @@ public Processo&lt;D&gt; cancelar() { return em(EstadoDoProcesso.de(situacao).ca
   <div class="table-wrap"><table>
     <thead><tr><th>Tipo</th><th>Onde fica</th><th>Exemplo</th></tr></thead>
     <tbody>
-      <tr><td>O negócio precisa da resposta no meio do fluxo</td><td>port no <code>domain</code> do core, implementado em <code>integracoes.&lt;sistema&gt;</code></td><td><code>SituacaoCadastral</code> → <code>integracoes.cadastro</code></td></tr>
+      <tr><td>O negócio precisa da resposta no meio do fluxo</td><td>port em <code>application/port/out</code> do core, implementado em <code>integracoes.&lt;sistema&gt;</code></td><td><code>SituacaoCadastral</code> → <code>integracoes.cadastro</code></td></tr>
       <tr><td>Reação a um fato, sem resposta para o fluxo</td><td>módulo que observa o evento; o core nem sabe que existe</td><td><code>impressao</code></td></tr>
       <tr><td>O sistema externo nos chama</td><td>entrada no <code>processo-app</code>, ou módulo próprio se for descartável</td><td>o REST do app</td></tr>
     </tbody>
@@ -553,9 +591,9 @@ public Processo&lt;D&gt; cancelar() { return em(EstadoDoProcesso.de(situacao).ca
   <ul>
     <li><code>CadastroClient</code> é o REST Client real (<code>GET /situacoes/{documento}</code>), com endereço em
       <code>quarkus.rest-client.cadastro.url</code> (variável <code>CADASTRO_URL</code>).</li>
-    <li><code>RespostaCadastro</code> é o modelo do sistema externo e não sai do pacote.</li>
-    <li><code>SituacaoCadastralAdapter</code> implementa o port e converte a resposta em <code>true</code> ou
-      <code>false</code>. Erro HTTP, de rede ou timeout vira <code>SistemaExternoIndisponivelException</code> (do domínio),
+    <li><code>RespostaCadastro</code> (<code>dto/</code>) é o modelo do sistema externo e não sai do pacote <code>cadastro</code>.</li>
+    <li><code>SituacaoCadastralAdapter</code> (<code>adapter/</code>) implementa o port, e o <code>CadastroMapper</code>
+      (<code>mapper/</code>) converte a resposta em <code>true</code> ou <code>false</code>. Erro HTTP, de rede ou timeout vira <code>SistemaExternoIndisponivelException</code> (do domínio),
       e a resposta é <code>503</code>.</li>
     <li><code>CadastroClientSimulado</code> substitui o cliente só no <code>quarkus:dev</code>:</li>
   </ul>
@@ -601,8 +639,8 @@ public class CadastroClientSimulado implements CadastroClient { ... }   // sempr
 <!-- 9 -->
 <section id="repositorios">
   <h2>Repositórios Jakarta Data</h2>
-  <p>As interfaces <code>@Repository</code>, como <code>ProcessoQueries</code>, <code>NumeracaoJpa</code> e
-    <code>ProcessosImobiliariosJpa</code>, não têm implementação escrita à mão. O caminho até virarem beans:</p>
+  <p>As interfaces <code>@Repository</code>, como <code>ProcessoQueries</code>, <code>NumeracaoRepository</code> e
+    <code>ProcessoImobiliarioRepository</code>, não têm implementação escrita à mão. O caminho até virarem beans:</p>
   <ol class="steps">
     <li><strong>Compilação:</strong> o <code>hibernate-processor</code> (annotation processor no POM pai) gera
       <code>ProcessoQueries_</code> em <code>target/generated-sources/annotations</code>. É Java comum e legível: um bean
@@ -612,8 +650,8 @@ public class CadastroClientSimulado implements CadastroClient { ... }   // sempr
     <li><strong>Empacotamento:</strong> o <code>jandex-maven-plugin</code> indexa o jar, e o Quarkus descobre o bean
       gerado.</li>
     <li><strong>Build do Quarkus:</strong> o CDI liga <code>ProcessoQueries</code> → <code>ProcessoQueries_</code>. No
-      core, o bean gerado também implementa o port do domínio (<code>Numeracao</code>,
-      <code>ProcessosImobiliarios</code>), e o motor nem sabe que é Jakarta Data.</li>
+      core, os repositories não conhecem o domínio: o adapter (<code>ProcessosImobiliariosAdapter</code>) implementa o
+      port, chama o repository e converte com o mapper. O motor nem sabe que é Jakarta Data.</li>
   </ol>
   <p>Em relação ao Panache, a parte implícita fica no build (código gerado e validado), e não em tempo de execução
     (strings de consulta e projeção por reflexão). O query também não herda <code>persist</code> nem
@@ -628,15 +666,17 @@ public class CadastroClientSimulado implements CadastroClient { ... }   // sempr
   <div class="grid2">
     <div class="card">
       <h4><code>processo-core</code> · ArquiteturaTest</h4>
-      <p>O motor não conhece segmentos. Segmentos não se enxergam (com imobiliário e veicular, a regra tem o que
-        verificar). Os domínios (do motor e dos segmentos) só usam Java puro e o domínio do motor.</p>
+      <p>O motor não conhece segmentos. Segmentos não se enxergam. Camadas: <code>domain</code> só usa Java puro (e o
+        domínio do motor); <code>application</code> só conhece ports, nunca adapters. Os repositories Jakarta Data não
+        conhecem o domínio.</p>
     </div>
     <div class="card">
       <h4><code>processo-app</code> · ArquiteturaModulosTest</h4>
       <p>Core e query não se enxergam. Ninguém depende da impressão, das integrações nem do app. As integrações só
-        usam os <code>domain</code> do core e não se enxergam entre si. O <code>jpa-core</code> não conhece o resto. HTTP
-        só no app, na impressão e nas integrações. O app não usa entidades JPA nem adapters do core. Não há ciclos
-        entre pacotes, e toda classe pertence a um módulo registrado.</p>
+        usam o domínio e os <code>port/out</code> do core e não se enxergam entre si. O <code>jpa-core</code> não conhece o
+        resto. HTTP só no app, na impressão e nas integrações. O app entra no core só pelos use cases
+        (<code>port/in</code>) e não usa entidades JPA. No REST, <code>dto</code> não conhece <code>resource</code> nem
+        <code>mapper</code>. Não há ciclos entre pacotes, e toda classe pertence a um módulo registrado.</p>
     </div>
   </div>
 </section>
@@ -692,34 +732,39 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
       <code>@PrimaryKeyJoinColumn</code>, mais a migration da tabela filha.</li>
     <li><code>processo-core</code>, pacote <code>segmento.&lt;nome&gt;</code>:
       <ul>
-        <li>record que implementa <code>DadosDoSegmento</code>;</li>
-        <li>regras em <code>Especificacao</code>;</li>
-        <li>port e adapter de persistência (gravar e carregar);</li>
-        <li>bean que implementa <code>Segmento&lt;D&gt;</code>, incluindo <code>carregar</code> e <code>avaliar</code>.</li>
+        <li><code>domain/model</code>: record que implementa <code>DadosDoSegmento</code>;</li>
+        <li><code>domain/rule</code>: regras em <code>Especificacao</code>;</li>
+        <li><code>application/port/out</code>: port de persistência (gravar e carregar);</li>
+        <li><code>application/service</code>: bean que implementa <code>Segmento&lt;D&gt;</code>, incluindo
+          <code>carregar</code> e <code>avaliar</code>;</li>
+        <li><code>adapter/outbound/persistence</code>: adapter, <code>repository/</code> e <code>mapper/</code>.</li>
       </ul></li>
     <li><code>processo-query</code>: projeção e consulta de detalhe na filha. A listagem já inclui o segmento novo.</li>
-    <li><code>processo-app</code>: endpoints <code>POST /processos/&lt;segmento&gt;</code> e <code>GET .../{id}</code>.</li>
+    <li><code>processo-app</code>, em <code>adapter/inbound/rest</code>: <code>resource/</code> com
+      <code>POST /processos/&lt;segmento&gt;</code> e <code>GET .../{id}</code>, o request em <code>dto/</code> e o
+      request → <code>Solicitacao</code> em <code>mapper/</code>.</li>
     <li>Testes unitários do segmento no motor real e um <code>Tipo</code> novo em
       <code>CicloDeVidaPorTipoIT.tipos()</code>. O motor, a máquina de estados, a impressão e os endpoints de ciclo de
       vida não mudam. O commit do veicular é o exemplo.</li>
   </ol>
   <h3>Adicionar uma integração síncrona</h3>
   <ol>
-    <li>Port no <code>domain</code> do core, no motor se vale para todos os segmentos, no segmento se é só dele. Use-o
-      numa regra.</li>
+    <li>Port em <code>application/port/out</code> do core: no motor se vale para todos os segmentos, no segmento se é só
+      dele. Use-o numa regra.</li>
     <li>Pacote <code>integracoes.&lt;sistema&gt;</code>:
       <ul>
-        <li>REST Client;</li>
-        <li>DTOs do sistema externo;</li>
-        <li>adapter que implementa o port;</li>
+        <li><code>client/</code>: o REST Client;</li>
+        <li><code>dto/</code>: o modelo do sistema externo;</li>
+        <li><code>mapper/</code>: modelo externo → domínio;</li>
+        <li><code>adapter/</code>: implementa o port;</li>
         <li>simulação <code>@IfBuildProfile("dev")</code>, se quiser rodar o dev sem o sistema.</li>
       </ul></li>
     <li><code>application.properties</code>: <code>quarkus.rest-client.&lt;chave&gt;.url</code>.</li>
     <li>IT: um servidor falso como o <code>CadastroFalso</code>, ligado com <code>@WithTestResource</code>.</li>
   </ol>
   <h3>Adicionar uma consulta</h3>
-  <p>Declare o método em <code>ProcessoQueries</code> com <code>@Query</code> e <code>select new</code> para um record
-    top-level e plano, e exponha no app. O HQL é validado na compilação do <code>processo-query</code>.</p>
+  <p>Declare o método em <code>repository/ProcessoQueries</code> com <code>@Query</code> e <code>select new</code> para um
+    record top-level e plano em <code>dto/</code>, e exponha num resource do app. O HQL é validado na compilação do <code>processo-query</code>.</p>
   <h3>Adicionar um novo módulo Maven</h3>
   <p>Faça quatro registros:</p>
   <ul>

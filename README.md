@@ -43,7 +43,22 @@ Exemplo de **processos de dois tipos (imobiliário e veicular) com um motor úni
 | `processo-query` | Consultas somente leitura que devolvem projeções: listagem de todos os segmentos e detalhe de cada tipo |
 | `integracoes` | Integrações de saída, um pacote por sistema externo: implementam ports do core e traduzem o modelo externo (anticorrupção). Exemplo: `cadastro`, consultado no ato da criação |
 | `impressao` | Ponte para o sistema de PDF: pede o documento de abertura de todo processo criado, de qualquer segmento |
-| `processo-app` | Todo o REST, o mapeamento de erros, a montagem do deploy único, os ITs e o ArchUnit entre módulos |
+| `processo-app` | Todo o REST (`adapter/inbound/rest`: resources, DTOs, mappers e tratamento de erros), a montagem do deploy único, os ITs e o ArchUnit entre módulos |
+
+### Convenção de pastas
+
+Cada contexto (o motor e cada segmento) segue a mesma estrutura hexagonal:
+
+```
+domain/        model · state · rule · exception · event         Java puro
+application/   port/in (use cases) · port/out · port/spi · service
+adapter/       inbound/rest/{resource, dto, mapper, exception}   (no processo-app)
+               outbound/persistence/{adapter, repository, mapper}
+config/        producers CDI
+```
+
+Pelas regras do ArchUnit, a dependência vai sempre `adapter → application → domain`. O REST entra no core só pelos
+use cases (`port/in`), e os repositories Jakarta Data não conhecem o domínio, porque quem converte é o mapper.
 
 ## API
 
@@ -133,11 +148,18 @@ com `Unsatisfied dependency for type ...SituacaoCadastral`, em vez de falhar em 
 
 ## Adicionar um segmento
 
-1. **No `processo-core`**: pacote `segmento.<nome>`, com um record de dados que implementa `DadosDoSegmento`, um
-   bean que implementa `Segmento<D>` (incluindo `carregar` e a decisão `avaliar`) e o adapter de persistência.
+1. **No `processo-core`**, pacote `segmento.<nome>`:
+   - `domain/model`: o record de dados, que implementa `DadosDoSegmento`;
+   - `domain/rule`: as regras;
+   - `application/port/out`: o port de persistência;
+   - `application/service`: o bean que implementa `Segmento<D>`, incluindo `carregar` e a decisão `avaliar`;
+   - `adapter/outbound/persistence`: o adapter, o repository e o mapper.
 2. **No `jpa-core`**: entidade filha de `ProcessoEntity` com `@DiscriminatorValue`, mais a migration da tabela.
 3. **No `processo-query`**: a consulta de detalhe na filha. A listagem já inclui o segmento novo.
-4. **No `processo-app`**: os endpoints de criação e detalhe do segmento.
+4. **No `processo-app`**, em `adapter/inbound/rest`:
+   - `resource/`: os endpoints de criação e detalhe;
+   - `dto/`: o request;
+   - `mapper/`: o request → `Solicitacao`.
 5. **Nos testes**: um `Tipo` novo em `CicloDeVidaPorTipoIT.tipos()`.
 
 O motor, a máquina de estados, os endpoints de ciclo de vida e a impressão não mudam. O commit que adicionou o

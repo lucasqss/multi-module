@@ -41,7 +41,7 @@ O `Processo` é o Context: guarda a `Situacao` (o valor persistido) e delega cad
 correspondente. Há uma classe por estado (`Aberto`, `EmProcessamento`, `Concluido`, `Recusado`, `Cancelado`), cada
 uma sobrescrevendo só as transições que permite; o `default` de todo evento lança `TransicaoInvalidaException`.
 
-- O pacote `motor.domain.estado` é autocontido, com a própria exceção, para não formar ciclo com o domínio.
+- O pacote `motor.domain.state` é autocontido, com a própria exceção, para não formar ciclo com `domain.model`.
 - O processamento tem duas transações curtas, com a avaliação do tipo fora delas. A troca de situação é
   compare-and-set, com update nativo em `PROCESSO` condicionado à situação anterior: um update HQL numa hierarquia
   JOINED usaria a estratégia multi-tabela do Hibernate. Conflito responde 409.
@@ -127,73 +127,107 @@ O `ArquiteturaTest` do core garante que:
 
 - o motor não conhece os segmentos;
 - os segmentos não se enxergam;
-- os domínios só usam Java puro e o domínio do motor.
+- as camadas seguem `adapter/config → application → domain`: o domínio só usa Java puro (e o domínio do motor),
+  e a application só conhece os ports, nunca os adapters;
+- os repositories Jakarta Data não conhecem o domínio (quem converte é o mapper).
 
 O `ArquiteturaModulosTest` do app garante que:
 
 - core e query não se enxergam;
 - nenhuma classe fora da impressão depende dela;
-- ninguém depende das integrações; elas só enxergam os `domain` do core, e os pacotes de sistemas diferentes não
-  se enxergam;
+- ninguém depende das integrações; elas só enxergam o domínio e os `port.out` do core, e os pacotes de sistemas
+  diferentes não se enxergam;
 - ninguém depende do app;
 - o `jpa-core` não conhece o resto;
 - HTTP só aparece no app, na impressão e nas integrações;
-- o app não usa entidades JPA nem adapters do core;
+- o app entra no core só pelos use cases (`port.in`) e pelos tipos do domínio; não usa entidades JPA;
+- no REST, o `dto` não conhece `resource` nem `mapper`, e o `mapper` não conhece `resource`;
 - não há ciclos entre pacotes;
 - toda classe pertence a um módulo registrado.
+
+## Convenção de pastas
+
+Estrutura hexagonal, igual em todo contexto. As pastas estruturais têm nomes em inglês e as classes, em português.
+
+| Pasta | O que vai lá |
+|---|---|
+| `domain/model` | entidades e value objects do domínio (records), sem framework |
+| `domain/state` | a máquina de estados (padrão State) |
+| `domain/rule` | `Especificacao` e as regras |
+| `domain/exception` | exceções de negócio |
+| `domain/event` | eventos de domínio |
+| `application/port/in` | use cases de entrada, chamados pelos adapters de entrada (REST) |
+| `application/port/out` | o que a aplicação precisa de fora (persistência, sistemas externos, transação) |
+| `application/port/spi` | ponto de extensão do motor (`Segmento`) |
+| `application/service` | implementação dos use cases e dos SPIs |
+| `adapter/inbound/rest` | `resource/` (endpoints), `dto/` (contratos de request/response), `mapper/` (dto ↔ domínio), `exception/` (exceção → HTTP) |
+| `adapter/outbound/persistence` | o adapter que implementa o port, `repository/` (Jakarta Data puro) e `mapper/` (entidade ↔ domínio) |
+| `config` | producers CDI (ex.: `Clock`) |
 
 ## Core (`com.example.processo.core`)
 
 **Motor (`core.motor`)**
 
 - `domain`, Java puro:
-  - `Processo<D>`, `Solicitacao<D>`, `Proponente`, `DadosDoSegmento`;
-  - `RegrasComuns`: nome obrigatório, CPF com dígitos verificadores, valor > 0;
-  - `Especificacao`, `RegraVioladaException`;
-  - ports `Segmento<D>`, `Numeracao` e `SituacaoCadastral` (sistema externo, implementado em `integracoes`);
-  - evento `ProcessoCriado`.
-- `application`: `MotorDeProcessamento`, `@Transactional`. Recusa dois segmentos com o mesmo código ou o mesmo
-  tipo de dados.
-- `adapter`: `Relogio`, o `Clock` injetado, e `persistence.NumeracaoJpa`, com `@SQL` na sequence.
+  - `model`: `Processo<D>` (Context do State), `Solicitacao<D>`, `Proponente`, `DadosDoSegmento`, `Avaliacao`;
+  - `state`: `Situacao`, `EstadoDoProcesso` e os estados concretos;
+  - `rule`: `Especificacao`, `RegrasComuns` (nome obrigatório, CPF com dígitos verificadores, valor > 0);
+  - `exception`: regra violada, processo não encontrado, conflito de situação, sistema externo indisponível;
+  - `event`: `ProcessoCriado`.
+- `application`:
+  - `port/in`: `CriarProcessoUseCase`, `ProcessarProcessoUseCase`, `CancelarProcessoUseCase`;
+  - `port/out`: `Processos`, `Numeracao`, `SituacaoCadastral` (implementado em `integracoes`), `Transacoes`;
+  - `port/spi`: `Segmento<D>`;
+  - `service`: `MotorDeProcessamento`, que implementa os três use cases e recusa dois segmentos com o mesmo código
+    ou o mesmo tipo de dados.
+- `adapter/outbound`:
+  - `persistence`: `ProcessosAdapter` e `NumeracaoAdapter`, sobre `repository/ProcessoRepository` (update
+    condicional com `@SQL`) e `repository/NumeracaoRepository` (sequence);
+  - `transaction`: `TransacoesQuarkus`.
+- `config`: `Relogio`, o producer do `Clock`.
 
-**Segmento imobiliário (`core.segmento.imobiliario`)**
+**Segmentos (`core.segmento.imobiliario`, `core.segmento.veicular`)**
 
-- `domain`:
-  - `DadosImobiliarios(matricula, tipoImovel, valorAvaliacao, uf)`;
-  - `TipoImovel`, com o limite da avaliação: residencial 80%, comercial 60%;
-  - `RegrasImobiliarias`;
-  - port `ProcessosImobiliarios`.
-- `application.SegmentoImobiliario`, o bean que pluga o segmento no motor. Por último aplica a regra que consulta
-  o banco: não pode haver outro processo aberto para a mesma matrícula na mesma UF.
-- `adapter.persistence.ProcessosImobiliariosJpa`:
-  - `@Insert` da `ProcessoImobiliarioEntity` grava as duas tabelas;
-  - a contagem por matrícula filtra pela `situacao`, que está no pai, e o Hibernate faz o join sozinho.
+- `domain/model`: `DadosImobiliarios` (com `TipoImovel` e o limite da avaliação: residencial 80%, comercial 60%)
+  ou `DadosVeiculares`.
+- `domain/rule`: `RegrasImobiliarias` ou `RegrasVeiculares`.
+- `application/port/out`: `ProcessosImobiliarios` ou `ProcessosVeiculares`.
+- `application/service`: `SegmentoImobiliario` ou `SegmentoVeicular`, o bean que implementa o SPI `Segmento`. O
+  imobiliário aplica por último a regra que consulta o banco: não pode haver processo em andamento para a mesma
+  matrícula na mesma UF.
+- `adapter/outbound/persistence`:
+  - o adapter (`ProcessosImobiliariosAdapter`) implementa o port;
+  - `repository/` (`ProcessoImobiliarioRepository`) faz o `@Insert` da entidade filha, que grava as duas tabelas, e
+    o `@Find`;
+  - `mapper/` (`ProcessoImobiliarioMapper`) converte entidade ↔ domínio.
 
 ## Query (`com.example.processo.query`)
 
-`ProcessoQueries` (`@Repository`):
+- `repository/ProcessoQueries` (`@Repository`): `todos()` e `naSituacao(situacao)` devolvem `ResumoProcesso`;
+  `imobiliario(id)` e `veicular(id)` devolvem o detalhe de cada tipo.
+- `dto/`: as projeções `ResumoProcesso`, `DetalheImobiliario` e `DetalheVeicular`. São records top-level e planos,
+  porque o `select new` não instancia records aninhados.
 
-- `todos()` e `naSituacao(situacao)` devolvem `ResumoProcesso`;
-- `imobiliario(id)` devolve `DetalheImobiliario`.
+## App (`com.example.processo.app.adapter.inbound.rest`)
 
-As projeções são records top-level e planos, porque o `select new` não instancia records aninhados.
-
-## App (`com.example.processo.app.rest`)
-
-- `ProcessoImobiliarioResource`: `POST /processos/imobiliarios` cria pelo motor; `GET /processos/imobiliarios/{id}`
-  lê pelo query.
-- `ProcessosResource`: `GET /processos?situacao=` faz a listagem.
-- `Criado`: o corpo do 201.
-- `ErrosMapper`: traduz `RegraVioladaException` em 422.
+- `resource/`: `ProcessoImobiliarioResource` e `ProcessoVeicularResource` (criar pelo `CriarProcessoUseCase`,
+  detalhe pelo query) e `ProcessosResource` (listagem, processar e cancelar pelos use cases).
+- `dto/`: contratos de request (`NovoProcessoImobiliarioRequest`, `ImovelRequest`, `NovoProcessoVeicularRequest`,
+  `VeiculoRequest`, `ProponenteRequest`) e de response (`ProcessoCriadoResponse`, `SituacaoResponse`,
+  `ErroResponse`). Os GETs devolvem direto as projeções do query, que já são o contrato de leitura.
+- `mapper/`: request → `Solicitacao` (`ProcessoImobiliarioRestMapper`, `ProcessoVeicularRestMapper`) e processo →
+  response (`ProcessoRestMapper`).
+- `exception/TratadorDeErros`: exceções do domínio → 422, 404, 409 e 503.
 
 ## Integrações (`com.example.processo.integracoes`)
 
-O pacote `cadastro` tem quatro classes:
+O pacote `cadastro` tem quatro subpacotes:
 
-- `CadastroClient`: o REST Client do sistema externo;
-- `CadastroClientSimulado`: a simulação do perfil dev, que responde sempre `REGULAR`;
-- `RespostaCadastro`: o modelo externo;
-- `SituacaoCadastralAdapter`: implementa o port `SituacaoCadastral`.
+- `client/`: `CadastroClient`, o REST Client do sistema externo, e `CadastroClientSimulado`, a simulação do perfil
+  dev, que responde sempre `REGULAR`;
+- `dto/`: `RespostaCadastro`, o modelo externo;
+- `mapper/`: `CadastroMapper`, que converte a resposta para o que o domínio entende;
+- `adapter/`: `SituacaoCadastralAdapter`, que implementa o port `SituacaoCadastral`.
 
 A simulação ocupa o lugar do REST Client sem que nenhum outro código saiba:
 
@@ -207,19 +241,20 @@ de lá, porque a simulação responde sempre `REGULAR`.
 
 ## Impressão (`com.example.processo.impressao`)
 
-- `ImpressaoDeProcessos`: o observer do evento.
-- `SistemaDePdf`: o REST Client, `POST /documentos`, com o endereço em `quarkus.rest-client.sistema-pdf.url`.
-- `Documento(modelo, referencia, processo)`: o modelo é `abertura-processo-<segmento>`, a referência é o número
-  do processo e `processo.dados` leva os campos do segmento.
+- `listener/ImpressaoDeProcessos`: o observer do evento.
+- `client/SistemaDePdf`: o REST Client, `POST /documentos`, com o endereço em `quarkus.rest-client.sistema-pdf.url`.
+- `dto/Documento(modelo, referencia, processo)`.
+- `mapper/DocumentoMapper`: o modelo é `abertura-processo-<segmento>`, a referência é o número do processo e
+  `processo.dados` leva os campos do segmento.
 
 ## Testes
 
 | Onde | O quê | Docker |
 |---|---|---|
-| `processo-core` | regras comuns e CPF; motor com dois segmentos falsos (mesmo fluxo, numeração única, regra violada não grava nem publica, situação cadastral irregular, sistema externo só consultado no fim); segmento imobiliário no motor real com port em memória; ArchUnit motor x segmentos | não |
-| `integracoes` | tradução da resposta externa no adapter | não |
-| `impressao` | montagem do `Documento` | não |
-| `processo-app` | ArchUnit entre módulos; `@QuarkusIntegrationTest` contra o jar, com Oracle e um sistema de PDF falso (`HttpServer` do JDK): criação, recusa por matrícula, numeração, regras, falha do PDF, detalhe e listagem | sim |
+| `processo-core` | tabela do State; regras comuns e CPF; motor com dois segmentos falsos (mesmo fluxo e ciclo de vida, numeração única, regra violada não grava nem publica, situação cadastral irregular, conflito, sistema externo só consultado no fim); segmentos imobiliário e veicular no motor real; ArchUnit de camadas e motor x segmentos | não |
+| `integracoes` | adapter e mapper da resposta externa; falha do cliente vira indisponibilidade | não |
+| `impressao` | `DocumentoMapper` | não |
+| `processo-app` | ArchUnit entre módulos; `@QuarkusIntegrationTest` contra o jar, com Oracle e um sistema de PDF falso (`HttpServer` do JDK): ciclo de vida igual por tipo (inclusive processamento simultâneo), recusa por matrícula, numeração, regras, cadastro irregular e fora do ar, falha do PDF, detalhe e listagem | sim |
 
 ## Armadilhas
 

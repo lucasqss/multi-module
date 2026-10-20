@@ -34,4 +34,12 @@ public interface ProcessoQueries {
             from ProcessoImobiliarioEntity p
             where p.id = :id""")
     Optional<DetalheImobiliario> imobiliario(UUID id);
+
+    @Query("""
+            select new com.example.processo.query.DetalheVeicular(
+                p.id, p.numero, p.proponenteNome, p.proponenteCpf, p.valor, p.situacao, p.motivoRecusa, p.dataAbertura,
+                p.placa, p.anoFabricacao, p.valorFipe)
+            from ProcessoVeicularEntity p
+            where p.id = :id""")
+    Optional<DetalheVeicular> veicular(UUID id);
 }

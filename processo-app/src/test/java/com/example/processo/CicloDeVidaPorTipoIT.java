@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
@@ -42,14 +43,24 @@ class CicloDeVidaPorTipoIT {
             () -> imobiliario("1200000.00", "2000000.00"),
             "Valor acima de 1000000.00 exige análise manual");
 
+    static final Tipo VEICULAR = new Tipo("VEICULAR", "/processos/veiculares",
+            () -> veicular(LocalDate.now().getYear() - 2),
+            () -> veicular(LocalDate.now().getYear() - 11),
+            "Veículo com mais de 10 anos (fabricado em " + (LocalDate.now().getYear() - 11) + ")");
+
     static Stream<Tipo> tipos() {
-        return Stream.of(IMOBILIARIO);
+        return Stream.of(IMOBILIARIO, VEICULAR);
     }
 
     static Map<String, Object> imobiliario(String valor, String avaliacao) {
         var matricula = Long.toString(ThreadLocalRandom.current().nextLong(1_000_000_000L, 2_000_000_000L));
         return Map.of("proponente", PROPONENTE, "valor", valor,
                 "imovel", Map.of("matricula", matricula, "tipo", "RESIDENCIAL", "valorAvaliacao", avaliacao, "uf", "SP"));
+    }
+
+    static Map<String, Object> veicular(int anoFabricacao) {
+        return Map.of("proponente", PROPONENTE, "valor", "45000.00",
+                "veiculo", Map.of("placa", "ABC1D23", "anoFabricacao", anoFabricacao, "valorFipe", "50000.00"));
     }
 
     static String criar(Tipo tipo, Map<String, Object> corpo) {

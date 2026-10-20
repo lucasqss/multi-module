@@ -176,10 +176,12 @@
     <li><a href="#visao">Visão geral</a></li>
     <li><a href="#modulos">Módulos e dependências</a></li>
     <li><a href="#pacotes">Pacotes e arquivos</a></li>
-    <li><a href="#criar">Fluxo do criar</a></li>
+    <li><a href="#criar">Fluxos de escrita</a></li>
     <li><a href="#consultar">Fluxo da consulta</a></li>
     <li><a href="#dados">Modelo de dados</a></li>
     <li><a href="#motor">Motor e segmentos</a></li>
+    <li><a href="#estados">Máquina de estados</a></li>
+    <li><a href="#motor-tipo">Motor x tipo</a></li>
     <li><a href="#integracoes">Integrações externas</a></li>
     <li><a href="#repositorios">Repositórios Jakarta Data</a></li>
     <li><a href="#arquitetura">Regras de arquitetura</a></li>
@@ -194,13 +196,14 @@
 <main>
 <header>
   <h1>Guia do projeto Processo</h1>
-  <p class="sub">Como o exemplo do <em>criar e consultar processo imobiliário</em> está organizado em Maven
+  <p class="sub">Como o exemplo de <em>processos de vários tipos com um motor único</em> está organizado em Maven
     multi-module, por que cada peça está onde está e como estender.</p>
   <div class="chips">
     <span class="chip">Java 25</span>
     <span class="chip">Quarkus 3.33</span>
     <span class="chip">Oracle + Flyway</span>
     <span class="chip">Jakarta Data</span>
+    <span class="chip">Padrão State</span>
     <span class="chip">ArchUnit</span>
     <span class="chip">JaCoCo + Sonar</span>
   </div>
@@ -209,11 +212,11 @@
 <!-- 1 -->
 <section id="visao">
   <h2>Visão geral</h2>
-  <p>O exemplo implementa um único caso de negócio, a abertura de um processo imobiliário, e a consulta dele. A
-    estrutura atende a cinco requisitos:</p>
+  <p>O exemplo tem dois tipos de processo, imobiliário e veicular. Os dois são criados, processados, cancelados
+    e consultados pelo mesmo motor. A estrutura atende a estes requisitos:</p>
   <div class="grid2">
-    <div class="card"><h4>Motor único</h4><p>O mesmo fluxo de criação serve todos os segmentos. Um segmento novo
-      não altera o motor.</p></div>
+    <div class="card"><h4>Motor único</h4><p>O mesmo fluxo de criação e a mesma máquina de estados servem todos os
+      tipos. O veicular entrou sem mudar o motor.</p></div>
     <div class="card"><h4>Processo pai, segmento filho</h4><p>Os dados comuns ficam na tabela <code>PROCESSO</code> e
       os do imóvel em <code>PROCESSO_IMOBILIARIO</code> (herança JPA <code>JOINED</code>).</p></div>
     <div class="card"><h4>Negócio sem HTTP</h4><p>Toda a regra fica no <code>processo-core</code>. O REST fica no
@@ -222,7 +225,8 @@
       não se enxergam.</p></div>
     <div class="card"><h4>Integrações isoladas</h4><p>Sistemas externos ficam atrás de ports. A impressão é
       descartável: apagar o módulo a remove.</p></div>
-    <div class="card"><h4>Deploy único</h4><p>Tudo vai num jar Quarkus, montado pelo <code>processo-app</code>.</p></div>
+    <div class="card"><h4>Estados com o padrão State</h4><p>Cada situação é um objeto que sabe quais eventos aceita.
+      Não há <code>if</code> sobre a situação no motor.</p></div>
   </div>
 </section>
 
@@ -286,7 +290,7 @@
     <thead><tr><th>Módulo</th><th>Responsabilidade</th><th>Depende de</th><th>Nunca depende de</th></tr></thead>
     <tbody>
       <tr><td><code>jpa-core</code></td><td>Única fonte do schema: entidades pai e filhas, enums de coluna, migrations Flyway. Sem regra de negócio.</td><td>Hibernate ORM, Flyway</td><td>qualquer outro módulo</td></tr>
-      <tr><td><code>processo-core</code></td><td>Toda a regra de negócio da escrita: o motor (fluxo do criar, regras comuns, numeração, ports) e os segmentos. Persistência pelos adapters.</td><td><code>jpa-core</code>, Jakarta Data</td><td>query, integrações, impressão, app, HTTP</td></tr>
+      <tr><td><code>processo-core</code></td><td>Toda a regra de negócio da escrita: o motor (criar, processar, cancelar, máquina de estados, regras comuns, numeração, ports) e os segmentos (imobiliário, veicular). Persistência pelos adapters.</td><td><code>jpa-core</code>, Jakarta Data</td><td>query, integrações, impressão, app, HTTP</td></tr>
       <tr><td><code>processo-query</code></td><td>Consultas somente leitura que devolvem projeções (records).</td><td><code>jpa-core</code>, Jakarta Data</td><td><code>processo-core</code></td></tr>
       <tr><td><code>integracoes</code></td><td>Clientes de sistemas externos, um pacote por sistema, implementando ports do core.</td><td><code>processo-core</code> (só os <code>domain</code>), REST Client</td><td>app, query; outro pacote de integração</td></tr>
       <tr><td><code>impressao</code></td><td>Ponte descartável para o sistema de PDF; reage ao evento <code>ProcessoCriado</code>.</td><td><code>processo-core</code>, REST Client</td><td>app, query, integrações</td></tr>
@@ -307,33 +311,40 @@
 ├─ jpa-core/
 │  ├─ jpacore/ProcessoEntity               pai, abstrata, JOINED, discriminador SEGMENTO
 │  ├─ jpacore/ProcessoImobiliarioEntity    filha, @DiscriminatorValue("IMOBILIARIO")
+│  ├─ jpacore/ProcessoVeicularEntity       filha, @DiscriminatorValue("VEICULAR")
 │  ├─ jpacore/SituacaoProcesso, TipoImovel enums das colunas
-│  └─ db/migration/V1__schema.sql          tabelas, sequence SEQ_NUMERO_PROCESSO
+│  └─ db/migration/                        V1 schema, V2 máquina de estados, V3 tabela veicular
 ├─ processo-core/  (com.example.processo.core)
-│  ├─ motor/domain        Processo&lt;D&gt;, Solicitacao&lt;D&gt;, Proponente, DadosDoSegmento,
-│  │                      RegrasComuns, Especificacao, RegraVioladaException,
-│  │                      ports Segmento&lt;D&gt;, Numeracao, SituacaoCadastral; evento ProcessoCriado
-│  ├─ motor/application   MotorDeProcessamento
-│  ├─ motor/adapter       Relogio, persistence/NumeracaoJpa
-│  └─ segmento/imobiliario/
-│     ├─ domain           DadosImobiliarios, RegrasImobiliarias, port ProcessosImobiliarios
-│     ├─ application      SegmentoImobiliario (o plug no motor)
-│     └─ adapter          persistence/ProcessosImobiliariosJpa
+│  ├─ motor/domain        Processo&lt;D&gt; (Context do State), Solicitacao&lt;D&gt;, Proponente, DadosDoSegmento,
+│  │                      Avaliacao, RegrasComuns, Especificacao, exceções,
+│  │                      ports Segmento&lt;D&gt;, Processos, Numeracao, SituacaoCadastral; evento ProcessoCriado
+│  ├─ motor/domain/estado Situacao, EstadoDoProcesso (State), Aberto, EmProcessamento, Concluido,
+│  │                      Recusado, Cancelado (ConcreteStates), TransicaoInvalidaException
+│  ├─ motor/application   MotorDeProcessamento, port Transacoes
+│  ├─ motor/adapter       Relogio, TransacoesQuarkus, persistence/NumeracaoJpa, persistence/ProcessosJpa
+│  └─ segmento/
+│     ├─ imobiliario/     domain (DadosImobiliarios, RegrasImobiliarias, port) · application (SegmentoImobiliario)
+│     │                   · adapter/persistence
+│     └─ veicular/        domain (DadosVeiculares, RegrasVeiculares, port) · application (SegmentoVeicular)
+│                         · adapter/persistence
 ├─ processo-query/  (com.example.processo.query)
-│  └─ ProcessoQueries, ResumoProcesso, DetalheImobiliario
+│  └─ ProcessoQueries, ResumoProcesso, DetalheImobiliario, DetalheVeicular
 ├─ integracoes/  (com.example.processo.integracoes)
 │  └─ cadastro/           CadastroClient, CadastroClientSimulado, RespostaCadastro, SituacaoCadastralAdapter
 ├─ impressao/  (com.example.processo.impressao)
 │  └─ ImpressaoDeProcessos, SistemaDePdf, Documento
 └─ processo-app/  (com.example.processo.app)
-   ├─ rest/               ProcessoImobiliarioResource, ProcessosResource, Criado, ErrosMapper
+   ├─ rest/               ProcessoImobiliarioResource, ProcessoVeicularResource, ProcessosResource,
+   │                      Criado, ErrosMapper
    ├─ application.properties
-   └─ test/               ArquiteturaModulosTest, CriarProcessoImobiliarioIT, CadastroFalso, SistemaDePdfFalso</code></pre>
+   └─ test/               ArquiteturaModulosTest, CicloDeVidaPorTipoIT, CriarProcessoImobiliarioIT,
+                          CadastroFalso, SistemaDePdfFalso</code></pre>
 </section>
 
 <!-- 4 -->
 <section id="criar">
-  <h2>Fluxo do criar</h2>
+  <h2>Fluxos de escrita</h2>
+  <h3>Criar</h3>
   <p><code>POST /processos/imobiliarios</code> com o corpo abaixo responde <code>201 {"id", "numero"}</code> e um
     <code>Location</code> para o detalhe.</p>
 <pre><code>{
@@ -351,15 +362,38 @@
       (comercial) da avaliação e, por último, a consulta ao banco: não pode haver processo aberto para a mesma
       matrícula na mesma UF.</li>
     <li><strong>Sistema externo:</strong> o port <code>SituacaoCadastral</code> consulta o cadastro do CPF. É a última
-      regra, para não chamar o sistema externo à toa.</li>
-    <li><strong>Número:</strong> <code>IMO-2026-000042</code>, com o prefixo do segmento, o ano e a sequence
-      <code>SEQ_NUMERO_PROCESSO</code>, que é única para todos os segmentos.</li>
+      regra, para não chamar o sistema externo à toa. Até aqui nada roda em transação.</li>
+    <li><strong>Transação curta:</strong> a partir daqui, dentro de <code>Transacoes.executar</code>. O número é
+      <code>IMO-2026-000042</code>, com o prefixo do segmento, o ano e a sequence <code>SEQ_NUMERO_PROCESSO</code>, que é
+      única para todos os segmentos.</li>
     <li><strong>Gravação:</strong> o segmento grava <code>PROCESSO</code> e <code>PROCESSO_IMOBILIARIO</code> com um
       <code>@Insert</code> da entidade filha.</li>
     <li><strong>Evento:</strong> o motor publica <code>ProcessoCriado</code>. Depois do commit, a <code>impressao</code>
       pede o PDF de abertura. Se o sistema de PDF falhar, o erro fica no log e o processo continua gravado.</li>
   </ol>
-  <p>Qualquer regra violada responde <code>422 {"motivo": "..."}</code>, sem gerar número, gravar ou publicar.</p>
+  <p>Qualquer regra violada responde <code>422 {"motivo": "..."}</code>, sem gerar número, gravar ou publicar. Se o
+    sistema de cadastro estiver fora do ar ou estourar o timeout (2 s), a resposta é <code>503</code>. O
+    <code>POST /processos/veiculares</code> segue o mesmo fluxo, com outro corpo (<code>veiculo</code>: placa, ano,
+    FIPE).</p>
+
+  <h3>Processar e cancelar (iguais para todos os tipos)</h3>
+  <p>Os endpoints são <code>POST /processos/{id}/processamento</code>, que responde
+    <code>200 {"situacao", "motivo"}</code>, e <code>POST /processos/{id}/cancelamento</code>, que responde <code>204</code>.</p>
+  <ol class="steps">
+    <li><strong>Qual tipo:</strong> o motor lê a coluna <code>SEGMENTO</code> (port <code>Processos</code>) e escolhe o
+      segmento pelo código. O segmento carrega o processo inteiro.</li>
+    <li><strong>ABERTO → EM_PROCESSAMENTO:</strong> o State valida e a troca é gravada numa transação curta por
+      compare-and-set: <code>update PROCESSO ... where ID = ? and SITUACAO = 'ABERTO'</code>. Se nenhuma linha mudou,
+      outra requisição chegou antes, e a resposta é <code>409</code>.</li>
+    <li><strong>Avaliação do tipo, fora de transação:</strong> <code>segmento.avaliar(processo)</code> devolve aprovado
+      ou recusado com motivo. O imobiliário recusa acima de R$ 1.000.000; o veicular recusa veículo com mais de 10
+      anos.</li>
+    <li><strong>EM_PROCESSAMENTO → CONCLUIDO ou RECUSADO:</strong> pelo State, em outra transação curta, guardando o
+      motivo da recusa.</li>
+  </ol>
+  <p><strong>Cancelar:</strong> o processo é carregado e passa de <code>ABERTO</code> para <code>CANCELADO</code> numa
+    transação. Em qualquer outro estado a resposta é <code>422</code>, por exemplo "Processo CONCLUIDO não pode ser
+    cancelado". Processo inexistente responde <code>404</code>.</p>
 </section>
 
 <!-- 5 -->
@@ -369,7 +403,7 @@
     <thead><tr><th>Endpoint</th><th>Consulta</th><th>Resposta</th></tr></thead>
     <tbody>
       <tr><td><code>GET /processos</code><br><code>?situacao=ABERTO</code></td><td>Sobre o pai, <code>ProcessoEntity</code>, projetando só colunas de <code>PROCESSO</code>. Atende todos os segmentos.</td><td>lista de <code>ResumoProcesso</code>: id, número, segmento, proponente, valor, situação, abertura</td></tr>
-      <tr><td><code>GET /processos/imobiliarios/{id}</code></td><td>Direto na filha, <code>ProcessoImobiliarioEntity</code>, que já enxerga os campos herdados.</td><td><code>DetalheImobiliario</code> ou 404</td></tr>
+      <tr><td><code>GET /processos/imobiliarios/{id}</code><br><code>GET /processos/veiculares/{id}</code></td><td>Direto na filha do tipo, que já enxerga os campos herdados (situação e motivo da recusa incluídos).</td><td><code>DetalheImobiliario</code> / <code>DetalheVeicular</code>, ou 404</td></tr>
     </tbody>
   </table></div>
   <p>O app recebe o pedido HTTP e chama o <code>ProcessoQueries</code> do <code>processo-query</code>. A leitura não passa
@@ -387,10 +421,17 @@
   PROPONENTE_NOME VARCHAR2                   VALOR_AVALIACAO NUMBER(15,2)
   PROPONENTE_CPF  VARCHAR2(11)               UF              VARCHAR2(2)
   VALOR           NUMBER(15,2)
-  SITUACAO        VARCHAR2 (ABERTO | CONCLUIDO | CANCELADO)
-  DATA_ABERTURA   DATE
+  SITUACAO        VARCHAR2 (ABERTO | EM_PROCESSAMENTO | CONCLUIDO | RECUSADO | CANCELADO)
+  MOTIVO_RECUSA   VARCHAR2                   PROCESSO_VEICULAR
+  DATA_ABERTURA   DATE          ◄─────────   PROCESSO_ID     RAW(16)  PK, FK
+                                             PLACA           VARCHAR2(7)
+                                             ANO_FABRICACAO  NUMBER(4)
+                                             VALOR_FIPE      NUMBER(15,2)
 
 SEQ_NUMERO_PROCESSO   sequence única de numeração</code></pre>
+  <p>As migrations contam a história: a <code>V1</code> cria o schema, a <code>V2</code> acrescenta as situações do
+    processamento e o motivo da recusa, e a <code>V3</code> cria a tabela do tipo veicular. Tipo novo é sempre uma
+    migration nova com a tabela filha.</p>
   <h3>Herança no banco, genéricos no domínio</h3>
   <p>No banco, o processo imobiliário é uma subclasse JPA: a entidade filha estende <code>ProcessoEntity</code>. No
     domínio, ele é um <code>Processo&lt;DadosImobiliarios&gt;</code>, ou seja, os dados do processo carregam os do
@@ -422,6 +463,8 @@ SEQ_NUMERO_PROCESSO   sequence única de numeração</code></pre>
     Class&lt;D&gt; tipoDosDados();                        // como o motor escolhe o segmento
     Especificacao&lt;Solicitacao&lt;D&gt;&gt; regras();        // regras próprias, aplicadas depois das comuns
     void salvar(Processo&lt;D&gt; processo);              // grava pai + filha
+    Optional&lt;Processo&lt;D&gt;&gt; carregar(UUID id);        // lê pai + filha
+    Avaliacao avaliar(Processo&lt;D&gt; processo);       // decisão do processamento (fora de transação)
 }</code></pre>
   <ul>
     <li><strong>Descoberta:</strong> o motor recebe <code>@Any Instance&lt;Segmento&lt;?&gt;&gt;</code>. Todo bean que
@@ -435,6 +478,62 @@ SEQ_NUMERO_PROCESSO   sequence única de numeração</code></pre>
     <li><strong>Endpoint por segmento:</strong> o corpo da requisição pertence ao segmento, e todos entregam ao mesmo
       <code>MotorDeProcessamento.criar</code>. A listagem é uma só, porque mostra apenas os campos comuns.</li>
   </ul>
+</section>
+
+<!-- estados -->
+<section id="estados">
+  <h2>Máquina de estados (padrão State)</h2>
+<pre><code>ABERTO ──iniciarProcessamento──► EM_PROCESSAMENTO ──concluir──► CONCLUIDO
+   │                                    └───recusar───► RECUSADO
+   └──cancelar──► CANCELADO</code></pre>
+  <p>A máquina é a mesma para todos os tipos e mora em <code>core.motor.domain.estado</code>. Os papéis do GoF:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Papel</th><th>Classe</th><th>O que faz</th></tr></thead>
+    <tbody>
+      <tr><td>Context</td><td><code>Processo&lt;D&gt;</code></td><td>Guarda a <code>Situacao</code> (o valor persistido) e delega cada evento ao estado correspondente. Imutável: cada evento devolve uma cópia na nova situação.</td></tr>
+      <tr><td>State</td><td><code>EstadoDoProcesso</code></td><td><code>sealed interface</code> com um método por evento. Por padrão todo evento lança <code>TransicaoInvalidaException</code>.</td></tr>
+      <tr><td>ConcreteStates</td><td><code>Aberto</code>, <code>EmProcessamento</code>, <code>Concluido</code>, <code>Recusado</code>, <code>Cancelado</code></td><td>Cada um sobrescreve só as transições que permite. Os finais não sobrescrevem nada.</td></tr>
+    </tbody>
+  </table></div>
+<pre><code>final class Aberto implements EstadoDoProcesso {
+    public Situacao situacao() { return Situacao.ABERTO; }
+    public EstadoDoProcesso iniciarProcessamento() { return EM_PROCESSAMENTO; }
+    public EstadoDoProcesso cancelar() { return CANCELADO; }
+    // concluir() e recusar() herdam o default: "Processo ABERTO não pode ser concluído"
+}
+
+// No Context:
+public Processo&lt;D&gt; cancelar() { return em(EstadoDoProcesso.de(situacao).cancelar(), null); }</code></pre>
+  <ul>
+    <li><strong>Pacote autocontido:</strong> o <code>estado</code> não depende de nada do resto do domínio (tem a própria
+      exceção), então não forma ciclo com o <code>Processo</code>, que o usa.</li>
+    <li><strong>Persistência:</strong> só a <code>Situacao</code> vai para o banco. <code>EstadoDoProcesso.de(situacao)</code>
+      devolve o objeto de comportamento.</li>
+    <li><strong>Teste:</strong> o <code>EstadoDoProcessoTest</code> é uma tabela com todos os estados × todos os eventos.
+      Uma transição nova é uma linha na tabela e um método num estado.</li>
+    <li><strong>Erros:</strong> transição inválida responde <code>422</code>, e conflito de concorrência
+      (compare-and-set) responde <code>409</code>.</li>
+  </ul>
+</section>
+
+<!-- motor x tipo -->
+<section id="motor-tipo">
+  <h2>Motor x tipo</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>É do motor (igual para todos)</th><th>É do tipo (cada um o seu)</th></tr></thead>
+    <tbody>
+      <tr><td>Fluxo de criação e ordem das regras</td><td>Dados, regras de abertura e endpoint de criação</td></tr>
+      <tr><td>Regras comuns (nome, CPF, valor) e situação cadastral</td><td>Prefixo do número</td></tr>
+      <tr><td>Numeração única</td><td>Tabela filha e gravação/leitura dela</td></tr>
+      <tr><td>Máquina de estados e transições (State)</td><td>Decisão do processamento (<code>avaliar</code>)</td></tr>
+      <tr><td>Processar e cancelar, com endpoint único</td><td>Consulta de detalhe</td></tr>
+      <tr><td>Transações, compare-and-set, eventos</td><td>Integrações que só ele usa (chamadas dentro do <code>avaliar</code>)</td></tr>
+    </tbody>
+  </table></div>
+  <div class="warn"><strong>Quando um tipo deve sair do motor</strong>O motor único vale enquanto os tipos compartilham
+    a máquina de estados e as etapas. Se um tipo precisar de estados ou etapas que os outros não têm, não estenda o
+    <code>Segmento</code> com flags e exceções: dê a esse tipo um fluxo próprio. Um SPI que cresce com casos
+    especiais é o sinal.</div>
 </section>
 
 <!-- 8 -->
@@ -455,7 +554,8 @@ SEQ_NUMERO_PROCESSO   sequence única de numeração</code></pre>
       <code>quarkus.rest-client.cadastro.url</code> (variável <code>CADASTRO_URL</code>).</li>
     <li><code>RespostaCadastro</code> é o modelo do sistema externo e não sai do pacote.</li>
     <li><code>SituacaoCadastralAdapter</code> implementa o port e converte a resposta em <code>true</code> ou
-      <code>false</code>.</li>
+      <code>false</code>. Erro HTTP, de rede ou timeout vira <code>SistemaExternoIndisponivelException</code> (do domínio),
+      e a resposta é <code>503</code>.</li>
     <li><code>CadastroClientSimulado</code> substitui o cliente só no <code>quarkus:dev</code>:</li>
   </ul>
 <pre><code>@IfBuildProfile("dev")             // o bean só existe no build de dev
@@ -527,8 +627,8 @@ public class CadastroClientSimulado implements CadastroClient { ... }   // sempr
   <div class="grid2">
     <div class="card">
       <h4><code>processo-core</code> · ArquiteturaTest</h4>
-      <p>O motor não conhece segmentos. Segmentos não se enxergam. Os domínios (do motor e dos segmentos) só usam
-        Java puro e o domínio do motor.</p>
+      <p>O motor não conhece segmentos. Segmentos não se enxergam (com imobiliário e veicular, a regra tem o que
+        verificar). Os domínios (do motor e dos segmentos) só usam Java puro e o domínio do motor.</p>
     </div>
     <div class="card">
       <h4><code>processo-app</code> · ArquiteturaModulosTest</h4>
@@ -546,10 +646,10 @@ public class CadastroClientSimulado implements CadastroClient { ... }   // sempr
   <div class="table-wrap"><table>
     <thead><tr><th>Onde</th><th>O quê</th><th>Docker</th></tr></thead>
     <tbody>
-      <tr><td><code>processo-core</code></td><td>Regras comuns e CPF. Motor com dois segmentos falsos: mesmo fluxo, numeração única, regra violada não grava nem publica, situação cadastral irregular, sistema externo só consultado no fim. Segmento imobiliário no motor real com port em memória. ArchUnit.</td><td>não</td></tr>
-      <tr><td><code>integracoes</code></td><td>Conversão da resposta externa pelo adapter; simulação do dev.</td><td>não</td></tr>
+      <tr><td><code>processo-core</code></td><td>Tabela do State (estados × eventos). Regras comuns e CPF. Motor com dois segmentos falsos: mesmo fluxo e mesmo ciclo de vida, numeração única, regra violada não grava nem publica, situação cadastral irregular, transição inválida, conflito (409), processo inexistente. Segmentos imobiliário e veicular no motor real, com o <code>avaliar</code> de cada um. ArchUnit.</td><td>não</td></tr>
+      <tr><td><code>integracoes</code></td><td>Conversão da resposta externa pelo adapter; falha do cliente vira indisponibilidade; simulação do dev.</td><td>não</td></tr>
       <tr><td><code>impressao</code></td><td>Montagem do <code>Documento</code>.</td><td>não</td></tr>
-      <tr><td><code>processo-app</code></td><td>ArchUnit entre módulos. <code>@QuarkusIntegrationTest</code> contra o jar, com Oracle do Dev Services, cadastro falso e PDF falso. Cobre criação, recusa por matrícula, numeração, regras, cadastro irregular, falha do PDF, detalhe e listagem.</td><td>sim</td></tr>
+      <tr><td><code>processo-app</code></td><td>ArchUnit entre módulos. <code>@QuarkusIntegrationTest</code> contra o jar, com Oracle do Dev Services, cadastro falso e PDF falso. <code>CicloDeVidaPorTipoIT</code> roda o mesmo cenário (aprovar, recusar, cancelar, transições inválidas, listagem) para cada tipo. <code>CriarProcessoImobiliarioIT</code> cobre recusa por matrícula, numeração, regras, cadastro irregular, cadastro fora do ar (503), falha do PDF e detalhe.</td><td>sim</td></tr>
     </tbody>
   </table></div>
 <pre><code># unitários (sem Docker)
@@ -585,7 +685,7 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
 <!-- 13 -->
 <section id="receitas">
   <h2>Receitas</h2>
-  <h3>Adicionar um segmento</h3>
+  <h3>Adicionar um tipo (segmento)</h3>
   <ol>
     <li><code>jpa-core</code>: entidade filha de <code>ProcessoEntity</code> com <code>@DiscriminatorValue</code> e
       <code>@PrimaryKeyJoinColumn</code>, mais a migration da tabela filha.</li>
@@ -593,12 +693,14 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
       <ul>
         <li>record que implementa <code>DadosDoSegmento</code>;</li>
         <li>regras em <code>Especificacao</code>;</li>
-        <li>port e adapter de persistência;</li>
-        <li>bean que implementa <code>Segmento&lt;D&gt;</code>.</li>
+        <li>port e adapter de persistência (gravar e carregar);</li>
+        <li>bean que implementa <code>Segmento&lt;D&gt;</code>, incluindo <code>carregar</code> e <code>avaliar</code>.</li>
       </ul></li>
     <li><code>processo-query</code>: projeção e consulta de detalhe na filha. A listagem já inclui o segmento novo.</li>
     <li><code>processo-app</code>: endpoints <code>POST /processos/&lt;segmento&gt;</code> e <code>GET .../{id}</code>.</li>
-    <li>Testes unitários do segmento no motor real e um IT. O motor e a impressão não mudam.</li>
+    <li>Testes unitários do segmento no motor real e um <code>Tipo</code> novo em
+      <code>CicloDeVidaPorTipoIT.tipos()</code>. O motor, a máquina de estados, a impressão e os endpoints de ciclo de
+      vida não mudam. O commit do veicular é o exemplo.</li>
   </ol>
   <h3>Adicionar uma integração síncrona</h3>
   <ol>
@@ -654,24 +756,22 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
   <h2>Pontos em aberto</h2>
   <p>O exemplo cumpre os requisitos, e os testes de unidade, integração e arquitetura passam. Antes de levar o
     padrão para produção, estes pontos merecem decisão:</p>
-  <div class="warn"><strong>Chamada externa dentro da transação</strong>O <code>MotorDeProcessamento.criar</code> é
-    <code>@Transactional</code> e consulta o cadastro externo dentro dela. Uma conexão de banco fica presa durante a
-    chamada HTTP. Com sistema lento, o pool esgota. Há duas opções:
-    <ul>
-      <li>separar as regras que não precisam de transação (incluindo a chamada externa) da parte transacional
-        (numeração e gravação);</li>
-      <li>no mínimo, configurar timeout curto no REST Client.</li>
-    </ul></div>
-  <div class="warn"><strong>Corrida na regra da matrícula</strong>"Não pode haver processo aberto para a mesma
-    matrícula" é verificado e depois gravado. Duas requisições simultâneas podem passar juntas. A situação está no pai
+  <div class="warn"><strong>Processo preso em EM_PROCESSAMENTO</strong>O processar grava
+    <code>EM_PROCESSAMENTO</code>, avalia fora de transação e grava o estado final noutra transação. Se a aplicação
+    cair, ou a avaliação lançar exceção, entre as duas, o processo fica em <code>EM_PROCESSAMENTO</code>. Isso exige
+    uma rotina de recuperação, que reprocesse ou devolva para <code>ABERTO</code> os processos parados há mais de N
+    minutos.</div>
+  <div class="warn"><strong>Corrida na regra da matrícula</strong>"Não pode haver processo em andamento para a
+    mesma matrícula" é verificado e depois gravado. Duas requisições simultâneas podem passar juntas. A situação está no pai
     e a matrícula na filha, então um índice único condicional não resolve sozinho. As saídas são:
     <ul>
       <li>trava pessimista;</li>
       <li>tabela de controle com chave única;</li>
       <li>copiar a situação para a filha.</li>
     </ul></div>
-  <div class="warn"><strong>Falha do sistema externo vira 500</strong>Timeout ou erro do cadastro sobe como exceção
-    genérica. Vale mapear para <code>503</code> no <code>ErrosMapper</code>, com uma exceção própria lançada pelo adapter.</div>
+  <div class="warn"><strong>Sem histórico de transições</strong>Só a situação atual e o motivo da última recusa ficam
+    gravados. Em pagamentos, costuma ser necessário saber quem mudou o quê e quando. Uma tabela de transições,
+    gravada pelo motor na mesma transação do compare-and-set, resolve.</div>
   <div class="warn"><strong>Impressão síncrona e sem retentativa</strong>O PDF é pedido depois do commit, na mesma
     thread da requisição, e uma falha só vai para o log. Se o PDF não puder se perder, o próximo passo é uma outbox
     (tabela de pendências com reenvio) dentro do módulo <code>impressao</code>.</div>

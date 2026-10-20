@@ -1,16 +1,19 @@
-# Design — Processo imobiliário (Quarkus 3.33 · Java 25 · Oracle)
+# Design — Processos com motor único (Quarkus 3.33 · Java 25 · Oracle)
 
 ## Objetivo
 
-Exemplo mínimo, com o **criar e consultar processo imobiliário**, para validar quatro requisitos:
+Exemplo mínimo, com **dois tipos de processo (imobiliário e veicular)** criados, processados, cancelados e
+consultados pelo mesmo motor, para validar seis requisitos:
 
-1. **Processo imobiliário é filho do processo.** Os dados comuns ficam no pai e os do imóvel na filha.
+1. **O processo de cada tipo é filho do processo.** Os dados comuns ficam no pai e os do tipo na filha.
 2. **O motor de processamento é único para todos os segmentos.** Segmento novo não altera o motor.
 3. **A impressão (ponte para o sistema de PDF) é descartável.** Ela fica num módulo próprio que pode ser apagado.
 4. **Toda a lógica de negócio fica num `processo-core`, sem HTTP.** O REST fica no app e as consultas num módulo
    à parte.
 5. **Integrações de saída não contaminam o core.** O core declara o que precisa (port) e o módulo `integracoes`
    implementa.
+6. **A máquina de estados é única e usa o padrão State (GoF).** Os tipos compartilham o ciclo de vida
+   `ABERTO → EM_PROCESSAMENTO → CONCLUIDO | RECUSADO`, e `ABERTO → CANCELADO`.
 
 ## Decisões
 
@@ -31,6 +34,20 @@ Exemplo mínimo, com o **criar e consultar processo imobiliário**, para validar
 | Persistência | Jakarta Data sobre `StatelessSession`, HQL validado em compilação pelo Hibernate Processor |
 | Deploy | Único, via `processo-app` |
 | Testes | Unitários sem Quarkus (motor com segmentos falsos; segmento plugado no motor real com fake do port); ArchUnit no core e entre módulos; `@QuarkusIntegrationTest` contra o jar com Oracle do Dev Services e um sistema de PDF falso |
+
+### Máquina de estados com o padrão State
+
+O `Processo` é o Context: guarda a `Situacao` (o valor persistido) e delega cada evento ao `EstadoDoProcesso`
+correspondente. Há uma classe por estado (`Aberto`, `EmProcessamento`, `Concluido`, `Recusado`, `Cancelado`), cada
+uma sobrescrevendo só as transições que permite; o `default` de todo evento lança `TransicaoInvalidaException`.
+
+- O pacote `motor.domain.estado` é autocontido, com a própria exceção, para não formar ciclo com o domínio.
+- O processamento tem duas transações curtas, com a avaliação do tipo fora delas. A troca de situação é
+  compare-and-set, com update nativo em `PROCESSO` condicionado à situação anterior: um update HQL numa hierarquia
+  JOINED usaria a estratégia multi-tabela do Hibernate. Conflito responde 409.
+- Os tipos só decidem (`Segmento.avaliar`). Estados, transições e persistência da situação são do motor.
+- Um tipo que precise de estados ou etapas que os outros não têm deve ganhar fluxo próprio, em vez de estender o
+  SPI com exceções.
 
 ### Por que motor e segmentos no mesmo módulo
 

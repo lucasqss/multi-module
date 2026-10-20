@@ -1,11 +1,13 @@
 # Processo — motor único por segmento em Maven multi-module (Quarkus 3.33 · Java 25 · Oracle)
 
-Exemplo do **criar e consultar processo imobiliário**, para mostrar:
+Exemplo de **processos de dois tipos (imobiliário e veicular) com um motor único**, para mostrar:
 
-- **Um motor de processamento único** para todos os segmentos. Motor e segmentos ficam no `processo-core`, e uma
-  regra do ArchUnit impede o motor de conhecer qualquer segmento.
-- **Processo imobiliário como filha do processo**: herança JPA `JOINED` (tabela `PROCESSO` + tabela
-  `PROCESSO_IMOBILIARIO`).
+- **Um motor de processamento único** para todos os tipos (segmentos): o mesmo fluxo de criação e o mesmo ciclo de
+  vida (processar, cancelar). O tipo veicular entrou sem mudar uma linha do motor. Uma regra do ArchUnit impede o
+  motor de conhecer qualquer segmento.
+- **Máquina de estados única com o padrão State (GoF)**: `ABERTO → EM_PROCESSAMENTO → CONCLUIDO | RECUSADO`, e
+  `ABERTO → CANCELADO`. Cada situação é um objeto que sabe quais eventos aceita.
+- **Processo de cada tipo como filha do processo**: herança JPA `JOINED` (tabela `PROCESSO` + uma tabela por tipo).
 - **CQRS**: o `processo-core` (escrita) e o `processo-query` (leitura) não se enxergam. Os dois só se encontram
   no REST do `processo-app`.
 - **Integrações de saída** no módulo `integracoes`: o core define o port e a integração o implementa, sem que
@@ -37,8 +39,8 @@ Exemplo do **criar e consultar processo imobiliário**, para mostrar:
 | Módulo | Responsabilidade |
 |---|---|
 | `jpa-core` | Única "verdade" do schema: `ProcessoEntity` (pai, abstrata), `ProcessoImobiliarioEntity` (filha) e migrations |
-| `processo-core` | Toda a lógica de negócio da escrita, sem HTTP: o `motor` (fluxo único do criar, regras comuns, numeração, SPI `Segmento`, evento `ProcessoCriado`) e os segmentos (`segmento.imobiliario`: dados, regras e gravação da filha) |
-| `processo-query` | Consultas somente leitura que devolvem projeções: listagem de todos os segmentos e detalhe do imobiliário |
+| `processo-core` | Toda a lógica de negócio da escrita, sem HTTP: o `motor` (criar, processar e cancelar únicos, máquina de estados no padrão State, regras comuns, numeração, SPI `Segmento`, evento `ProcessoCriado`) e os segmentos (`segmento.imobiliario`, `segmento.veicular`: dados, regras, decisão do processamento e persistência da filha) |
+| `processo-query` | Consultas somente leitura que devolvem projeções: listagem de todos os segmentos e detalhe de cada tipo |
 | `integracoes` | Integrações de saída, um pacote por sistema externo: implementam ports do core e traduzem o modelo externo (anticorrupção). Exemplo: `cadastro`, consultado no ato da criação |
 | `impressao` | Ponte para o sistema de PDF: pede o documento de abertura de todo processo criado, de qualquer segmento |
 | `processo-app` | Todo o REST, o mapeamento de erros, a montagem do deploy único, os ITs e o ArchUnit entre módulos |
@@ -47,12 +49,20 @@ Exemplo do **criar e consultar processo imobiliário**, para mostrar:
 
 | Método e caminho | Lado | O que faz |
 |---|---|---|
-| `POST /processos/imobiliarios` | core | cria pelo motor único; responde `201 {"id", "numero"}` com `Location` para o detalhe |
-| `GET /processos/imobiliarios/{id}` | query | detalhe com os campos do pai e da filha |
+| `POST /processos/imobiliarios`, `POST /processos/veiculares` | core | cria pelo motor único; responde `201 {"id", "numero"}` com `Location` para o detalhe |
+| `POST /processos/{id}/processamento` | core | processa, para qualquer tipo; responde `200 {"situacao", "motivo"}` (`CONCLUIDO` ou `RECUSADO`) |
+| `POST /processos/{id}/cancelamento` | core | cancela um processo `ABERTO`; responde `204` |
+| `GET /processos/imobiliarios/{id}`, `GET /processos/veiculares/{id}` | query | detalhe com os campos do pai e da filha, incluindo situação e motivo da recusa |
 | `GET /processos?situacao=ABERTO` | query | listagem de todos os segmentos, só com os campos comuns; filtro opcional |
 
-Regras violadas respondem `422 {"motivo": "..."}`. Processo inexistente e situação inválida no filtro respondem
-`404`.
+Códigos de erro, todos com corpo `{"motivo": "..."}`:
+
+| Código | Quando |
+|---|---|
+| `422` | regra violada ou transição inválida, por exemplo "Processo CONCLUIDO não pode ser cancelado" |
+| `409` | outra requisição mudou o processo no meio |
+| `404` | processo inexistente, ou situação inválida no filtro da listagem |
+| `503` | sistema de cadastro fora do ar ou timeout |
 
 Exemplo de corpo do `POST`:
 
@@ -64,7 +74,7 @@ Exemplo de corpo do `POST`:
 }
 ```
 
-## O fluxo do criar
+## Os fluxos de escrita
 
 ```
 POST /processos/imobiliarios                                     (processo-app)
@@ -73,11 +83,19 @@ POST /processos/imobiliarios                                     (processo-app)
       2. regras comuns (nome, CPF, valor > 0)
       3. regras do segmento (matrícula, UF, tipo, avaliação, limite de 80%/60%, matrícula sem processo aberto)
       3b. situação cadastral do CPF no sistema externo (port SituacaoCadastral → integracoes.cadastro)
+      ── até aqui fora de transação; daqui em diante, transação curta ──
       4. número IMO-2026-000042 (prefixo do segmento + sequence única)
       5. segmento grava PROCESSO + PROCESSO_IMOBILIARIO
       6. publica ProcessoCriado
   → 201
                          depois do commit: impressao → POST /documentos no sistema de PDF
+
+POST /processos/{id}/processamento                               (igual para todos os tipos)
+  → MotorDeProcessamento.processar(id)
+      1. lê o tipo (coluna SEGMENTO) e o segmento carrega o processo
+      2. ABERTO → EM_PROCESSAMENTO (State) e compare-and-set     | transação curta; 409 se outro mudou antes
+      3. segmento.avaliar(processo)                                | fora de transação
+      4. EM_PROCESSAMENTO → CONCLUIDO | RECUSADO (State)           | transação curta
 ```
 
 Falha no sistema de PDF não desfaz o processo: fica no log.
@@ -116,12 +134,14 @@ com `Unsatisfied dependency for type ...SituacaoCadastral`, em vez de falhar em 
 ## Adicionar um segmento
 
 1. **No `processo-core`**: pacote `segmento.<nome>`, com um record de dados que implementa `DadosDoSegmento`, um
-   bean que implementa `Segmento<D>` e o adapter de gravação.
+   bean que implementa `Segmento<D>` (incluindo `carregar` e a decisão `avaliar`) e o adapter de persistência.
 2. **No `jpa-core`**: entidade filha de `ProcessoEntity` com `@DiscriminatorValue`, mais a migration da tabela.
 3. **No `processo-query`**: a consulta de detalhe na filha. A listagem já inclui o segmento novo.
-4. **No `processo-app`**: os endpoints do segmento.
+4. **No `processo-app`**: os endpoints de criação e detalhe do segmento.
+5. **Nos testes**: um `Tipo` novo em `CicloDeVidaPorTipoIT.tipos()`.
 
-O motor não muda, e a impressão passa a atender o segmento novo sozinha (modelo `abertura-processo-<código>`).
+O motor, a máquina de estados, os endpoints de ciclo de vida e a impressão não mudam. O commit que adicionou o
+veicular é o exemplo.
 
 ## Remover a impressão
 

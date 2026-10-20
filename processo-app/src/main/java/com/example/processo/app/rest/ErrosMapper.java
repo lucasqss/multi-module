@@ -3,6 +3,7 @@ package com.example.processo.app.rest;
 import com.example.processo.core.motor.domain.ConflitoDeSituacaoException;
 import com.example.processo.core.motor.domain.ProcessoNaoEncontradoException;
 import com.example.processo.core.motor.domain.RegraVioladaException;
+import com.example.processo.core.motor.domain.SistemaExternoIndisponivelException;
 import com.example.processo.core.motor.domain.estado.TransicaoInvalidaException;
 import jakarta.ws.rs.core.Response;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
@@ -31,6 +32,11 @@ public class ErrosMapper {
     @ServerExceptionMapper
     public Response conflito(ConflitoDeSituacaoException e) {
         return erro(409, e);
+    }
+
+    @ServerExceptionMapper
+    public Response indisponivel(SistemaExternoIndisponivelException e) {
+        return erro(503, e);
     }
 
     private static Response erro(int status, RuntimeException e) {

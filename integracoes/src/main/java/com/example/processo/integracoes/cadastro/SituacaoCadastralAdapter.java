@@ -1,7 +1,10 @@
 package com.example.processo.integracoes.cadastro;
 
+import com.example.processo.core.motor.domain.SistemaExternoIndisponivelException;
 import com.example.processo.core.motor.domain.SituacaoCadastral;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.ProcessingException;
+import jakarta.ws.rs.WebApplicationException;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 /**
@@ -17,8 +20,13 @@ public class SituacaoCadastralAdapter implements SituacaoCadastral {
         this.cliente = cliente;
     }
 
+    /** Erro HTTP (WebApplicationException) ou de rede/timeout (ProcessingException) vira erro do domínio. */
     @Override
     public boolean regular(String cpf) {
-        return RespostaCadastro.REGULAR.equals(cliente.consultar(cpf).situacao());
+        try {
+            return RespostaCadastro.REGULAR.equals(cliente.consultar(cpf).situacao());
+        } catch (WebApplicationException | ProcessingException e) {
+            throw new SistemaExternoIndisponivelException("de cadastro", e);
+        }
     }
 }

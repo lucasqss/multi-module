@@ -12,11 +12,12 @@ import java.util.Map;
 /**
  * Faz o papel do sistema externo de cadastro nos ITs. O jar roda no perfil prod, sem a simulação do dev, então a
  * chamada é HTTP de verdade pelo REST Client: GET /situacoes/{documento} responde SUSPENSA para
- * {@link #CPF_IRREGULAR} e REGULAR para os demais.
+ * {@link #CPF_IRREGULAR}, erro 500 para {@link #CPF_SISTEMA_FORA} e REGULAR para os demais.
  */
 public class CadastroFalso implements QuarkusTestResourceLifecycleManager {
 
     static final String CPF_IRREGULAR = "11144477735";
+    static final String CPF_SISTEMA_FORA = "39053344705";
 
     private HttpServer servidor;
 
@@ -29,6 +30,11 @@ public class CadastroFalso implements QuarkusTestResourceLifecycleManager {
         }
         servidor.createContext("/situacoes/", troca -> {
             var documento = troca.getRequestURI().getPath().substring("/situacoes/".length());
+            if (documento.equals(CPF_SISTEMA_FORA)) {
+                troca.sendResponseHeaders(500, -1);
+                troca.close();
+                return;
+            }
             var situacao = documento.equals(CPF_IRREGULAR) ? "SUSPENSA" : "REGULAR";
             var corpo = "{\"documento\":\"%s\",\"situacao\":\"%s\"}".formatted(documento, situacao)
                     .getBytes(StandardCharsets.UTF_8);

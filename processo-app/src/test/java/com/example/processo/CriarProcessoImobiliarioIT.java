@@ -143,6 +143,12 @@ class CriarProcessoImobiliarioIT {
     }
 
     @Test
+    void sistemaDeCadastroForaDoArResponde503() {
+        criar(CadastroFalso.CPF_SISTEMA_FORA, "1000.00", matricula(), "RESIDENCIAL", "500000.00").statusCode(503)
+                .body("motivo", equalTo("Sistema de cadastro indisponível; tente novamente mais tarde"));
+    }
+
+    @Test
     void falhaNoSistemaDePdfNaoDesfazOProcesso() {
         var matricula = SistemaDePdfFalso.FALHA + ThreadLocalRandom.current().nextInt(1_000_000, 10_000_000);
         String numero = criar(matricula).statusCode(201).extract().path("numero");

@@ -1,6 +1,9 @@
 package com.example.processo.app.rest;
 
+import com.example.processo.core.motor.domain.ConflitoDeSituacaoException;
+import com.example.processo.core.motor.domain.ProcessoNaoEncontradoException;
 import com.example.processo.core.motor.domain.RegraVioladaException;
+import com.example.processo.core.motor.domain.estado.TransicaoInvalidaException;
 import jakarta.ws.rs.core.Response;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 
@@ -12,6 +15,25 @@ public class ErrosMapper {
 
     @ServerExceptionMapper
     public Response regraViolada(RegraVioladaException e) {
-        return Response.status(422).entity(new Erro(e.getMessage())).build();
+        return erro(422, e);
+    }
+
+    @ServerExceptionMapper
+    public Response transicaoInvalida(TransicaoInvalidaException e) {
+        return erro(422, e);
+    }
+
+    @ServerExceptionMapper
+    public Response naoEncontrado(ProcessoNaoEncontradoException e) {
+        return erro(404, e);
+    }
+
+    @ServerExceptionMapper
+    public Response conflito(ConflitoDeSituacaoException e) {
+        return erro(409, e);
+    }
+
+    private static Response erro(int status, RuntimeException e) {
+        return Response.status(status).entity(new Erro(e.getMessage())).build();
     }
 }

@@ -47,6 +47,10 @@ public abstract class ProcessoEntity {
     @Column(nullable = false, length = 20)
     private SituacaoProcesso situacao;
 
+    /** Preenchido só quando a situação é RECUSADO. */
+    @Column(name = "MOTIVO_RECUSA")
+    private String motivoRecusa;
+
     @Column(name = "DATA_ABERTURA", nullable = false)
     private LocalDate dataAbertura;
 
@@ -71,5 +75,6 @@ public abstract class ProcessoEntity {
     public String getProponenteCpf() { return proponenteCpf; }
     public BigDecimal getValor() { return valor; }
     public SituacaoProcesso getSituacao() { return situacao; }
+    public String getMotivoRecusa() { return motivoRecusa; }
     public LocalDate getDataAbertura() { return dataAbertura; }
 }

@@ -1,5 +1,8 @@
 package com.example.processo.core.segmento.imobiliario.application;
 
+import com.example.processo.core.Fakes;
+import com.example.processo.core.motor.domain.Avaliacao;
+import com.example.processo.core.motor.domain.estado.Situacao;
 import com.example.processo.core.segmento.imobiliario.domain.DadosImobiliarios;
 import com.example.processo.core.segmento.imobiliario.domain.DadosImobiliarios.TipoImovel;
 import com.example.processo.core.segmento.imobiliario.domain.ProcessosImobiliarios;
@@ -18,6 +21,8 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,18 +38,23 @@ class SegmentoImobiliarioTest {
     static class ProcessosEmMemoria implements ProcessosImobiliarios {
         final List<Processo<DadosImobiliarios>> dados = new ArrayList<>();
 
-        public boolean existeAbertoParaMatricula(String matricula, String uf) {
-            return dados.stream().anyMatch(p -> p.situacao() == Processo.Situacao.ABERTO
+        public boolean existeEmAndamentoParaMatricula(String matricula, String uf) {
+            return dados.stream().anyMatch(p -> (p.situacao() == Situacao.ABERTO || p.situacao() == Situacao.EM_PROCESSAMENTO)
                     && p.dados().matricula().equals(matricula) && p.dados().uf().equals(uf));
         }
 
         public void salvar(Processo<DadosImobiliarios> processo) { dados.add(processo); }
+
+        public Optional<Processo<DadosImobiliarios>> porId(UUID id) {
+            return dados.stream().filter(p -> p.id().equals(id)).findFirst();
+        }
     }
 
     final ProcessosEmMemoria processos = new ProcessosEmMemoria();
     final List<ProcessoCriado> publicados = new ArrayList<>();
-    final MotorDeProcessamento motor = new MotorDeProcessamento(List.of(new SegmentoImobiliario(processos)),
-            cpf -> true, new AtomicLong(41)::incrementAndGet, Clock.fixed(Instant.from(HOJE.atStartOfDay(ZoneOffset.UTC)),
+    final SegmentoImobiliario segmento = new SegmentoImobiliario(processos);
+    final MotorDeProcessamento motor = new MotorDeProcessamento(List.of(segmento),
+            cpf -> true, new AtomicLong(41)::incrementAndGet, new Fakes.BancoEmMemoria(), Fakes.semTransacao(), Clock.fixed(Instant.from(HOJE.atStartOfDay(ZoneOffset.UTC)),
             ZoneOffset.UTC), publicados::add);
 
     static Solicitacao<DadosImobiliarios> solicitacao(String valor, TipoImovel tipo, String avaliacao) {
@@ -80,10 +90,10 @@ class SegmentoImobiliarioTest {
     }
 
     @Test
-    void matriculaComProcessoAbertoNaMesmaUf() {
+    void matriculaComProcessoEmAndamentoNaMesmaUf() {
         motor.criar(solicitacao("100000", new DadosImobiliarios("777", TipoImovel.RESIDENCIAL, new BigDecimal("500000"), "SP")));
 
-        assertEquals("Já existe processo aberto para a matrícula 777/SP", motivo(
+        assertEquals("Já existe processo em andamento para a matrícula 777/SP", motivo(
                 solicitacao("100000", new DadosImobiliarios("777", TipoImovel.RESIDENCIAL, new BigDecimal("500000"), "SP"))));
         motor.criar(solicitacao("100000", new DadosImobiliarios("777", TipoImovel.RESIDENCIAL, new BigDecimal("500000"), "RJ")));
         assertEquals(2, processos.dados.size());
@@ -108,5 +118,22 @@ class SegmentoImobiliarioTest {
         var cpfInvalido = new Solicitacao<>(new Proponente("Ana Souza", "12345678900"), new BigDecimal("1000"),
                 new DadosImobiliarios("12", TipoImovel.RESIDENCIAL, new BigDecimal("500000"), "SP"));
         assertEquals("CPF inválido: 12345678900", motivo(cpfInvalido));
+    }
+
+    @Test
+    void processamentoRecusaValorAcimaDoLimiteAutomatico() {
+        var noLimite = motor.criar(solicitacao("1000000.00", TipoImovel.RESIDENCIAL, "2000000.00"));
+        var acima = motor.criar(solicitacao("1000000.01", new DadosImobiliarios("999", TipoImovel.RESIDENCIAL,
+                new BigDecimal("2000000.00"), "SP")));
+
+        assertEquals(Avaliacao.aprovado(), segmento.avaliar(noLimite));
+        assertEquals(Avaliacao.recusado("Valor acima de 1000000.00 exige análise manual"), segmento.avaliar(acima));
+    }
+
+    @Test
+    void carregaOQueGravou() {
+        var processo = motor.criar(solicitacao("400000.00", TipoImovel.RESIDENCIAL, "500000.00"));
+
+        assertEquals(Optional.of(processo), segmento.carregar(processo.id()));
     }
 }

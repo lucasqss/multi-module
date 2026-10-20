@@ -117,7 +117,7 @@ class CriarProcessoImobiliarioIT {
         criar(matricula).statusCode(201);
 
         criar(matricula).statusCode(422)
-                .body("motivo", equalTo("Já existe processo aberto para a matrícula " + matricula + "/SP"));
+                .body("motivo", equalTo("Já existe processo em andamento para a matrícula " + matricula + "/SP"));
     }
 
     @Test

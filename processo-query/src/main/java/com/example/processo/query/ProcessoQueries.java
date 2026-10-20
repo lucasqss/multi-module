@@ -29,7 +29,7 @@ public interface ProcessoQueries {
     /** Detalhe de um segmento: consulta direto a filha, que já enxerga os campos herdados do pai. */
     @Query("""
             select new com.example.processo.query.DetalheImobiliario(
-                p.id, p.numero, p.proponenteNome, p.proponenteCpf, p.valor, p.situacao, p.dataAbertura,
+                p.id, p.numero, p.proponenteNome, p.proponenteCpf, p.valor, p.situacao, p.motivoRecusa, p.dataAbertura,
                 p.matricula, p.tipoImovel, p.valorAvaliacao, p.uf)
             from ProcessoImobiliarioEntity p
             where p.id = :id""")

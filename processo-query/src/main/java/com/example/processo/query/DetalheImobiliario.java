@@ -12,6 +12,7 @@ import java.util.UUID;
  * Hibernate não instancia records aninhados.
  */
 public record DetalheImobiliario(UUID id, String numero, String proponenteNome, String proponenteCpf,
-                                 BigDecimal valor, SituacaoProcesso situacao, LocalDate dataAbertura,
+                                 BigDecimal valor, SituacaoProcesso situacao, String motivoRecusa,
+                                 LocalDate dataAbertura,
                                  String matricula, TipoImovel tipoImovel, BigDecimal valorAvaliacao, String uf) {
 }

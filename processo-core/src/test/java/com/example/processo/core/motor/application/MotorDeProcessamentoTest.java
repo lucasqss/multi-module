@@ -1,14 +1,20 @@
 package com.example.processo.core.motor.application;
 
+import com.example.processo.core.Fakes;
+import com.example.processo.core.motor.domain.Avaliacao;
+import com.example.processo.core.motor.domain.ConflitoDeSituacaoException;
 import com.example.processo.core.motor.domain.DadosDoSegmento;
 import com.example.processo.core.motor.domain.Especificacao;
 import com.example.processo.core.motor.domain.Processo;
 import com.example.processo.core.motor.domain.ProcessoCriado;
+import com.example.processo.core.motor.domain.ProcessoNaoEncontradoException;
 import com.example.processo.core.motor.domain.Proponente;
 import com.example.processo.core.motor.domain.RegraVioladaException;
 import com.example.processo.core.motor.domain.Segmento;
 import com.example.processo.core.motor.domain.SituacaoCadastral;
 import com.example.processo.core.motor.domain.Solicitacao;
+import com.example.processo.core.motor.domain.estado.Situacao;
+import com.example.processo.core.motor.domain.estado.TransicaoInvalidaException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -18,13 +24,16 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** O motor com dois segmentos de mentira: o mesmo fluxo atende os dois, cada um com as próprias regras. */
+/** O motor com dois segmentos de mentira: o mesmo fluxo e o mesmo ciclo de vida atendem os dois. */
 class MotorDeProcessamentoTest {
 
     static final LocalDate HOJE = LocalDate.of(2026, 10, 19);
@@ -36,32 +45,41 @@ class MotorDeProcessamentoTest {
     record DadosServico(String descricao) implements DadosDoSegmento {
     }
 
-    /** Segmento de teste: guarda o que o motor mandou gravar. */
-    static class SegmentoEmMemoria<D extends DadosDoSegmento> implements Segmento<D> {
+    /** Segmento de teste: grava e lê no banco em memória; a decisão do processamento é passada no construtor. */
+    class SegmentoEmMemoria<D extends DadosDoSegmento> implements Segmento<D> {
         final String codigo;
         final String prefixo;
         final Class<D> tipo;
         final Especificacao<Solicitacao<D>> regras;
+        final Function<Processo<D>, Avaliacao> avaliacao;
         final List<Processo<D>> gravados = new ArrayList<>();
 
-        SegmentoEmMemoria(String codigo, String prefixo, Class<D> tipo, Especificacao<Solicitacao<D>> regras) {
+        SegmentoEmMemoria(String codigo, String prefixo, Class<D> tipo, Especificacao<Solicitacao<D>> regras,
+                          Function<Processo<D>, Avaliacao> avaliacao) {
             this.codigo = codigo;
             this.prefixo = prefixo;
             this.tipo = tipo;
             this.regras = regras;
+            this.avaliacao = avaliacao;
         }
 
         public String codigo() { return codigo; }
         public String prefixo() { return prefixo; }
         public Class<D> tipoDosDados() { return tipo; }
         public Especificacao<Solicitacao<D>> regras() { return regras; }
-        public void salvar(Processo<D> processo) { gravados.add(processo); }
+        public void salvar(Processo<D> processo) { gravados.add(processo); banco.processos.put(processo.id(), processo); }
+        @SuppressWarnings("unchecked")
+        public Optional<Processo<D>> carregar(UUID id) { return Optional.ofNullable((Processo<D>) banco.processos.get(id)); }
+        public Avaliacao avaliar(Processo<D> processo) { return avaliacao.apply(processo); }
     }
 
+    final Fakes.BancoEmMemoria banco = new Fakes.BancoEmMemoria();
+    /** Auto: recusa no processamento placas antigas (sem letra na 5ª posição). */
     final SegmentoEmMemoria<DadosAuto> auto = new SegmentoEmMemoria<>("AUTO", "AUT", DadosAuto.class,
-            Especificacao.exige(s -> s.dados().placa().matches("[A-Z]{3}\\d[A-Z0-9]\\d{2}"), "Placa inválida"));
+            Especificacao.exige(s -> s.dados().placa().matches("[A-Z]{3}\\d[A-Z0-9]\\d{2}"), "Placa inválida"),
+            p -> p.dados().placa().matches("[A-Z]{3}\\d{4}") ? Avaliacao.recusado("Placa antiga") : Avaliacao.aprovado());
     final SegmentoEmMemoria<DadosServico> servico = new SegmentoEmMemoria<>("SERVICO", "SRV", DadosServico.class,
-            s -> java.util.Optional.empty());
+            s -> Optional.empty(), p -> Avaliacao.aprovado());
     final AtomicLong sequencia = new AtomicLong();
     final List<ProcessoCriado> publicados = new ArrayList<>();
     /** CPF que o sistema externo falso considera irregular. */
@@ -69,8 +87,16 @@ class MotorDeProcessamentoTest {
     final List<String> consultados = new ArrayList<>();
     final SituacaoCadastral situacaoCadastral = cpf -> consultados.add(cpf) && !cpf.equals(CPF_IRREGULAR);
     final MotorDeProcessamento motor = new MotorDeProcessamento(List.of(auto, servico), situacaoCadastral,
-            sequencia::incrementAndGet,
+            sequencia::incrementAndGet, banco, Fakes.semTransacao(),
             Clock.fixed(Instant.from(HOJE.atStartOfDay(ZoneOffset.UTC)), ZoneOffset.UTC), publicados::add);
+
+    Processo<?> criarAuto(String placa) {
+        return motor.criar(new Solicitacao<>(ANA, new BigDecimal("50000"), new DadosAuto(placa)));
+    }
+
+    Situacao situacaoNoBanco(Processo<?> processo) {
+        return banco.processos.get(processo.id()).situacao();
+    }
 
     @Test
     void mesmoMotorAtendeTodosOsSegmentosComNumeracaoUnica() {
@@ -89,7 +115,7 @@ class MotorDeProcessamentoTest {
         var processo = motor.criar(new Solicitacao<>(ANA, new BigDecimal("50000"), new DadosAuto("ABC1D23")));
 
         assertEquals("AUTO", processo.segmento());
-        assertEquals(Processo.Situacao.ABERTO, processo.situacao());
+        assertEquals(Situacao.ABERTO, processo.situacao());
         assertEquals(HOJE, processo.dataAbertura());
         assertEquals(ANA, processo.proponente());
         assertEquals(new DadosAuto("ABC1D23"), processo.dados());
@@ -147,8 +173,75 @@ class MotorDeProcessamentoTest {
 
     @Test
     void segmentoRegistradoDuasVezes() {
-        var outroAuto = new SegmentoEmMemoria<>("AUTO", "AUT", DadosServico.class, s -> java.util.Optional.empty());
+        var outroAuto = new SegmentoEmMemoria<>("AUTO", "AUT", DadosServico.class, s -> Optional.empty(),
+                p -> Avaliacao.aprovado());
         assertThrows(IllegalStateException.class, () -> new MotorDeProcessamento(List.of(auto, outroAuto),
-                situacaoCadastral, sequencia::incrementAndGet, Clock.systemUTC(), publicados::add));
+                situacaoCadastral, sequencia::incrementAndGet, banco, Fakes.semTransacao(), Clock.systemUTC(),
+                publicados::add));
+    }
+
+    // Ciclo de vida: o mesmo para todos os segmentos; cada um só decide aprovar ou recusar
+
+    @Test
+    void processarAprovadoTerminaConcluido() {
+        var processo = criarAuto("ABC1D23");
+
+        var processado = motor.processar(processo.id());
+
+        assertEquals(Situacao.CONCLUIDO, processado.situacao());
+        assertEquals(Situacao.CONCLUIDO, situacaoNoBanco(processo));
+    }
+
+    @Test
+    void processarRecusadoGuardaOMotivoDoSegmento() {
+        var processo = criarAuto("ABC1234");
+
+        var processado = motor.processar(processo.id());
+
+        assertEquals(Situacao.RECUSADO, processado.situacao());
+        assertEquals("Placa antiga", processado.motivoRecusa());
+        assertEquals("Placa antiga", banco.processos.get(processo.id()).motivoRecusa());
+    }
+
+    @Test
+    void mesmoCicloParaOutroSegmento() {
+        var reforma = motor.criar(new Solicitacao<>(ANA, new BigDecimal("8000"), new DadosServico("Reforma")));
+
+        assertEquals(Situacao.CONCLUIDO, motor.processar(reforma.id()).situacao());
+    }
+
+    @Test
+    void transicaoInvalidaNaoGrava() {
+        var processo = criarAuto("ABC1D23");
+        motor.processar(processo.id());
+
+        var erro = assertThrows(TransicaoInvalidaException.class, () -> motor.processar(processo.id()));
+        assertEquals("Processo CONCLUIDO não pode ser processado", erro.getMessage());
+        assertThrows(TransicaoInvalidaException.class, () -> motor.cancelar(processo.id()));
+        assertEquals(Situacao.CONCLUIDO, situacaoNoBanco(processo));
+    }
+
+    @Test
+    void cancelarSoQuandoAberto() {
+        var processo = criarAuto("ABC1D23");
+
+        assertEquals(Situacao.CANCELADO, motor.cancelar(processo.id()).situacao());
+        assertEquals(Situacao.CANCELADO, situacaoNoBanco(processo));
+        assertThrows(TransicaoInvalidaException.class, () -> motor.processar(processo.id()));
+    }
+
+    @Test
+    void outraRequisicaoMudouOProcessoNoMeio() {
+        var processo = criarAuto("ABC1D23");
+        banco.simularConflito = true;
+
+        assertThrows(ConflitoDeSituacaoException.class, () -> motor.processar(processo.id()));
+        assertEquals(Situacao.ABERTO, situacaoNoBanco(processo));
+    }
+
+    @Test
+    void processoInexistente() {
+        assertThrows(ProcessoNaoEncontradoException.class, () -> motor.processar(UUID.randomUUID()));
+        assertThrows(ProcessoNaoEncontradoException.class, () -> motor.cancelar(UUID.randomUUID()));
     }
 }

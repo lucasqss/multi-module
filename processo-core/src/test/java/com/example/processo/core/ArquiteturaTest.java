@@ -9,8 +9,12 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 /**
- * Motor e segmentos vivem no mesmo módulo, então o Maven não impede que um importe o outro. Estas regras fazem
- * esse papel: o motor continua único (não conhece segmento nenhum) e os domínios continuam Java puro.
+ * Motor e segmentos vivem no mesmo módulo, então o Maven não impede que um importe o outro, nem que uma camada
+ * pule outra. Estas regras fazem esse papel, em cada contexto (motor, segmento.*):
+ *
+ * <pre>
+ * adapter / config  →  application (port.in, port.out, port.spi, service)  →  domain (model, state, rule, ...)
+ * </pre>
  */
 class ArquiteturaTest {
 
@@ -33,12 +37,29 @@ class ArquiteturaTest {
     }
 
     @Test
-    void dominiosNaoConhecemInfraestrutura() {
-        // O domain de um segmento pode usar o domain do motor (SPI, Especificacao), nada além disso
-        noClasses().that().resideInAnyPackage("..motor.domain..", "..segmento.*.domain..")
+    void dominioNaoConheceApplicationNemInfraestrutura() {
+        // O domain de um segmento pode usar o domain do motor (modelo, regras), nada além disso
+        noClasses().that().resideInAPackage("..core..domain..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "jakarta..", "io.quarkus..", "org.hibernate..", "com.example.jpacore..",
-                        "..application..", "..adapter..")
+                        "..core..application..", "..core..adapter..", "..core..config..")
+                .check(CLASSES);
+    }
+
+    @Test
+    void applicationNaoConheceAdapters() {
+        // Os adapters implementam os ports; a application só conhece as interfaces
+        noClasses().that().resideInAPackage("..core..application..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "..core..adapter..", "..core..config..", "com.example.jpacore..")
+                .check(CLASSES);
+    }
+
+    @Test
+    void repositoriesNaoConhecemODominio() {
+        // Jakarta Data puro sobre as entidades: a conversão para o domínio é do mapper, no adapter
+        noClasses().that().resideInAPackage("..persistence.repository..")
+                .should().dependOnClassesThat().resideInAnyPackage("..core..domain..", "..core..application..")
                 .check(CLASSES);
     }
 }

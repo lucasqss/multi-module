@@ -1,10 +1,10 @@
 package com.example.processo.core;
 
-import com.example.processo.core.motor.application.Transacoes;
-import com.example.processo.core.motor.domain.DadosDoSegmento;
-import com.example.processo.core.motor.domain.Processo;
-import com.example.processo.core.motor.domain.Processos;
-import com.example.processo.core.motor.domain.estado.Situacao;
+import com.example.processo.core.motor.application.port.out.Processos;
+import com.example.processo.core.motor.application.port.out.Transacoes;
+import com.example.processo.core.motor.domain.model.DadosDoSegmento;
+import com.example.processo.core.motor.domain.model.Processo;
+import com.example.processo.core.motor.domain.state.Situacao;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

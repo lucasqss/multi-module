@@ -84,9 +84,11 @@ class ArquiteturaModulosTest {
         noClasses().that().resideOutsideOfPackage(INTEGRACOES + "..")
                 .should().dependOnClassesThat().resideInAPackage(INTEGRACOES + "..")
                 .check(CLASSES);
-        // Do core, a integração só enxerga os domains (ports e tipos), nunca casos de uso nem adapters
+        // Do core, a integração só enxerga o domínio e os ports de saída que implementa
         noClasses().that().resideInAPackage(INTEGRACOES + "..")
-                .should().dependOnClassesThat().resideInAnyPackage(CORE + "..application..", CORE + "..adapter..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        CORE + "..application.service..", CORE + "..application.port.in..",
+                        CORE + "..application.port.spi..", CORE + "..adapter..", CORE + "..config..")
                 .check(CLASSES);
         // Um sistema externo por pacote, sem um enxergar o outro
         slices().matching(INTEGRACOES + ".(*)..").should().notDependOnEachOther().check(CLASSES);
@@ -117,12 +119,26 @@ class ArquiteturaModulosTest {
     }
 
     @Test
-    void appNaoUsaEntidadesNemRepositoriosDeEscrita() {
-        // O app traduz HTTP: cria pelo motor e lê pelas projeções do query. Entidades JPA e adapters do core ficam
-        // por trás (enums do jpa-core, usados nas projeções, são permitidos).
+    void appEntraNoCoreSoPelosUseCases() {
+        // O REST chama os use cases (port.in) e usa os tipos do domínio. Motor, ports de saída, SPI e adapters ficam
+        // por trás. Entidades JPA também: a leitura usa as projeções do query (enums do jpa-core são permitidos).
         noClasses().that().resideInAPackage(APP + "..")
-                .should().dependOnClassesThat().areAnnotatedWith(jakarta.persistence.Entity.class)
-                .orShould().dependOnClassesThat().resideInAPackage(CORE + "..adapter..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        CORE + "..application.service..", CORE + "..application.port.out..",
+                        CORE + "..application.port.spi..", CORE + "..adapter..", CORE + "..config..")
+                .orShould().dependOnClassesThat().areAnnotatedWith(jakarta.persistence.Entity.class)
+                .check(CLASSES);
+    }
+
+    @Test
+    void restOrganizadoPorPapel() {
+        // resource → mapper → dto; o dto não conhece resource nem mapper
+        noClasses().that().resideInAPackage(APP + ".adapter.inbound.rest.dto..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        APP + ".adapter.inbound.rest.resource..", APP + ".adapter.inbound.rest.mapper..")
+                .check(CLASSES);
+        noClasses().that().resideInAPackage(APP + ".adapter.inbound.rest.mapper..")
+                .should().dependOnClassesThat().resideInAPackage(APP + ".adapter.inbound.rest.resource..")
                 .check(CLASSES);
     }
 

@@ -87,8 +87,8 @@ class ArquiteturaModulosTest {
         // Do core, a integração só enxerga o domínio e os ports de saída que implementa
         noClasses().that().resideInAPackage(INTEGRACOES + "..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        CORE + "..application.service..", CORE + "..application.port.in..",
-                        CORE + "..application.port.spi..", CORE + "..adapter..", CORE + "..config..")
+                        CORE + "..application.service..", CORE + "..application.port.spi..",
+                        CORE + "..adapter..", CORE + "..config..")
                 .check(CLASSES);
         // Um sistema externo por pacote, sem um enxergar o outro
         slices().matching(INTEGRACOES + ".(*)..").should().notDependOnEachOther().check(CLASSES);
@@ -119,13 +119,13 @@ class ArquiteturaModulosTest {
     }
 
     @Test
-    void appEntraNoCoreSoPelosUseCases() {
-        // O REST chama os use cases (port.in) e usa os tipos do domínio. Motor, ports de saída, SPI e adapters ficam
+    void appEntraNoCorePeloMotor() {
+        // O REST chama o motor (application.service) e usa os tipos do domínio. Ports de saída, SPI e adapters ficam
         // por trás. Entidades JPA também: a leitura usa as projeções do query (enums do jpa-core são permitidos).
         noClasses().that().resideInAPackage(APP + "..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        CORE + "..application.service..", CORE + "..application.port.out..",
-                        CORE + "..application.port.spi..", CORE + "..adapter..", CORE + "..config..")
+                        CORE + "..application.port.out..", CORE + "..application.port.spi..",
+                        CORE + "..adapter..", CORE + "..config..")
                 .orShould().dependOnClassesThat().areAnnotatedWith(jakarta.persistence.Entity.class)
                 .check(CLASSES);
     }

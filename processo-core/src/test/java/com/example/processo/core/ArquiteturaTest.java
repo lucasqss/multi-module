@@ -13,8 +13,10 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
  * pule outra. Estas regras fazem esse papel, em cada contexto (motor, segmento.*):
  *
  * <pre>
- * adapter / config  →  application (port.in, port.out, port.spi, service)  →  domain (model, state, rule, ...)
+ * adapter / config  →  application (port.out, port.spi, service)  →  domain (model, state, rule, ...)
  * </pre>
+ *
+ * Interface só onde há costura real (port.out e port.spi): dentro do contexto, injeta-se a classe.
  */
 class ArquiteturaTest {
 
@@ -52,14 +54,6 @@ class ArquiteturaTest {
         noClasses().that().resideInAPackage("..core..application..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "..core..adapter..", "..core..config..", "com.example.jpacore..")
-                .check(CLASSES);
-    }
-
-    @Test
-    void repositoriesNaoConhecemODominio() {
-        // Jakarta Data puro sobre as entidades: a conversão para o domínio é do mapper, no adapter
-        noClasses().that().resideInAPackage("..persistence.repository..")
-                .should().dependOnClassesThat().resideInAnyPackage("..core..domain..", "..core..application..")
                 .check(CLASSES);
     }
 }

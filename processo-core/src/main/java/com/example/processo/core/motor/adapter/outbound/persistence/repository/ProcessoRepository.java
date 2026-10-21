@@ -1,5 +1,7 @@
 package com.example.processo.core.motor.adapter.outbound.persistence.repository;
 
+import com.example.processo.core.motor.application.port.out.Processos;
+import com.example.processo.core.motor.domain.state.Situacao;
 import jakarta.data.repository.Query;
 import jakarta.data.repository.Repository;
 import org.hibernate.annotations.processing.SQL;
@@ -7,9 +9,9 @@ import org.hibernate.annotations.processing.SQL;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Jakarta Data puro, sobre a tabela pai: o que o motor precisa sem conhecer o segmento. */
+/** Implementa o port do motor sobre a tabela pai: o que o motor precisa sem conhecer o segmento. */
 @Repository
-public interface ProcessoRepository {
+public interface ProcessoRepository extends Processos {
 
     @Query("select segmento from ProcessoEntity where id = :id")
     Optional<String> buscarSegmento(UUID id);
@@ -20,4 +22,15 @@ public interface ProcessoRepository {
      */
     @SQL("update PROCESSO set SITUACAO = :para, MOTIVO_RECUSA = :motivo where ID = :id and SITUACAO = :de")
     int atualizarSituacao(UUID id, String de, String para, String motivo);
+
+    @Override
+    default Optional<String> segmentoDe(UUID id) {
+        return buscarSegmento(id);
+    }
+
+    /** Compare-and-set: só uma linha muda se a situação ainda for a anterior. */
+    @Override
+    default boolean mudarSituacao(UUID id, Situacao de, Situacao para, String motivoRecusa) {
+        return atualizarSituacao(id, de.name(), para.name(), motivoRecusa) == 1;
+    }
 }

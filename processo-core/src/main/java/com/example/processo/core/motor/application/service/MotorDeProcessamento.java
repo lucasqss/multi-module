@@ -1,8 +1,5 @@
 package com.example.processo.core.motor.application.service;
 
-import com.example.processo.core.motor.application.port.in.CancelarProcessoUseCase;
-import com.example.processo.core.motor.application.port.in.CriarProcessoUseCase;
-import com.example.processo.core.motor.application.port.in.ProcessarProcessoUseCase;
 import com.example.processo.core.motor.application.port.out.Numeracao;
 import com.example.processo.core.motor.application.port.out.Processos;
 import com.example.processo.core.motor.application.port.out.SituacaoCadastral;
@@ -30,9 +27,9 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
- * Motor único, que implementa os use cases de entrada ({@code port.in}): o mesmo fluxo de criação e o mesmo ciclo
- * de vida para todos os segmentos. O que varia (dados, regras, prefixo, gravação, decisão do processamento) vem do
- * {@link Segmento}; os estados e as transições são do motor, pelo padrão State ({@code domain.state}).
+ * Motor único: o mesmo fluxo de criação e o mesmo ciclo de vida para todos os segmentos. O que varia (dados,
+ * regras, prefixo, gravação, decisão do processamento) vem do {@link Segmento}; os estados e as transições são do
+ * motor, pelo padrão State ({@code domain.state}). É o ponto de entrada do core: o REST o injeta direto.
  *
  * <pre>
  * criar:     regras comuns → regras do segmento → situação cadastral (externo)  | fora de transação
@@ -47,7 +44,7 @@ import java.util.function.Consumer;
  * {@link ConflitoDeSituacaoException} em vez de sobrescrever.
  */
 @ApplicationScoped
-public class MotorDeProcessamento implements CriarProcessoUseCase, ProcessarProcessoUseCase, CancelarProcessoUseCase {
+public class MotorDeProcessamento {
 
     private final Map<Class<?>, Segmento<?>> porTipoDosDados = new HashMap<>();
     private final Map<String, Segmento<?>> porCodigo = new HashMap<>();
@@ -83,7 +80,6 @@ public class MotorDeProcessamento implements CriarProcessoUseCase, ProcessarProc
         this.publicar = publicar;
     }
 
-    @Override
     public <D extends DadosDoSegmento> Processo<D> criar(Solicitacao<D> solicitacao) {
         var segmento = segmentoDe(solicitacao.dados());
         // A chamada ao sistema externo vem por último: só acontece se a solicitação passou em todas as outras regras
@@ -98,12 +94,10 @@ public class MotorDeProcessamento implements CriarProcessoUseCase, ProcessarProc
         });
     }
 
-    @Override
     public Processo<?> processar(UUID id) {
         return processar(segmentoDoProcesso(id), id);
     }
 
-    @Override
     public Processo<?> cancelar(UUID id) {
         return cancelar(segmentoDoProcesso(id), id);
     }

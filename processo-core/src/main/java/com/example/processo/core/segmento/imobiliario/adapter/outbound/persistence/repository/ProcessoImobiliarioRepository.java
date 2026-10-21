@@ -2,6 +2,10 @@ package com.example.processo.core.segmento.imobiliario.adapter.outbound.persiste
 
 import com.example.jpacore.ProcessoImobiliarioEntity;
 import com.example.jpacore.SituacaoProcesso;
+import com.example.processo.core.motor.domain.model.Processo;
+import com.example.processo.core.segmento.imobiliario.adapter.outbound.persistence.mapper.ProcessoImobiliarioMapper;
+import com.example.processo.core.segmento.imobiliario.application.port.out.ProcessosImobiliarios;
+import com.example.processo.core.segmento.imobiliario.domain.model.DadosImobiliarios;
 import jakarta.data.repository.Find;
 import jakarta.data.repository.Insert;
 import jakarta.data.repository.Query;
@@ -11,9 +15,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Jakarta Data puro, sobre a entidade filha: não conhece o domínio (quem converte é o mapper). */
+/**
+ * Implementa o port do segmento: os métodos Jakarta Data trabalham com a entidade e os {@code default} convertem
+ * pelo mapper.
+ */
 @Repository
-public interface ProcessoImobiliarioRepository {
+public interface ProcessoImobiliarioRepository extends ProcessosImobiliarios {
+
+    List<SituacaoProcesso> EM_ANDAMENTO = List.of(SituacaoProcesso.ABERTO, SituacaoProcesso.EM_PROCESSAMENTO);
 
     /** situacao vem da entidade pai: a consulta na filha enxerga os campos herdados (join automático). */
     @Query("select count(*) from ProcessoImobiliarioEntity where matricula = :matricula and uf = :uf and situacao in :situacoes")
@@ -24,4 +33,19 @@ public interface ProcessoImobiliarioRepository {
 
     @Find
     Optional<ProcessoImobiliarioEntity> buscar(UUID id);
+
+    @Override
+    default boolean existeEmAndamentoParaMatricula(String matricula, String uf) {
+        return contar(matricula, uf, EM_ANDAMENTO) > 0;
+    }
+
+    @Override
+    default void salvar(Processo<DadosImobiliarios> processo) {
+        inserir(ProcessoImobiliarioMapper.paraEntidade(processo));
+    }
+
+    @Override
+    default Optional<Processo<DadosImobiliarios>> porId(UUID id) {
+        return buscar(id).map(ProcessoImobiliarioMapper::paraDominio);
+    }
 }

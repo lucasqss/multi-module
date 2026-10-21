@@ -51,14 +51,17 @@ Cada contexto (o motor e cada segmento) segue a mesma estrutura hexagonal:
 
 ```
 domain/        model · state · rule · exception · event         Java puro
-application/   port/in (use cases) · port/out · port/spi · service
+application/   port/out · port/spi · service (o motor e os segmentos)
 adapter/       inbound/rest/{resource, dto, mapper, exception}   (no processo-app)
-               outbound/persistence/{adapter, repository, mapper}
+               outbound/persistence/{repository, mapper}
 config/        producers CDI
 ```
 
-Pelas regras do ArchUnit, a dependência vai sempre `adapter → application → domain`. O REST entra no core só pelos
-use cases (`port/in`), e os repositories Jakarta Data não conhecem o domínio, porque quem converte é o mapper.
+Pelas regras do ArchUnit, a dependência vai sempre `adapter → application → domain`. O REST entra no core pelo
+motor, e cada repository Jakarta Data implementa o port de persistência, convertendo pelo mapper.
+
+**Interface só onde há costura real**: entre módulos, com sistema externo ou num ponto de extensão (`Segmento`,
+`SituacaoCadastral`, o evento `ProcessoCriado`). Dentro de um contexto, injeta-se a classe.
 
 ## API
 
@@ -153,7 +156,7 @@ com `Unsatisfied dependency for type ...SituacaoCadastral`, em vez de falhar em 
    - `domain/rule`: as regras;
    - `application/port/out`: o port de persistência;
    - `application/service`: o bean que implementa `Segmento<D>`, incluindo `carregar` e a decisão `avaliar`;
-   - `adapter/outbound/persistence`: o adapter, o repository e o mapper.
+   - `adapter/outbound/persistence`: o repository (que implementa o port) e o mapper.
 2. **No `jpa-core`**: entidade filha de `ProcessoEntity` com `@DiscriminatorValue`, mais a migration da tabela.
 3. **No `processo-query`**: a consulta de detalhe na filha. A listagem já inclui o segmento novo.
 4. **No `processo-app`**, em `adapter/inbound/rest`:

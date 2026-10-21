@@ -129,7 +129,6 @@ O `ArquiteturaTest` do core garante que:
 - os segmentos não se enxergam;
 - as camadas seguem `adapter/config → application → domain`: o domínio só usa Java puro (e o domínio do motor),
   e a application só conhece os ports, nunca os adapters;
-- os repositories Jakarta Data não conhecem o domínio (quem converte é o mapper).
 
 O `ArquiteturaModulosTest` do app garante que:
 
@@ -140,7 +139,7 @@ O `ArquiteturaModulosTest` do app garante que:
 - ninguém depende do app;
 - o `jpa-core` não conhece o resto;
 - HTTP só aparece no app, na impressão e nas integrações;
-- o app entra no core só pelos use cases (`port.in`) e pelos tipos do domínio; não usa entidades JPA;
+- o app entra no core pelo motor (`application.service`) e pelos tipos do domínio, nunca pelos ports de saída, SPI ou adapters; não usa entidades JPA;
 - no REST, o `dto` não conhece `resource` nem `mapper`, e o `mapper` não conhece `resource`;
 - não há ciclos entre pacotes;
 - toda classe pertence a um módulo registrado.
@@ -156,13 +155,21 @@ Estrutura hexagonal, igual em todo contexto. As pastas estruturais têm nomes em
 | `domain/rule` | `Especificacao` e as regras |
 | `domain/exception` | exceções de negócio |
 | `domain/event` | eventos de domínio |
-| `application/port/in` | use cases de entrada, chamados pelos adapters de entrada (REST) |
 | `application/port/out` | o que a aplicação precisa de fora (persistência, sistemas externos, transação) |
 | `application/port/spi` | ponto de extensão do motor (`Segmento`) |
-| `application/service` | implementação dos use cases e dos SPIs |
+| `application/service` | o motor e as implementações do SPI (os segmentos) |
 | `adapter/inbound/rest` | `resource/` (endpoints), `dto/` (contratos de request/response), `mapper/` (dto ↔ domínio), `exception/` (exceção → HTTP) |
-| `adapter/outbound/persistence` | o adapter que implementa o port, `repository/` (Jakarta Data puro) e `mapper/` (entidade ↔ domínio) |
+| `adapter/outbound/persistence` | `repository/` (Jakarta Data, implementa o port de persistência) e `mapper/` (entidade ↔ domínio) |
 | `config` | producers CDI (ex.: `Clock`) |
+
+### Interface só onde há costura real
+
+Uma interface só existe quando há uma costura de verdade: entre módulos, com sistema externo ou num ponto de
+extensão. Os exemplos são o SPI `Segmento` (o motor não conhece os segmentos), `SituacaoCadastral` (o core não conhece o
+REST Client, que mora em `integracoes`) e o evento `ProcessoCriado` (a impressão pode ser apagada). Dentro de um
+contexto, injeta-se a classe: uma interface com uma única implementação no mesmo módulo é indireção sem retorno. Por
+isso o REST injeta o `MotorDeProcessamento` direto, e o repository Jakarta Data implementa o port de persistência
+sem uma classe adapter no meio.
 
 ## Core (`com.example.processo.core`)
 
@@ -175,14 +182,13 @@ Estrutura hexagonal, igual em todo contexto. As pastas estruturais têm nomes em
   - `exception`: regra violada, processo não encontrado, conflito de situação, sistema externo indisponível;
   - `event`: `ProcessoCriado`.
 - `application`:
-  - `port/in`: `CriarProcessoUseCase`, `ProcessarProcessoUseCase`, `CancelarProcessoUseCase`;
   - `port/out`: `Processos`, `Numeracao`, `SituacaoCadastral` (implementado em `integracoes`), `Transacoes`;
   - `port/spi`: `Segmento<D>`;
-  - `service`: `MotorDeProcessamento`, que implementa os três use cases e recusa dois segmentos com o mesmo código
-    ou o mesmo tipo de dados.
+  - `service`: `MotorDeProcessamento`, o ponto de entrada do core (criar, processar, cancelar). Recusa dois
+    segmentos com o mesmo código ou o mesmo tipo de dados.
 - `adapter/outbound`:
-  - `persistence`: `ProcessosAdapter` e `NumeracaoAdapter`, sobre `repository/ProcessoRepository` (update
-    condicional com `@SQL`) e `repository/NumeracaoRepository` (sequence);
+  - `persistence/repository`: `ProcessoRepository` (update condicional com `@SQL`) e `NumeracaoRepository`
+    (sequence), que implementam os ports `Processos` e `Numeracao`;
   - `transaction`: `TransacoesQuarkus`.
 - `config`: `Relogio`, o producer do `Clock`.
 
@@ -196,9 +202,8 @@ Estrutura hexagonal, igual em todo contexto. As pastas estruturais têm nomes em
   imobiliário aplica por último a regra que consulta o banco: não pode haver processo em andamento para a mesma
   matrícula na mesma UF.
 - `adapter/outbound/persistence`:
-  - o adapter (`ProcessosImobiliariosAdapter`) implementa o port;
-  - `repository/` (`ProcessoImobiliarioRepository`) faz o `@Insert` da entidade filha, que grava as duas tabelas, e
-    o `@Find`;
+  - `repository/` (`ProcessoImobiliarioRepository`) implementa o port: o `@Insert` da entidade filha grava as duas
+    tabelas, o `@Find` lê, e os métodos `default` do port convertem pelo mapper;
   - `mapper/` (`ProcessoImobiliarioMapper`) converte entidade ↔ domínio.
 
 ## Query (`com.example.processo.query`)
@@ -210,8 +215,8 @@ Estrutura hexagonal, igual em todo contexto. As pastas estruturais têm nomes em
 
 ## App (`com.example.processo.app.adapter.inbound.rest`)
 
-- `resource/`: `ProcessoImobiliarioResource` e `ProcessoVeicularResource` (criar pelo `CriarProcessoUseCase`,
-  detalhe pelo query) e `ProcessosResource` (listagem, processar e cancelar pelos use cases).
+- `resource/`: `ProcessoImobiliarioResource` e `ProcessoVeicularResource` (criar pelo motor, detalhe pelo query) e
+  `ProcessosResource` (listagem pelo query; processar e cancelar pelo motor).
 - `dto/`: contratos de request (`NovoProcessoImobiliarioRequest`, `ImovelRequest`, `NovoProcessoVeicularRequest`,
   `VeiculoRequest`, `ProponenteRequest`) e de response (`ProcessoCriadoResponse`, `SituacaoResponse`,
   `ErroResponse`). Os GETs devolvem direto as projeções do query, que já são o contrato de leitura.

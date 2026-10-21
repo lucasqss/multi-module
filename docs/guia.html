@@ -312,15 +312,20 @@
       <tr><td><code>domain/state</code></td><td>A máquina de estados (padrão State).</td></tr>
       <tr><td><code>domain/rule</code></td><td><code>Especificacao</code> e as regras de negócio.</td></tr>
       <tr><td><code>domain/exception</code>, <code>domain/event</code></td><td>Exceções de negócio e eventos de domínio.</td></tr>
-      <tr><td><code>application/port/in</code></td><td>Use cases de entrada, chamados pelo REST (<code>CriarProcessoUseCase</code>...).</td></tr>
       <tr><td><code>application/port/out</code></td><td>O que a aplicação precisa de fora: persistência, sistemas externos, transação.</td></tr>
       <tr><td><code>application/port/spi</code></td><td>Ponto de extensão do motor (<code>Segmento</code>).</td></tr>
-      <tr><td><code>application/service</code></td><td>Implementação dos use cases e do SPI.</td></tr>
+      <tr><td><code>application/service</code></td><td>O motor (ponto de entrada do core, injetado pelo REST) e as implementações do SPI (os segmentos).</td></tr>
       <tr><td><code>adapter/inbound/rest</code></td><td><code>resource/</code> (endpoints), <code>dto/</code> (contratos de request e response), <code>mapper/</code> (dto ↔ domínio), <code>exception/</code> (exceção → HTTP). Fica no <code>processo-app</code>.</td></tr>
-      <tr><td><code>adapter/outbound/persistence</code></td><td>O adapter que implementa o port, <code>repository/</code> (Jakarta Data puro) e <code>mapper/</code> (entidade ↔ domínio).</td></tr>
+      <tr><td><code>adapter/outbound/persistence</code></td><td><code>repository/</code> (Jakarta Data; implementa o port de persistência) e <code>mapper/</code> (entidade ↔ domínio).</td></tr>
       <tr><td><code>config</code></td><td>Producers CDI (ex.: <code>Clock</code>).</td></tr>
     </tbody>
   </table></div>
+  <div class="note"><strong>Interface só onde há costura real</strong>Uma interface existe quando há costura de
+    verdade: entre módulos, com sistema externo ou num ponto de extensão. Os exemplos são o SPI <code>Segmento</code> (o
+    motor não conhece os segmentos), <code>SituacaoCadastral</code> (o core não conhece o REST Client) e o evento
+    <code>ProcessoCriado</code> (a impressão pode ser apagada). Dentro de um contexto, injeta-se a classe: uma interface
+    com uma única implementação no mesmo módulo é indireção sem retorno. Por isso o REST injeta o
+    <code>MotorDeProcessamento</code>, e o repository Jakarta Data implementa o port sem uma classe adapter no meio.</div>
 <pre><code>multi-module/
 ├─ pom.xml                     agregador: BOM Quarkus, versões, hibernate-processor, jandex, JaCoCo, Sonar
 ├─ docker-compose.yml          Oracle para rodar o jar fora dos testes
@@ -341,12 +346,11 @@
 │  │  │  ├─ exception/   RegraViolada, ProcessoNaoEncontrado, ConflitoDeSituacao, SistemaExternoIndisponivel
 │  │  │  └─ event/       ProcessoCriado
 │  │  ├─ application/
-│  │  │  ├─ port/in/     CriarProcessoUseCase, ProcessarProcessoUseCase, CancelarProcessoUseCase
 │  │  │  ├─ port/out/    Processos, Numeracao, SituacaoCadastral, Transacoes
 │  │  │  ├─ port/spi/    Segmento
-│  │  │  └─ service/     MotorDeProcessamento (implementa os use cases)
+│  │  │  └─ service/     MotorDeProcessamento (ponto de entrada do core)
 │  │  ├─ adapter/outbound/
-│  │  │  ├─ persistence/ ProcessosAdapter, NumeracaoAdapter · repository/ ProcessoRepository, NumeracaoRepository
+│  │  │  ├─ persistence/ repository/ ProcessoRepository, NumeracaoRepository (implementam os ports)
 │  │  │  └─ transaction/ TransacoesQuarkus
 │  │  └─ config/         Relogio
 │  └─ segmento/
@@ -354,8 +358,7 @@
 │     │  ├─ domain/      model/ DadosImobiliarios · rule/ RegrasImobiliarias
 │     │  ├─ application/ port/out/ ProcessosImobiliarios · service/ SegmentoImobiliario
 │     │  └─ adapter/outbound/persistence/
-│     │                  ProcessosImobiliariosAdapter · repository/ ProcessoImobiliarioRepository
-│     │                  · mapper/ ProcessoImobiliarioMapper
+│     │                  repository/ ProcessoImobiliarioRepository · mapper/ ProcessoImobiliarioMapper
 │     └─ veicular/       mesma estrutura (DadosVeiculares, RegrasVeiculares, SegmentoVeicular...)
 ├─ processo-query/  (com.example.processo.query)
 │  ├─ repository/        ProcessoQueries
@@ -480,7 +483,7 @@ SEQ_NUMERO_PROCESSO   sequence única de numeração</code></pre>
     <li>Um <code>sealed</code> não funcionaria entre módulos Maven.</li>
     <li>Para o motor, todo processo é igual e só <code>D</code> muda.</li>
   </ul>
-  <p>Cada segmento converte o próprio <code>Processo&lt;D&gt;</code> na própria entidade filha, no adapter de persistência.</p>
+  <p>Cada segmento converte o próprio <code>Processo&lt;D&gt;</code> na própria entidade filha, no mapper de persistência.</p>
   <h3>Por que o <code>jpa-core</code> fica fora do <code>processo-core</code></h3>
   <p>Escrita e leitura precisam das mesmas entidades e não podem se enxergar. Com as entidades num módulo próprio:</p>
   <ul>
@@ -650,8 +653,8 @@ public class CadastroClientSimulado implements CadastroClient { ... }   // sempr
     <li><strong>Empacotamento:</strong> o <code>jandex-maven-plugin</code> indexa o jar, e o Quarkus descobre o bean
       gerado.</li>
     <li><strong>Build do Quarkus:</strong> o CDI liga <code>ProcessoQueries</code> → <code>ProcessoQueries_</code>. No
-      core, os repositories não conhecem o domínio: o adapter (<code>ProcessosImobiliariosAdapter</code>) implementa o
-      port, chama o repository e converte com o mapper. O motor nem sabe que é Jakarta Data.</li>
+      core, o repository estende o port de persistência: o bean gerado implementa o port, e os métodos
+      <code>default</code> convertem com o mapper. O motor nem sabe que é Jakarta Data.</li>
   </ol>
   <p>Em relação ao Panache, a parte implícita fica no build (código gerado e validado), e não em tempo de execução
     (strings de consulta e projeção por reflexão). O query também não herda <code>persist</code> nem
@@ -667,15 +670,14 @@ public class CadastroClientSimulado implements CadastroClient { ... }   // sempr
     <div class="card">
       <h4><code>processo-core</code> · ArquiteturaTest</h4>
       <p>O motor não conhece segmentos. Segmentos não se enxergam. Camadas: <code>domain</code> só usa Java puro (e o
-        domínio do motor); <code>application</code> só conhece ports, nunca adapters. Os repositories Jakarta Data não
-        conhecem o domínio.</p>
+        domínio do motor); <code>application</code> só conhece ports, nunca adapters.</p>
     </div>
     <div class="card">
       <h4><code>processo-app</code> · ArquiteturaModulosTest</h4>
       <p>Core e query não se enxergam. Ninguém depende da impressão, das integrações nem do app. As integrações só
         usam o domínio e os <code>port/out</code> do core e não se enxergam entre si. O <code>jpa-core</code> não conhece o
-        resto. HTTP só no app, na impressão e nas integrações. O app entra no core só pelos use cases
-        (<code>port/in</code>) e não usa entidades JPA. No REST, <code>dto</code> não conhece <code>resource</code> nem
+        resto. HTTP só no app, na impressão e nas integrações. O app entra no core pelo motor, nunca
+        pelos ports de saída, SPI ou adapters, e não usa entidades JPA. No REST, <code>dto</code> não conhece <code>resource</code> nem
         <code>mapper</code>. Não há ciclos entre pacotes, e toda classe pertence a um módulo registrado.</p>
     </div>
   </div>
@@ -737,7 +739,7 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
         <li><code>application/port/out</code>: port de persistência (gravar e carregar);</li>
         <li><code>application/service</code>: bean que implementa <code>Segmento&lt;D&gt;</code>, incluindo
           <code>carregar</code> e <code>avaliar</code>;</li>
-        <li><code>adapter/outbound/persistence</code>: adapter, <code>repository/</code> e <code>mapper/</code>.</li>
+        <li><code>adapter/outbound/persistence</code>: <code>repository/</code> (implementa o port) e <code>mapper/</code>.</li>
       </ul></li>
     <li><code>processo-query</code>: projeção e consulta de detalhe na filha. A listagem já inclui o segmento novo.</li>
     <li><code>processo-app</code>, em <code>adapter/inbound/rest</code>: <code>resource/</code> com

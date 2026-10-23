@@ -6,6 +6,7 @@ import com.example.processo.core.motor.domain.exception.ProcessoNaoEncontradoExc
 import com.example.processo.core.motor.domain.exception.RegraVioladaException;
 import com.example.processo.core.motor.domain.exception.SistemaExternoIndisponivelException;
 import com.example.processo.core.motor.domain.state.TransicaoInvalidaException;
+import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.core.Response;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 
@@ -30,6 +31,12 @@ public class TratadorDeErros {
     @ServerExceptionMapper
     public Response conflito(ConflitoDeSituacaoException e) {
         return erro(409, e);
+    }
+
+    /** Parâmetro de consulta inválido (ex.: paginação fora dos limites), com o mesmo corpo dos outros erros. */
+    @ServerExceptionMapper
+    public Response parametroInvalido(BadRequestException e) {
+        return erro(400, e);
     }
 
     @ServerExceptionMapper

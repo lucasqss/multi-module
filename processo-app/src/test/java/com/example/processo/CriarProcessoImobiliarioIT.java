@@ -14,7 +14,6 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
@@ -100,14 +99,35 @@ class CriarProcessoImobiliarioIT {
     void listagemDeTodosOsSegmentosComFiltroPorSituacao() {
         String numero = criar(matricula()).statusCode(201).extract().path("numero");
 
-        given().get("/processos").then().statusCode(200)
-                .body("find { it.numero == '%s' }.segmento".formatted(numero), equalTo("IMOBILIARIO"))
-                .body("find { it.numero == '%s' }.proponente".formatted(numero), equalTo("Ana Souza"));
-        given().queryParam("situacao", "ABERTO").get("/processos").then().statusCode(200)
-                .body("numero", hasItem(numero));
-        given().queryParam("situacao", "CANCELADO").get("/processos").then().statusCode(200)
-                .body("numero", not(hasItem(numero)));
+        var item = Listagem.porNumero(Listagem.todos(null), numero);
+        assertEquals("IMOBILIARIO", item.get("segmento"));
+        assertEquals("Ana Souza", item.get("proponente"));
+        Listagem.porNumero(Listagem.todos("ABERTO"), numero);
+        assertTrue(Listagem.todos("CANCELADO").stream().noneMatch(i -> numero.equals(i.get("numero"))));
         given().queryParam("situacao", "QUALQUER").get("/processos").then().statusCode(404);
+    }
+
+    @Test
+    void listagemPaginada() {
+        criar(matricula()).statusCode(201);
+        criar(matricula()).statusCode(201);
+
+        var primeira = given().queryParam("tamanho", 1).get("/processos").then().statusCode(200)
+                .body("pagina", equalTo(1))
+                .body("tamanho", equalTo(1))
+                .body("itens.size()", equalTo(1))
+                .extract().jsonPath();
+        assertTrue(primeira.getLong("total") >= 2);
+        given().queryParam("pagina", 2).queryParam("tamanho", 1).get("/processos").then().statusCode(200)
+                .body("itens[0].numero", not(equalTo(primeira.getString("itens[0].numero"))));
+    }
+
+    @Test
+    void paginacaoForaDosLimites() {
+        given().queryParam("tamanho", 0).get("/processos").then().statusCode(400)
+                .body("motivo", equalTo("pagina deve ser >= 1 e tamanho entre 1 e 100"));
+        given().queryParam("tamanho", 101).get("/processos").then().statusCode(400);
+        given().queryParam("pagina", 0).get("/processos").then().statusCode(400);
     }
 
     @Test

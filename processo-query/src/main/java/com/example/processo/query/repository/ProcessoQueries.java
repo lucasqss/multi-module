@@ -4,10 +4,11 @@ import com.example.jpacore.SituacaoProcesso;
 import com.example.processo.query.dto.DetalheImobiliario;
 import com.example.processo.query.dto.DetalheVeicular;
 import com.example.processo.query.dto.ResumoProcesso;
+import jakarta.data.page.Page;
+import jakarta.data.page.PageRequest;
 import jakarta.data.repository.Query;
 import jakarta.data.repository.Repository;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,14 +21,14 @@ public interface ProcessoQueries {
             from ProcessoEntity p""";
 
     /**
-     * Listagem polimórfica: consulta o pai (todos os segmentos) projetando só colunas de PROCESSO, então segmento
-     * novo não acrescenta join aqui.
+     * Listagem polimórfica e paginada: consulta o pai (todos os segmentos) projetando só colunas de PROCESSO, então
+     * segmento novo não acrescenta join aqui. O Hibernate gera também o count para o total.
      */
     @Query(RESUMO + " order by p.numero")
-    List<ResumoProcesso> todos();
+    Page<ResumoProcesso> todos(PageRequest pagina);
 
     @Query(RESUMO + " where p.situacao = :situacao order by p.numero")
-    List<ResumoProcesso> naSituacao(SituacaoProcesso situacao);
+    Page<ResumoProcesso> naSituacao(SituacaoProcesso situacao, PageRequest pagina);
 
     /** Detalhe de um segmento: consulta direto a filha, que já enxerga os campos herdados do pai. */
     @Query("""

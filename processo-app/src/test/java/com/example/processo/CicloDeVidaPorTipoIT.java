@@ -157,8 +157,9 @@ class CicloDeVidaPorTipoIT {
         var id = criar(tipo, tipo.aprovavel().get());
         given().post("/processos/" + id + "/processamento").then().statusCode(200);
 
-        given().queryParam("situacao", "CONCLUIDO").get("/processos").then().statusCode(200)
-                .body("find { it.id == '%s' }.segmento".formatted(id), equalTo(tipo.nome()));
+        var item = Listagem.todos("CONCLUIDO").stream().filter(i -> id.equals(i.get("id"))).findFirst()
+                .orElseThrow(() -> new AssertionError("Processo " + id + " não está na listagem"));
+        assertEquals(tipo.nome(), item.get("segmento"));
     }
 
     @Test

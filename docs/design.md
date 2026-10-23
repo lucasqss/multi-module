@@ -7,7 +7,8 @@ consultados pelo mesmo motor, para validar seis requisitos:
 
 1. **O processo de cada tipo é filho do processo.** Os dados comuns ficam no pai e os do tipo na filha.
 2. **O motor de processamento é único para todos os segmentos.** Segmento novo não altera o motor.
-3. **A impressão (ponte para o sistema de PDF) é descartável.** Ela fica num módulo próprio que pode ser apagado.
+3. **O PDF de abertura vem de um sistema externo.** O motor pede depois do commit, por um port; a integração fica
+   em `integracoes.pdf`, e falha no PDF não desfaz o processo.
 4. **Toda a lógica de negócio fica num `processo-core`, sem HTTP.** O REST fica no app e as consultas num módulo
    à parte.
 5. **Integrações de saída não contaminam o core.** O core declara o que precisa (port) e o módulo `integracoes`
@@ -19,7 +20,7 @@ consultados pelo mesmo motor, para validar seis requisitos:
 
 | Tema | Decisão |
 |---|---|
-| Módulos | `jpa-core`, `processo-core`, `processo-query`, `integracoes`, `impressao`, `processo-app` |
+| Módulos | `jpa-core`, `processo-core`, `processo-query`, `integracoes`, `processo-app` |
 | Integrações de saída | Port no domínio do core, implementação em `integracoes.<sistema>` (um pacote por sistema), com tradução do modelo externo; o app liga pela dependência |
 | Motor e segmentos | No mesmo módulo (`processo-core`), em pacotes `motor` e `segmento.<nome>`; ArchUnit garante que o motor não conhece segmentos e que segmentos não se enxergam |
 | REST | Todo no `processo-app`; o core não tem dependência de HTTP |
@@ -30,7 +31,9 @@ consultados pelo mesmo motor, para validar seis requisitos:
 | Ponto de extensão | SPI `Segmento<D>`: código, prefixo, tipo dos dados, regras próprias e gravação |
 | Regras | `Especificacao<T>`: devolve o motivo da violação; comuns primeiro, depois as do segmento, por último a que consulta o banco |
 | Numeração | Sequence `SEQ_NUMERO_PROCESSO`, única para todos os segmentos: `<prefixo>-<ano>-<6 dígitos>` |
-| Impressão | Observa `ProcessoCriado` com `TransactionPhase.AFTER_SUCCESS` e chama o sistema de PDF por REST Client |
+| PDF de abertura | Port `GeradorDeDocumentos` chamado pelo motor depois do commit; `integracoes.pdf` chama o sistema por REST Client (timeout 2 s); falha só vai para o log |
+| Listagem | Paginada com `Page`/`PageRequest` do Jakarta Data: `?pagina` (1..) e `?tamanho` (1..100) |
+| Operação | `quarkus-smallrye-openapi` (`/q/openapi`, Swagger UI no dev) e `quarkus-smallrye-health` (`/q/health`) |
 | Persistência | Jakarta Data sobre `StatelessSession`, HQL validado em compilação pelo Hibernate Processor |
 | Deploy | Único, via `processo-app` |
 | Testes | Unitários sem Quarkus (motor com segmentos falsos; segmento plugado no motor real com fake do port); ArchUnit no core e entre módulos; `@QuarkusIntegrationTest` contra o jar com Oracle do Dev Services e um sistema de PDF falso |
@@ -55,15 +58,13 @@ arquivo, e o valor persistido e o comportamento são o mesmo objeto.
 Tudo vai no mesmo jar e é mantido pelo mesmo time. Um módulo Maven por segmento daria a mesma garantia que as
 regras do ArchUnit já dão, mas cobraria mais um POM, mais um jandex e mais uma dependência direta no app por
 segmento. Um módulo por segmento só compensaria com times diferentes, dependências pesadas exclusivas de um
-segmento ou deploys com conjuntos diferentes de segmentos. A impressão continua em módulo próprio porque ali o
-módulo tem função: apagar a pasta remove a ponte.
+segmento ou deploys com conjuntos diferentes de segmentos.
 
 ### Por que o REST fica no app
 
 O core fica só com regra e persistência, e não sabe que existe HTTP (o Maven garante: ele não tem a extensão
 REST). O app é a porta de entrada: traduz HTTP, cria pelo motor e lê pelo query. Outras entradas, como um
-consumidor de fila do mainframe, entram no mesmo lugar ou, se forem descartáveis, num módulo próprio como a
-impressão. Custo: segmento novo também ganha código no app (os endpoints).
+consumidor de fila do mainframe, entram no mesmo lugar ou, se forem descartáveis, num módulo próprio. Custo: segmento novo também ganha código no app (os endpoints).
 
 ### Por que integrações num módulo à parte, e não no app nem no core
 
@@ -73,8 +74,7 @@ impressão. Custo: segmento novo também ganha código no app (os endpoints).
 - **Em `integracoes`**, o core declara o port (`SituacaoCadastral`) e testa com fakes, e o módulo implementa e
   traduz. Um pacote por sistema mantém um módulo só enquanto os sistemas forem pequenos e estáveis.
 
-Sistema com ciclo de vida próprio, dependências pesadas (SOAP, MQ, código gerado) ou descartável ganha módulo
-próprio. O motor consulta o sistema externo por último, só quando a solicitação já passou nas outras regras.
+Sistema com dependências pesadas (SOAP, MQ, código gerado) pode ganhar módulo próprio. O motor consulta o sistema externo por último, só quando a solicitação já passou nas outras regras.
 
 ### Por que um módulo de consultas
 
@@ -101,14 +101,15 @@ conhecessem todos os subtipos, e isso quebra a regra de que segmento novo não t
 endpoints entregam a solicitação ao mesmo `MotorDeProcessamento.criar`. A listagem, por ser só dos campos
 comuns, é uma só: `GET /processos`.
 
-### Por que evento e não port para a impressão
+### Por que o PDF é um port chamado pelo motor
 
-Com um port `Impressora` no motor, o motor dependeria de alguém implementá-lo, e remover o módulo exigiria um
-substituto. Com o evento, o motor só publica `ProcessoCriado` e não sabe se alguém escuta. `AFTER_SUCCESS`
-garante que só se imprime o que foi gravado e que uma falha no sistema de PDF não desfaz o processo.
+O PDF deixou de ser uma funcionalidade nossa (antes um módulo `impressao` que observava um evento) e passou a ser
+um sistema externo como o cadastro. Com o port `GeradorDeDocumentos`, o passo fica explícito no fluxo de criação,
+e a regra "falha no PDF não desfaz o processo" fica no motor, onde dá para ler e testar sem Quarkus. O motor só
+chama depois que a transação fez commit, então só se pede PDF do que foi gravado.
 
-A chamada é síncrona, depois do commit e antes da resposta HTTP. Em produção, se o PDF não puder se perder,
-o próximo passo é uma tabela de saída (outbox) com reprocessamento, ainda dentro do módulo `impressao`.
+A chamada é síncrona, depois do commit e antes da resposta HTTP, com timeout de 2 s. Se o PDF não puder se
+perder, o próximo passo é uma tabela de saída (outbox) gravada na mesma transação e reenviada por um job.
 
 ## Estrutura e dependências
 
@@ -119,9 +120,8 @@ multi-module/
 ├─ jpa-core/          @Entity pai/filha + db/migration     → quarkus-hibernate-orm, quarkus-flyway(-oracle)
 ├─ processo-core/     motor + segmento.*                   → jpa-core, jakarta.data-api
 ├─ processo-query/    consultas somente leitura            → jpa-core, jakarta.data-api
-├─ integracoes/       um pacote por sistema externo        → processo-core
-├─ impressao/         observer + REST Client               → processo-core, quarkus-rest-client-jackson
-└─ processo-app/      REST + montagem + ITs + ArchUnit     → processo-core, processo-query, integracoes, impressao, jpa-core, quarkus-rest-jackson, quarkus-jdbc-oracle
+├─ integracoes/       um pacote por sistema externo        → processo-core, quarkus-rest-client-jackson
+└─ processo-app/      REST + montagem + ITs + ArchUnit     → processo-core, processo-query, integracoes, jpa-core, quarkus-rest-jackson, quarkus-jdbc-oracle, smallrye-openapi, smallrye-health
 ```
 
 O `ArquiteturaTest` do core garante que:
@@ -134,14 +134,13 @@ O `ArquiteturaTest` do core garante que:
 O `ArquiteturaModulosTest` do app garante que:
 
 - core e query não se enxergam;
-- nenhuma classe fora da impressão depende dela;
 - ninguém depende das integrações; elas só enxergam o domínio e os `port.out` do core, e os pacotes de sistemas
   diferentes não se enxergam;
 - ninguém depende do app;
 - o `jpa-core` não conhece o resto;
-- HTTP só aparece no app, na impressão e nas integrações;
+- HTTP só aparece no app e nas integrações;
 - o app entra no core pelo motor (`application.service`) e pelos tipos do domínio, nunca pelos ports de saída, SPI ou adapters; não usa entidades JPA;
-- no REST, o `dto` não conhece `resource` nem `mapper`, e o `mapper` não conhece `resource`;
+- no REST, o `dto` não conhece o `resource`;
 - não há ciclos entre pacotes;
 - toda classe pertence a um módulo registrado.
 
@@ -155,7 +154,6 @@ Estrutura hexagonal, igual em todo contexto. As pastas estruturais têm nomes em
 | `domain/state` | a máquina de estados (padrão State) |
 | `domain/rule` | `Especificacao` e as regras |
 | `domain/exception` | exceções de negócio |
-| `domain/event` | eventos de domínio |
 | `application/port/out` | o que a aplicação precisa de fora (persistência, sistemas externos, transação) |
 | `application/port/spi` | ponto de extensão do motor (`Segmento`) |
 | `application/service` | o motor e as implementações do SPI (os segmentos) |
@@ -167,7 +165,7 @@ Estrutura hexagonal, igual em todo contexto. As pastas estruturais têm nomes em
 
 Uma interface só existe quando há uma costura de verdade: entre módulos, com sistema externo ou num ponto de
 extensão. Os exemplos são o SPI `Segmento` (o motor não conhece os segmentos), `SituacaoCadastral` (o core não conhece o
-REST Client, que mora em `integracoes`) e o evento `ProcessoCriado` (a impressão pode ser apagada). Dentro de um
+REST Client, que mora em `integracoes`) e `GeradorDeDocumentos` (o mesmo para o sistema de PDF). Dentro de um
 contexto, injeta-se a classe: uma interface com uma única implementação no mesmo módulo é indireção sem retorno. Por
 isso o REST injeta o `MotorDeProcessamento` direto, e o repository Jakarta Data implementa o port de persistência
 sem uma classe adapter no meio.
@@ -184,10 +182,10 @@ Classe em `mapper/` fica para domínio ↔ entidade JPA, que traduz enums e mont
   - `model`: `Processo<D>` (Context do State), `Solicitacao<D>`, `Proponente`, `DadosDoSegmento`, `Avaliacao`;
   - `state`: `Situacao` (o State, um enum) e `TransicaoInvalidaException`;
   - `rule`: `Especificacao`, `RegrasComuns` (nome obrigatório, CPF com dígitos verificadores, valor > 0);
-  - `exception`: regra violada, processo não encontrado, conflito de situação, sistema externo indisponível;
-  - `event`: `ProcessoCriado`.
+  - `exception`: regra violada, processo não encontrado, conflito de situação, sistema externo indisponível.
 - `application`:
-  - `port/out`: `Processos`, `Numeracao`, `SituacaoCadastral` (implementado em `integracoes`), `Transacoes`;
+  - `port/out`: `Processos`, `Numeracao`, `Transacoes`, `SituacaoCadastral` e `GeradorDeDocumentos` (os dois
+    implementados em `integracoes`);
   - `port/spi`: `Segmento<D>`;
   - `service`: `MotorDeProcessamento`, o ponto de entrada do core (criar, processar, cancelar). Recusa dois
     segmentos com o mesmo código ou o mesmo tipo de dados.
@@ -226,7 +224,8 @@ Classe em `mapper/` fica para domínio ↔ entidade JPA, que traduz enums e mont
   `VeiculoRequest`, `ProponenteRequest`) e de response (`ProcessoCriadoResponse`, `SituacaoResponse`,
   `ErroResponse`). Os requests convertem a si mesmos em `Solicitacao` (`paraSolicitacao()`) e os responses se
   montam do processo (`de(p)`). Os GETs devolvem direto as projeções do query, que já são o contrato de leitura.
-- `exception/TratadorDeErros`: exceções do domínio → 422, 404, 409 e 503.
+- `dto/PaginaResponse`: a página da listagem (`itens`, `pagina`, `tamanho`, `total`).
+- `exception/TratadorDeErros`: exceções do domínio → 422, 404, 409 e 503; paginação inválida → 400.
 
 ## Integrações (`com.example.processo.integracoes`)
 
@@ -248,22 +247,25 @@ No jar de produção o bean não existe, então só sobra o REST Client. Os ITs 
 HTTP falso (`CadastroFalso`), e assim a chamada real é testada: a resposta `SUSPENSA` para um CPF só pode vir
 de lá, porque a simulação responde sempre `REGULAR`.
 
-## Impressão (`com.example.processo.impressao`)
+### PDF (`integracoes.pdf`)
 
-- `listener/ImpressaoDeProcessos`: o observer do evento.
-- `client/SistemaDePdf`: o REST Client, `POST /documentos`, com o endereço em `quarkus.rest-client.sistema-pdf.url`.
-- `dto/Documento(modelo, referencia, processo)`. `Documento.deAbertura(p)` escolhe o modelo
+Mesmo molde do cadastro:
+
+- `client/SistemaDePdf`: o REST Client, `POST /documentos`, com o endereço em `quarkus.rest-client.sistema-pdf.url`
+  e timeout de 2 s; `client/SistemaDePdfSimulado`, a simulação do dev, só registra o pedido no log;
+- `dto/Documento(modelo, referencia, processo)`: `Documento.deAbertura(p)` escolhe o modelo
   `abertura-processo-<segmento>`, usa o número do processo como referência, e `processo.dados` leva os campos do
-  segmento.
+  segmento;
+- `adapter/GeradorDeDocumentosAdapter`: implementa o port e traduz erro HTTP, de rede ou timeout para
+  `SistemaExternoIndisponivelException`, que o motor só loga.
 
 ## Testes
 
 | Onde | O quê | Docker |
 |---|---|---|
-| `processo-core` | tabela do State; regras comuns e CPF; motor com dois segmentos falsos (mesmo fluxo e ciclo de vida, numeração única, regra violada não grava nem publica, situação cadastral irregular, conflito, sistema externo só consultado no fim); segmentos imobiliário e veicular no motor real; ArchUnit de camadas e motor x segmentos | não |
-| `integracoes` | adapter e conversão da resposta externa; falha do cliente vira indisponibilidade | não |
-| `impressao` | `Documento.deAbertura` | não |
-| `processo-app` | ArchUnit entre módulos; `@QuarkusIntegrationTest` contra o jar, com Oracle e um sistema de PDF falso (`HttpServer` do JDK): ciclo de vida igual por tipo (inclusive processamento simultâneo), recusa por matrícula, numeração, regras, cadastro irregular e fora do ar, falha do PDF, detalhe e listagem | sim |
+| `processo-core` | tabela do State; regras comuns e CPF; motor com dois segmentos falsos (mesmo fluxo e ciclo de vida, numeração única, regra violada não grava nem pede PDF, falha no PDF não desfaz a criação, situação cadastral irregular, conflito, sistema externo só consultado no fim); segmentos imobiliário e veicular no motor real; ArchUnit de camadas e motor x segmentos | não |
+| `integracoes` | adapters do cadastro e do PDF, `Documento.deAbertura`; falha do cliente vira indisponibilidade | não |
+| `processo-app` | ArchUnit entre módulos; `@QuarkusIntegrationTest` contra o jar, com Oracle e um sistema de PDF falso (`HttpServer` do JDK): ciclo de vida igual por tipo (inclusive processamento simultâneo), recusa por matrícula, numeração, regras, cadastro irregular e fora do ar, falha do PDF, detalhe, listagem paginada, health e OpenAPI | sim |
 
 ## Armadilhas
 

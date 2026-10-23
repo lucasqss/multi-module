@@ -10,39 +10,37 @@ Exemplo de **processos de dois tipos (imobiliário e veicular) com um motor úni
 - **Processo de cada tipo como filha do processo**: herança JPA `JOINED` (tabela `PROCESSO` + uma tabela por tipo).
 - **CQRS**: o `processo-core` (escrita) e o `processo-query` (leitura) não se enxergam. Os dois só se encontram
   no REST do `processo-app`.
-- **Integrações de saída** no módulo `integracoes`: o core define o port e a integração o implementa, sem que
-  o core conheça o sistema externo.
-- **Um módulo de impressão descartável**: a ponte para o sistema de geração de PDF. Ninguém depende dele, então
-  removê-lo é apagar o módulo.
+- **Integrações de saída** no módulo `integracoes` (cadastro e PDF): o core define o port e a integração o
+  implementa, sem que o core conheça o sistema externo.
+- **Pronto para operar**: listagem paginada, contrato OpenAPI (`/q/openapi`, Swagger UI no dev) e health
+  (`/q/health`).
 
 ## Módulos
 
 ```
-                                ┌───────────────────────────┐
-                                │       processo-app        │  todo o REST, montagem,
-                                │   REST · ITs · ArchUnit   │  ITs e regras entre módulos
-                                └─────────────┬─────────────┘
-              ┌───────────────────┬───────────┴───────┬──────────────────────┐
-     ┌────────▼───────┐  ┌────────▼──────┐  ┌─────────▼──────┐  ┌────────────▼─────┐
-     │  integracoes   │  │   impressao   │  │ processo-core  │  │  processo-query  │
-     │ implementa     │  │ observa       │  │ motor (único)  │  │ projeções,       │
-     │ ports do core  │  │ ProcessoCriado│  │ segmento.*     │  │ somente leitura  │
-     │ (cadastro)     │  │ → sistema PDF │  │ sem HTTP       │  │ não vê o core    │
-     └────────┬───────┘  └───────┬───────┘  └──▲──────┬──────┘  └─────────┬────────┘
-              └──────────────────┴─────────────┘      │                   │
-                     dependem do core                 └─────────┬─────────┘
-                                                      ┌─────────▼─────────┐
-                                                      │     jpa-core      │  @Entity pai/filhas e Flyway
-                                                      └───────────────────┘
+                          ┌───────────────────────────┐
+                          │       processo-app        │  todo o REST, montagem,
+                          │   REST · ITs · ArchUnit   │  ITs e regras entre módulos
+                          └─────────────┬─────────────┘
+              ┌─────────────────────────┼──────────────────────┐
+     ┌────────▼───────┐       ┌─────────▼──────┐      ┌────────▼─────────┐
+     │  integracoes   │       │ processo-core  │      │  processo-query  │
+     │ implementa     ├──────►│ motor (único)  │      │ projeções,       │
+     │ ports do core  │       │ segmento.*     │      │ somente leitura  │
+     │ (cadastro, pdf)│       │ sem HTTP       │      │ não vê o core    │
+     └────────────────┘       └────────┬───────┘      └────────┬─────────┘
+                                       └───────────┬───────────┘
+                                         ┌─────────▼─────────┐
+                                         │     jpa-core      │  @Entity pai/filhas e Flyway
+                                         └───────────────────┘
 ```
 
 | Módulo | Responsabilidade |
 |---|---|
 | `jpa-core` | Única "verdade" do schema: `ProcessoEntity` (pai, abstrata), `ProcessoImobiliarioEntity` (filha) e migrations |
-| `processo-core` | Toda a lógica de negócio da escrita, sem HTTP: o `motor` (criar, processar e cancelar únicos, máquina de estados no padrão State, regras comuns, numeração, SPI `Segmento`, evento `ProcessoCriado`) e os segmentos (`segmento.imobiliario`, `segmento.veicular`: dados, regras, decisão do processamento e persistência da filha) |
+| `processo-core` | Toda a lógica de negócio da escrita, sem HTTP: o `motor` (criar, processar e cancelar únicos, máquina de estados no padrão State, regras comuns, numeração, SPI `Segmento`) e os segmentos (`segmento.imobiliario`, `segmento.veicular`: dados, regras, decisão do processamento e persistência da filha) |
 | `processo-query` | Consultas somente leitura que devolvem projeções: listagem de todos os segmentos e detalhe de cada tipo |
-| `integracoes` | Integrações de saída, um pacote por sistema externo: implementam ports do core e traduzem o modelo externo (anticorrupção). Exemplo: `cadastro`, consultado no ato da criação |
-| `impressao` | Ponte para o sistema de PDF: pede o documento de abertura de todo processo criado, de qualquer segmento |
+| `integracoes` | Integrações de saída, um pacote por sistema externo: implementam ports do core e traduzem o modelo externo (anticorrupção). Exemplos: `cadastro`, consultado no ato da criação, e `pdf`, que gera o documento de abertura |
 | `processo-app` | Todo o REST (`adapter/inbound/rest`: resources, DTOs e tratamento de erros), a montagem do deploy único, os ITs e o ArchUnit entre módulos |
 
 ### Convenção de pastas
@@ -50,7 +48,7 @@ Exemplo de **processos de dois tipos (imobiliário e veicular) com um motor úni
 Cada contexto (o motor e cada segmento) segue a mesma estrutura hexagonal:
 
 ```
-domain/        model · state · rule · exception · event         Java puro
+domain/        model · state · rule · exception                 Java puro
 application/   port/out · port/spi · service (o motor e os segmentos)
 adapter/       inbound/rest/{resource, dto, exception}           (no processo-app)
                outbound/persistence/{repository, mapper}
@@ -61,7 +59,7 @@ Pelas regras do ArchUnit, a dependência vai sempre `adapter → application →
 motor, e cada repository Jakarta Data implementa o port de persistência, convertendo pelo mapper.
 
 **Interface só onde há costura real**: entre módulos, com sistema externo ou num ponto de extensão (`Segmento`,
-`SituacaoCadastral`, o evento `ProcessoCriado`). Dentro de um contexto, injeta-se a classe.
+`SituacaoCadastral`, `GeradorDeDocumentos`). Dentro de um contexto, injeta-se a classe.
 
 ## API
 
@@ -71,7 +69,8 @@ motor, e cada repository Jakarta Data implementa o port de persistência, conver
 | `POST /processos/{id}/processamento` | core | processa, para qualquer tipo; responde `200 {"situacao", "motivo"}` (`CONCLUIDO` ou `RECUSADO`) |
 | `POST /processos/{id}/cancelamento` | core | cancela um processo `ABERTO`; responde `204` |
 | `GET /processos/imobiliarios/{id}`, `GET /processos/veiculares/{id}` | query | detalhe com os campos do pai e da filha, incluindo situação e motivo da recusa |
-| `GET /processos?situacao=ABERTO` | query | listagem de todos os segmentos, só com os campos comuns; filtro opcional |
+| `GET /processos?situacao=ABERTO&pagina=1&tamanho=20` | query | listagem paginada de todos os segmentos, só com os campos comuns: `{"itens", "pagina", "tamanho", "total"}`; filtro opcional, tamanho até 100 |
+| `GET /q/openapi`, `GET /q/health` | app | contrato da API (Swagger UI em `/q/swagger-ui` no dev) e health (readiness com o banco) |
 
 Códigos de erro, todos com corpo `{"motivo": "..."}`:
 
@@ -80,6 +79,7 @@ Códigos de erro, todos com corpo `{"motivo": "..."}`:
 | `422` | regra violada ou transição inválida, por exemplo "Processo CONCLUIDO não pode ser cancelado" |
 | `409` | outra requisição mudou o processo no meio |
 | `404` | processo inexistente, ou situação inválida no filtro da listagem |
+| `400` | paginação fora dos limites (`pagina` < 1, `tamanho` fora de 1..100) |
 | `503` | sistema de cadastro fora do ar ou timeout |
 
 Exemplo de corpo do `POST`:
@@ -104,9 +104,9 @@ POST /processos/imobiliarios                                     (processo-app)
       ── até aqui fora de transação; daqui em diante, transação curta ──
       4. número IMO-2026-000042 (prefixo do segmento + sequence única)
       5. segmento grava PROCESSO + PROCESSO_IMOBILIARIO
-      6. publica ProcessoCriado
+      ── depois do commit ──
+      6. pede o PDF de abertura (port GeradorDeDocumentos → integracoes.pdf → POST /documentos)
   → 201
-                         depois do commit: impressao → POST /documentos no sistema de PDF
 
 POST /processos/{id}/processamento                               (igual para todos os tipos)
   → MotorDeProcessamento.processar(id)
@@ -116,14 +116,14 @@ POST /processos/{id}/processamento                               (igual para tod
       4. EM_PROCESSAMENTO → CONCLUIDO | RECUSADO (State)           | transação curta
 ```
 
-Falha no sistema de PDF não desfaz o processo: fica no log.
+Falha no sistema de PDF (erro ou timeout de 2 s) não desfaz o processo: o motor só registra no log.
 
 ## Integrações com sistemas externos
 
 | Tipo | Onde fica | Exemplo aqui |
 |---|---|---|
 | O negócio precisa da resposta no meio do fluxo | port no domínio do core, implementado em `integracoes.<sistema>` | `SituacaoCadastral` → `integracoes.cadastro` |
-| Reação a um fato, sem resposta para o fluxo | módulo que observa o evento; o core nem sabe que existe | `impressao` |
+| Passo do fluxo sem resposta para o negócio | port chamado pelo motor, implementado em `integracoes.<sistema>`; falha só loga | `GeradorDeDocumentos` → `integracoes.pdf` |
 | O sistema externo nos chama | entrada no `processo-app`, ou módulo próprio se for descartável | REST do app |
 
 Como está o exemplo:
@@ -137,6 +137,8 @@ Como está o exemplo:
 - `SituacaoCadastralAdapter` implementa o port do motor e converte a resposta. Ele injeta `@RestClient
   CadastroClient` e não sabe se recebeu o real ou o simulado.
 - O motor só chama o sistema externo depois que todas as outras regras passaram.
+- `integracoes.pdf` segue o mesmo molde: `SistemaDePdf` (REST Client), `SistemaDePdfSimulado` (dev, só loga),
+  `Documento` e `GeradorDeDocumentosAdapter`.
 
 | Onde | O que responde |
 |---|---|
@@ -145,8 +147,8 @@ Como está o exemplo:
 | ITs (`@QuarkusIntegrationTest`, rodam o jar) | REST Client contra o `CadastroFalso`, um servidor HTTP do teste que responde `SUSPENSA` para um CPF |
 | testes unitários | o adapter recebe um `CadastroClient` em lambda |
 
-Sistema externo novo é um pacote novo em `integracoes`. Se ele tiver ciclo de vida próprio ou for descartável,
-ganha um módulo próprio, como a `impressao`. Se o módulo de integração sair do deploy, o build do Quarkus falha
+Sistema externo novo é um pacote novo em `integracoes`. Se ele tiver dependências pesadas (SOAP, MQ, código
+gerado), pode ganhar um módulo próprio. Se o módulo de integração sair do deploy, o build do Quarkus falha
 com `Unsatisfied dependency for type ...SituacaoCadastral`, em vez de falhar em produção.
 
 ## Adicionar um segmento
@@ -164,14 +166,8 @@ com `Unsatisfied dependency for type ...SituacaoCadastral`, em vez de falhar em 
    - `dto/`: o request, com `paraSolicitacao()`.
 5. **Nos testes**: um `Tipo` novo em `CicloDeVidaPorTipoIT.tipos()`.
 
-O motor, a máquina de estados, os endpoints de ciclo de vida e a impressão não mudam. O commit que adicionou o
+O motor, a máquina de estados, os endpoints de ciclo de vida e as integrações não mudam. O commit que adicionou o
 veicular é o exemplo.
-
-## Remover a impressão
-
-Apague a pasta `impressao`, a linha `<module>` e o `<dependency>` no POM pai, a dependência no `processo-app` e a
-propriedade `quarkus.rest-client.sistema-pdf.url`. O `ArquiteturaModulosTest` garante que nenhum outro módulo
-usa classes dela.
 
 ## Como rodar
 
@@ -179,12 +175,12 @@ Pré-requisitos: Java 25, Maven 3.9+, Docker.
 
 ```bash
 # Testes unitários (sem Docker)
-mvn -pl processo-core,integracoes,impressao -am test
+mvn -pl processo-core,integracoes -am test
 
 # Build completo + testes de integração (o Dev Services sobe um Oracle Free no Docker)
 mvn verify
 
-# Modo dev: Oracle via Dev Services e o sistema de cadastro simulado (CadastroClientSimulado)
+# Modo dev: Oracle via Dev Services, cadastro e PDF simulados; Swagger UI em http://localhost:8080/q/swagger-ui
 mvn install -DskipTests && mvn -pl processo-app quarkus:dev
 
 # Jar empacotado contra o Oracle do docker-compose

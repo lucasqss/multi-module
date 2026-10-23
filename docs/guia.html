@@ -220,8 +220,8 @@
       (herança JPA <code>JOINED</code>).</p></div>
     <div class="card"><h4>Escrita e leitura separadas</h4><p><code>processo-core</code> escreve,
       <code>processo-query</code> lê. Um não enxerga o outro.</p></div>
-    <div class="card"><h4>Bordas trocáveis</h4><p>REST no app, sistemas externos atrás de interfaces, impressão
-      descartável.</p></div>
+    <div class="card"><h4>Bordas trocáveis</h4><p>REST no app; cadastro e PDF atrás de interfaces, em
+      <code>integracoes</code>.</p></div>
   </div>
 </section>
 
@@ -238,44 +238,38 @@
       </defs>
 
       <!-- setas do app -->
-      <path class="svg-arrow" d="M380,84 L100,148" marker-end="url(#seta)"/>
-      <path class="svg-arrow" d="M380,84 L280,148" marker-end="url(#seta)"/>
-      <path class="svg-arrow" d="M380,84 L480,148" marker-end="url(#seta)"/>
-      <path class="svg-arrow" d="M380,84 L660,148" marker-end="url(#seta)"/>
-      <!-- integracoes e impressao dependem do core -->
-      <path class="svg-arrow" d="M100,214 L100,248 L450,248 L450,216" marker-end="url(#seta)"/>
-      <path class="svg-arrow" d="M280,214 L280,248"/>
+      <path class="svg-arrow" d="M380,84 L120,148" marker-end="url(#seta)"/>
+      <path class="svg-arrow" d="M380,84 L380,148" marker-end="url(#seta)"/>
+      <path class="svg-arrow" d="M380,84 L640,148" marker-end="url(#seta)"/>
+      <!-- integracoes depende do core (implementa os ports) -->
+      <path class="svg-arrow" d="M200,182 L298,182" marker-end="url(#seta)"/>
       <!-- core e query dependem do jpa-core -->
-      <path class="svg-arrow" d="M520,214 L520,278" marker-end="url(#seta)"/>
-      <path class="svg-arrow" d="M630,214 L630,278" marker-end="url(#seta)"/>
+      <path class="svg-arrow" d="M420,214 L470,278" marker-end="url(#seta)"/>
+      <path class="svg-arrow" d="M600,214 L550,278" marker-end="url(#seta)"/>
       <!-- separação CQRS -->
-      <line class="svg-sep" x1="570" y1="158" x2="570" y2="222"/>
-      <text class="svg-sep-text" x="570" y="238" text-anchor="middle">não se</text>
-      <text class="svg-sep-text" x="570" y="252" text-anchor="middle">enxergam</text>
+      <line class="svg-sep" x1="510" y1="158" x2="510" y2="222"/>
+      <text class="svg-sep-text" x="510" y="238" text-anchor="middle">não se</text>
+      <text class="svg-sep-text" x="510" y="252" text-anchor="middle">enxergam</text>
 
       <rect class="svg-box-strong" x="300" y="20" width="160" height="64" rx="8"/>
       <text class="svg-title" x="380" y="47" text-anchor="middle">processo-app</text>
       <text class="svg-text" x="380" y="66" text-anchor="middle">REST · montagem · ITs</text>
 
-      <rect class="svg-box" x="20" y="150" width="160" height="64" rx="8"/>
-      <text class="svg-title" x="100" y="177" text-anchor="middle">integracoes</text>
-      <text class="svg-text" x="100" y="196" text-anchor="middle">implementa ports</text>
+      <rect class="svg-box" x="40" y="150" width="160" height="64" rx="8"/>
+      <text class="svg-title" x="120" y="177" text-anchor="middle">integracoes</text>
+      <text class="svg-text" x="120" y="196" text-anchor="middle">cadastro · pdf</text>
 
-      <rect class="svg-box" x="200" y="150" width="160" height="64" rx="8"/>
-      <text class="svg-title" x="280" y="177" text-anchor="middle">impressao</text>
-      <text class="svg-text" x="280" y="196" text-anchor="middle">observa ProcessoCriado</text>
+      <rect class="svg-box-strong" x="300" y="150" width="160" height="64" rx="8"/>
+      <text class="svg-title" x="380" y="177" text-anchor="middle">processo-core</text>
+      <text class="svg-text" x="380" y="196" text-anchor="middle">motor + segmentos</text>
 
-      <rect class="svg-box-strong" x="400" y="150" width="160" height="64" rx="8"/>
-      <text class="svg-title" x="480" y="177" text-anchor="middle">processo-core</text>
-      <text class="svg-text" x="480" y="196" text-anchor="middle">motor + segmentos</text>
+      <rect class="svg-box" x="560" y="150" width="160" height="64" rx="8"/>
+      <text class="svg-title" x="640" y="177" text-anchor="middle">processo-query</text>
+      <text class="svg-text" x="640" y="196" text-anchor="middle">projeções de leitura</text>
 
-      <rect class="svg-box" x="580" y="150" width="160" height="64" rx="8"/>
-      <text class="svg-title" x="660" y="177" text-anchor="middle">processo-query</text>
-      <text class="svg-text" x="660" y="196" text-anchor="middle">projeções de leitura</text>
-
-      <rect class="svg-box" x="490" y="280" width="160" height="64" rx="8"/>
-      <text class="svg-title" x="570" y="307" text-anchor="middle">jpa-core</text>
-      <text class="svg-text" x="570" y="326" text-anchor="middle">@Entity + Flyway</text>
+      <rect class="svg-box" x="430" y="280" width="160" height="64" rx="8"/>
+      <text class="svg-title" x="510" y="307" text-anchor="middle">jpa-core</text>
+      <text class="svg-text" x="510" y="326" text-anchor="middle">@Entity + Flyway</text>
     </svg>
     <figcaption>A seta sai de quem depende. O app também depende do <code>jpa-core</code> direto, só para a cobertura
       agregada.</figcaption>
@@ -285,10 +279,9 @@
     <thead><tr><th>Módulo</th><th>O que tem</th><th>Não pode depender de</th></tr></thead>
     <tbody>
       <tr><td><code>jpa-core</code></td><td>O schema: entidades, enums de coluna e migrations. Nenhuma regra.</td><td>nenhum outro módulo</td></tr>
-      <tr><td><code>processo-core</code></td><td>Toda a regra de escrita: o motor e os segmentos.</td><td>query, integrações, impressão, app, HTTP</td></tr>
+      <tr><td><code>processo-core</code></td><td>Toda a regra de escrita: o motor e os segmentos.</td><td>query, integrações, app, HTTP</td></tr>
       <tr><td><code>processo-query</code></td><td>Consultas somente leitura que devolvem records.</td><td><code>processo-core</code></td></tr>
-      <tr><td><code>integracoes</code></td><td>Um pacote por sistema externo, implementando interfaces do core.</td><td>app, query, outro pacote de integração</td></tr>
-      <tr><td><code>impressao</code></td><td>Pede o PDF quando um processo é criado. Descartável.</td><td>app, query, integrações</td></tr>
+      <tr><td><code>integracoes</code></td><td>Um pacote por sistema externo (<code>cadastro</code>, <code>pdf</code>), implementando interfaces do core.</td><td>app, query, outro pacote de integração</td></tr>
       <tr><td><code>processo-app</code></td><td>REST, tratamento de erros, montagem do jar e testes de integração.</td><td>(ninguém depende dele)</td></tr>
     </tbody>
   </table></div>
@@ -302,7 +295,7 @@
   <div class="table-wrap"><table>
     <thead><tr><th>Pasta</th><th>O que vai lá</th></tr></thead>
     <tbody>
-      <tr><td><code>domain/</code></td><td>Java puro: <code>model</code> (records), <code>state</code> (máquina de estados), <code>rule</code> (regras), <code>exception</code>, <code>event</code>.</td></tr>
+      <tr><td><code>domain/</code></td><td>Java puro: <code>model</code> (records), <code>state</code> (máquina de estados), <code>rule</code> (regras), <code>exception</code>.</td></tr>
       <tr><td><code>application/port/out</code></td><td>Interfaces do que o core precisa de fora: banco, sistemas externos, transação.</td></tr>
       <tr><td><code>application/port/spi</code></td><td>O contrato que cada segmento implementa (<code>Segmento</code>).</td></tr>
       <tr><td><code>application/service</code></td><td>O motor e os segmentos.</td></tr>
@@ -314,7 +307,7 @@
   <div class="note"><strong>Duas regras para não criar código à toa</strong>
     <ul>
       <li><strong>Interface só onde há costura real:</strong> entre módulos (<code>Segmento</code>,
-        <code>SituacaoCadastral</code>) ou num evento (<code>ProcessoCriado</code>). Dentro do módulo, injete a classe:
+        <code>SituacaoCadastral</code>, <code>GeradorDeDocumentos</code>). Dentro do módulo, injete a classe:
         o REST injeta o <code>MotorDeProcessamento</code> direto.</li>
       <li><strong>Mapper só quando a conversão tem lógica:</strong> conversão de uma linha é método do DTO
         (<code>request.paraSolicitacao()</code>, <code>ProcessoCriadoResponse.de(p)</code>). Classe em
@@ -325,8 +318,8 @@
 ├─ processo-core/
 │  ├─ motor/
 │  │  ├─ domain/       model/ Processo&lt;D&gt;, Solicitacao&lt;D&gt;, Avaliacao · state/ Situacao
-│  │  │                rule/ Especificacao, RegrasComuns · exception/ · event/ ProcessoCriado
-│  │  ├─ application/  port/out/ Processos, Numeracao, SituacaoCadastral, Transacoes
+│  │  │                rule/ Especificacao, RegrasComuns · exception/
+│  │  ├─ application/  port/out/ Processos, Numeracao, Transacoes, SituacaoCadastral, GeradorDeDocumentos
 │  │  │                port/spi/ Segmento · service/ MotorDeProcessamento
 │  │  ├─ adapter/      outbound/persistence/repository/ · outbound/transaction/
 │  │  └─ config/       Relogio
@@ -335,7 +328,7 @@
 │     └─ veicular/     mesma estrutura
 ├─ processo-query/   repository/ ProcessoQueries · dto/ ResumoProcesso, Detalhe&lt;Tipo&gt;
 ├─ integracoes/      cadastro/ client/ · dto/ · adapter/ SituacaoCadastralAdapter
-├─ impressao/        listener/ ImpressaoDeProcessos · client/ SistemaDePdf · dto/ Documento
+│                    pdf/      client/ · dto/ Documento · adapter/ GeradorDeDocumentosAdapter
 └─ processo-app/     adapter/inbound/rest/ resource/ · dto/ · exception/ TratadorDeErros</code></pre>
 </section>
 
@@ -356,9 +349,9 @@
     <li><strong>Regras, fora de transação:</strong> primeiro as comuns (nome, CPF, valor), depois as do segmento
       (limite da avaliação, matrícula sem processo em andamento) e por último o sistema de cadastro, para não
       chamá-lo à toa.</li>
-    <li><strong>Transação curta:</strong> gera o número (<code>IMO-2026-000042</code>), grava pai e filha e publica
-      <code>ProcessoCriado</code>.</li>
-    <li><strong>Depois do commit:</strong> a impressão pede o PDF. Se falhar, só loga.</li>
+    <li><strong>Transação curta:</strong> gera o número (<code>IMO-2026-000042</code>) e grava pai e filha.</li>
+    <li><strong>Depois do commit:</strong> o motor pede o PDF de abertura (<code>GeradorDeDocumentos</code>). Se o
+      sistema falhar, só loga: o processo já está gravado.</li>
   </ol>
   <p>Respostas: <code>201 {"id", "numero"}</code>; regra violada <code>422 {"motivo"}</code>; cadastro fora do ar
     <code>503</code>. O veicular é igual, com <code>veiculo</code> (placa, ano, FIPE) no corpo.</p>
@@ -381,7 +374,9 @@
     chamar sistemas externos. O compare-and-set garante o mesmo sem travar.</div>
 
   <h3>Consultar</h3>
-  <p><code>GET /processos?situacao=ABERTO</code> lista todos os tipos a partir da tabela pai.
+  <p><code>GET /processos?situacao=ABERTO&amp;pagina=1&amp;tamanho=20</code> lista todos os tipos a partir da tabela
+    pai, paginado (<code>{"itens", "pagina", "tamanho", "total"}</code>; tamanho até 100, fora disso
+    <code>400</code>).
     <code>GET /processos/imobiliarios/{id}</code> (ou <code>/veiculares/{id}</code>) consulta a filha. As duas vão
     direto ao <code>processo-query</code>, sem passar pelo domínio, e as projeções dele já são a resposta.</p>
 </section>
@@ -471,8 +466,7 @@ public Processo&lt;D&gt; cancelar() { return em(situacao.cancelar(), null); }</c
   <div class="table-wrap"><table>
     <thead><tr><th>Situação</th><th>Onde fica</th><th>Exemplo</th></tr></thead>
     <tbody>
-      <tr><td>O fluxo precisa da resposta</td><td>interface em <code>port/out</code> do core, implementada em <code>integracoes.&lt;sistema&gt;</code></td><td>cadastro</td></tr>
-      <tr><td>Só reage a um fato</td><td>módulo que observa o evento; o core nem sabe que existe</td><td>impressão</td></tr>
+      <tr><td>O fluxo precisa da resposta</td><td>interface em <code>port/out</code> do core, implementada em <code>integracoes.&lt;sistema&gt;</code></td><td>cadastro, PDF</td></tr>
       <tr><td>O sistema externo nos chama</td><td>REST no <code>processo-app</code></td><td>os resources</td></tr>
     </tbody>
   </table></div>
@@ -491,11 +485,12 @@ public class CadastroClientSimulado implements CadastroClient { ... }</code></pr
   <p>No dev responde a simulação; no jar, o REST Client real; nos ITs, o REST Client contra o servidor falso
     <code>CadastroFalso</code>. Se o módulo <code>integracoes</code> sair do app, o build falha, não a produção.</p>
 
-  <h3>Impressão</h3>
-  <p><code>ImpressaoDeProcessos</code> observa <code>ProcessoCriado</code> depois do commit
-    (<code>AFTER_SUCCESS</code>) e envia <code>Documento.deAbertura(processo)</code> ao sistema de PDF. Para remover:
-    apague o módulo, a entrada no POM pai, a dependência no app e a propriedade
-    <code>quarkus.rest-client.sistema-pdf.url</code>.</p>
+  <h3>PDF</h3>
+  <p>Mesmo molde do cadastro, no pacote <code>integracoes.pdf</code>. O motor chama o port
+    <code>GeradorDeDocumentos</code> depois do commit; o <code>GeradorDeDocumentosAdapter</code> envia
+    <code>Documento.deAbertura(processo)</code> ao sistema de PDF (<code>SISTEMA_PDF_URL</code>, timeout de 2 s) e
+    traduz falhas para <code>SistemaExternoIndisponivelException</code>, que o motor só loga. No dev, o
+    <code>SistemaDePdfSimulado</code> só registra o pedido no log.</p>
 </section>
 
 <!-- 9 -->
@@ -520,19 +515,21 @@ public class CadastroClientSimulado implements CadastroClient { ... }</code></pr
     <li><strong><code>ArquiteturaTest</code> (core):</strong> o motor não conhece segmentos, segmentos não se
       enxergam, <code>domain</code> é Java puro, <code>application</code> não conhece adapters.</li>
     <li><strong><code>ArquiteturaModulosTest</code> (app):</strong> core e query não se enxergam; ninguém depende de
-      impressão, integrações ou app; HTTP só nas bordas; o app entra no core pelo motor; sem ciclos.</li>
+      integrações nem do app; HTTP só nas bordas; o app entra no core pelo motor; sem ciclos.</li>
   </ul>
   <div class="table-wrap"><table>
     <thead><tr><th>Módulo</th><th>Testes</th><th>Docker</th></tr></thead>
     <tbody>
       <tr><td><code>processo-core</code></td><td>Tabela de estados × eventos, regras, motor com segmentos falsos, cada segmento no motor real.</td><td>não</td></tr>
-      <tr><td><code>integracoes</code>, <code>impressao</code></td><td>Conversão da resposta, falha do cliente vira indisponibilidade, montagem do documento.</td><td>não</td></tr>
-      <tr><td><code>processo-app</code></td><td>ITs contra o jar com Oracle: o mesmo ciclo de vida para cada tipo (inclusive 8 processamentos simultâneos, só um vence) e os casos da criação.</td><td>sim</td></tr>
+      <tr><td><code>integracoes</code></td><td>Conversão da resposta do cadastro, documento enviado ao PDF, falha do cliente vira indisponibilidade.</td><td>não</td></tr>
+      <tr><td><code>processo-app</code></td><td>ITs contra o jar com Oracle: o mesmo ciclo de vida para cada tipo (inclusive 8 processamentos simultâneos, só um vence), os casos da criação, a paginação e health/OpenAPI.</td><td>sim</td></tr>
     </tbody>
   </table></div>
-<pre><code>mvn -pl processo-core,integracoes,impressao -am test   # unitários, sem Docker
-mvn verify                                              # tudo, com os ITs
+<pre><code>mvn -pl processo-core,integracoes -am test   # unitários, sem Docker
+mvn verify                                    # tudo, com os ITs
 mvn install -DskipTests &amp;&amp; mvn -pl processo-app quarkus:dev   # dev: Oracle via Dev Services</code></pre>
+  <p>No dev: Swagger UI em <code>/q/swagger-ui</code>. Em qualquer ambiente: contrato em <code>/q/openapi</code> e
+    health em <code>/q/health</code> (o readiness confere o banco).</p>
 </section>
 
 <!-- 11 -->
@@ -562,10 +559,10 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
       <code>paraSolicitacao()</code>.</li>
     <li>Testes: os do segmento e um <code>Tipo</code> novo em <code>CicloDeVidaPorTipoIT.tipos()</code>.</li>
   </ol>
-  <p>O motor, os estados e a impressão não mudam. O commit do veicular é o exemplo.</p>
+  <p>O motor, os estados e as integrações não mudam. O commit do veicular é o exemplo.</p>
   <h3>Nova integração</h3>
   <ol>
-    <li>Interface em <code>port/out</code> do core (do motor ou do segmento que a usa), chamada numa regra.</li>
+    <li>Interface em <code>port/out</code> do core (do motor ou do segmento que a usa), chamada numa regra ou num passo do fluxo.</li>
     <li>Pacote <code>integracoes.&lt;sistema&gt;</code> com <code>client/</code>, <code>dto/</code>,
       <code>adapter/</code> e, se quiser, a simulação de dev.</li>
     <li>URL em <code>application.properties</code> e um servidor falso no IT (<code>@WithTestResource</code>).</li>
@@ -609,8 +606,7 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
       <tr><td>Processo preso em <code>EM_PROCESSAMENTO</code></td><td>Queda entre as duas transações do processar.</td><td>Rotina que reprocessa ou devolve para <code>ABERTO</code> após N minutos.</td></tr>
       <tr><td>Corrida na regra da matrícula</td><td>Duas criações simultâneas passam juntas.</td><td>Lock, tabela de controle com chave única ou situação copiada para a filha.</td></tr>
       <tr><td>Sem histórico de transições</td><td>Não se sabe quem mudou o quê e quando.</td><td>Tabela de transições gravada junto do compare-and-set.</td></tr>
-      <tr><td>Impressão sem retentativa</td><td>Falha do PDF só vai para o log.</td><td>Outbox dentro do módulo <code>impressao</code>.</td></tr>
-      <tr><td>Listagem sem paginação</td><td><code>GET /processos</code> devolve tudo.</td><td><code>PageRequest</code> do Jakarta Data.</td></tr>
+      <tr><td>PDF sem retentativa</td><td>Chamada síncrona depois do commit (timeout de 2 s); falha só vai para o log.</td><td>Outbox: tabela de pendências gravada na transação e reenviada por um job.</td></tr>
       <tr><td>REST e query com 0% no Sonar</td><td>Só os ITs os exercitam.</td><td><code>@QuarkusTest</code> nessas camadas, se o gate exigir.</td></tr>
       <tr><td>Lacunas de numeração</td><td>Falha na gravação deixa número sem uso.</td><td>Aceitar, ou trocar a sequence por um contador travado na transação, se precisar ser contínua.</td></tr>
     </tbody>

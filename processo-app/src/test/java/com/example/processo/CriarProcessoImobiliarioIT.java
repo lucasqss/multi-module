@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Ponta a ponta contra o jar: REST → motor → Oracle (PROCESSO + PROCESSO_IMOBILIARIO) → impressão, e a leitura
+ * Ponta a ponta contra o jar: REST → motor → Oracle (PROCESSO + PROCESSO_IMOBILIARIO) → sistema de PDF, e a leitura
  * pelo lado query.
  * Os testes compartilham o banco, então cada um usa uma matrícula própria.
  */

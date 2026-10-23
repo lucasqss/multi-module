@@ -1,12 +1,16 @@
 package com.example.processo.core;
 
+import com.example.processo.core.motor.application.port.out.GeradorDeDocumentos;
 import com.example.processo.core.motor.application.port.out.Processos;
 import com.example.processo.core.motor.application.port.out.Transacoes;
+import com.example.processo.core.motor.domain.exception.SistemaExternoIndisponivelException;
 import com.example.processo.core.motor.domain.model.DadosDoSegmento;
 import com.example.processo.core.motor.domain.model.Processo;
 import com.example.processo.core.motor.domain.state.Situacao;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,6 +29,21 @@ public final class Fakes {
                 return trabalho.get();
             }
         };
+    }
+
+    /** Sistema de PDF em memória: guarda cada processo pedido e, se mandado, falha como o sistema fora do ar. */
+    public static class DocumentosEmMemoria implements GeradorDeDocumentos {
+
+        public final List<Processo<?>> pedidos = new ArrayList<>();
+        public boolean simularFalha;
+
+        @Override
+        public void gerarAbertura(Processo<?> processo) {
+            pedidos.add(processo);
+            if (simularFalha) {
+                throw new SistemaExternoIndisponivelException("de PDF", new RuntimeException("fora do ar"));
+            }
+        }
     }
 
     /**

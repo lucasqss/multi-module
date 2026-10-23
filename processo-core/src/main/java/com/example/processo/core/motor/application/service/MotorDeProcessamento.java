@@ -1,22 +1,23 @@
 package com.example.processo.core.motor.application.service;
 
+import com.example.processo.core.motor.application.port.out.GeradorDeDocumentos;
 import com.example.processo.core.motor.application.port.out.Numeracao;
 import com.example.processo.core.motor.application.port.out.Processos;
 import com.example.processo.core.motor.application.port.out.SituacaoCadastral;
 import com.example.processo.core.motor.application.port.out.Transacoes;
 import com.example.processo.core.motor.application.port.spi.Segmento;
-import com.example.processo.core.motor.domain.event.ProcessoCriado;
 import com.example.processo.core.motor.domain.exception.ConflitoDeSituacaoException;
 import com.example.processo.core.motor.domain.exception.ProcessoNaoEncontradoException;
+import com.example.processo.core.motor.domain.exception.SistemaExternoIndisponivelException;
 import com.example.processo.core.motor.domain.model.DadosDoSegmento;
 import com.example.processo.core.motor.domain.model.Processo;
 import com.example.processo.core.motor.domain.model.Solicitacao;
 import com.example.processo.core.motor.domain.rule.RegrasComuns;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Event;
 import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.jboss.logging.Logger;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -24,7 +25,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 /**
  * Motor único: o mesmo fluxo de criação e o mesmo ciclo de vida para todos os segmentos. O que varia (dados,
@@ -33,7 +33,8 @@ import java.util.function.Consumer;
  *
  * <pre>
  * criar:     regras comuns → regras do segmento → situação cadastral (externo)  | fora de transação
- *            → número → abrir → segmento grava → publica ProcessoCriado          | transação curta
+ *            → número → abrir → segmento grava                                    | transação curta
+ *            → pede o PDF de abertura (externo; falha só vai para o log)          | depois do commit
  * processar: carregar → ABERTO → EM_PROCESSAMENTO                                 | transação curta
  *            → segmento avalia                                                    | fora de transação
  *            → CONCLUIDO ou RECUSADO                                              | transação curta
@@ -46,6 +47,8 @@ import java.util.function.Consumer;
 @ApplicationScoped
 public class MotorDeProcessamento {
 
+    private static final Logger LOG = Logger.getLogger(MotorDeProcessamento.class);
+
     private final Map<Class<?>, Segmento<?>> porTipoDosDados = new HashMap<>();
     private final Map<String, Segmento<?>> porCodigo = new HashMap<>();
     private final SituacaoCadastral situacaoCadastral;
@@ -53,19 +56,19 @@ public class MotorDeProcessamento {
     private final Processos processos;
     private final Transacoes transacoes;
     private final Clock relogio;
-    private final Consumer<ProcessoCriado> publicar;
+    private final GeradorDeDocumentos documentos;
 
     @Inject
     MotorDeProcessamento(@Any Instance<Segmento<?>> segmentos, SituacaoCadastral situacaoCadastral,
                          Numeracao numeracao, Processos processos, Transacoes transacoes, Clock relogio,
-                         Event<ProcessoCriado> eventos) {
-        this(segmentos, situacaoCadastral, numeracao, processos, transacoes, relogio, eventos::fire);
+                         GeradorDeDocumentos documentos) {
+        this(segmentos.stream().toList(), situacaoCadastral, numeracao, processos, transacoes, relogio, documentos);
     }
 
-    /** Sem CDI, para os testes: segmentos e publicação passados diretamente. */
+    /** Sem CDI, para os testes: os segmentos passados diretamente. */
     public MotorDeProcessamento(Iterable<? extends Segmento<?>> segmentos, SituacaoCadastral situacaoCadastral,
                                 Numeracao numeracao, Processos processos, Transacoes transacoes, Clock relogio,
-                                Consumer<ProcessoCriado> publicar) {
+                                GeradorDeDocumentos documentos) {
         for (var segmento : segmentos) {
             if (porCodigo.put(segmento.codigo(), segmento) != null
                     || porTipoDosDados.put(segmento.tipoDosDados(), segmento) != null) {
@@ -77,7 +80,7 @@ public class MotorDeProcessamento {
         this.processos = processos;
         this.transacoes = transacoes;
         this.relogio = relogio;
-        this.publicar = publicar;
+        this.documentos = documentos;
     }
 
     public <D extends DadosDoSegmento> Processo<D> criar(Solicitacao<D> solicitacao) {
@@ -85,13 +88,19 @@ public class MotorDeProcessamento {
         // A chamada ao sistema externo vem por último: só acontece se a solicitação passou em todas as outras regras
         RegrasComuns.<D>todas().e(segmento.regras()).e(this::cadastroRegular).exigir(solicitacao);
 
-        return transacoes.executar(() -> {
-            var processo = Processo.abrir(numero(segmento), segmento.codigo(), solicitacao, LocalDate.now(relogio));
-            segmento.salvar(processo);
-            // Dentro da transação: quem observa com AFTER_SUCCESS (a impressão) só roda depois do commit
-            publicar.accept(new ProcessoCriado(processo));
-            return processo;
+        Processo<D> processo = transacoes.executar(() -> {
+            var aberto = Processo.abrir(numero(segmento), segmento.codigo(), solicitacao, LocalDate.now(relogio));
+            segmento.salvar(aberto);
+            return aberto;
         });
+
+        // Depois do commit: processo que não foi gravado não é impresso, e falha no PDF não desfaz o processo
+        try {
+            documentos.gerarAbertura(processo);
+        } catch (SistemaExternoIndisponivelException e) {
+            LOG.errorf(e, "Falha ao pedir o PDF de abertura do processo %s", processo.numero());
+        }
+        return processo;
     }
 
     public Processo<?> processar(UUID id) {

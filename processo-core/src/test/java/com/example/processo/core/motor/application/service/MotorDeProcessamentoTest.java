@@ -3,7 +3,6 @@ package com.example.processo.core.motor.application.service;
 import com.example.processo.core.Fakes;
 import com.example.processo.core.motor.application.port.out.SituacaoCadastral;
 import com.example.processo.core.motor.application.port.spi.Segmento;
-import com.example.processo.core.motor.domain.event.ProcessoCriado;
 import com.example.processo.core.motor.domain.exception.ConflitoDeSituacaoException;
 import com.example.processo.core.motor.domain.exception.ProcessoNaoEncontradoException;
 import com.example.processo.core.motor.domain.exception.RegraVioladaException;
@@ -81,14 +80,14 @@ class MotorDeProcessamentoTest {
     final SegmentoEmMemoria<DadosServico> servico = new SegmentoEmMemoria<>("SERVICO", "SRV", DadosServico.class,
             s -> Optional.empty(), p -> Avaliacao.aprovado());
     final AtomicLong sequencia = new AtomicLong();
-    final List<ProcessoCriado> publicados = new ArrayList<>();
+    final Fakes.DocumentosEmMemoria documentos = new Fakes.DocumentosEmMemoria();
     /** CPF que o sistema externo falso considera irregular. */
     static final String CPF_IRREGULAR = "11144477735";
     final List<String> consultados = new ArrayList<>();
     final SituacaoCadastral situacaoCadastral = cpf -> consultados.add(cpf) && !cpf.equals(CPF_IRREGULAR);
     final MotorDeProcessamento motor = new MotorDeProcessamento(List.of(auto, servico), situacaoCadastral,
             sequencia::incrementAndGet, banco, Fakes.semTransacao(),
-            Clock.fixed(Instant.from(HOJE.atStartOfDay(ZoneOffset.UTC)), ZoneOffset.UTC), publicados::add);
+            Clock.fixed(Instant.from(HOJE.atStartOfDay(ZoneOffset.UTC)), ZoneOffset.UTC), documentos);
 
     Processo<?> criarAuto(String placa) {
         return motor.criar(new Solicitacao<>(ANA, new BigDecimal("50000"), new DadosAuto(placa)));
@@ -107,7 +106,17 @@ class MotorDeProcessamentoTest {
         assertEquals("SRV-2026-000002", reforma.numero());
         assertEquals(List.of(carro), auto.gravados);
         assertEquals(List.of(reforma), servico.gravados);
-        assertEquals(List.of(new ProcessoCriado(carro), new ProcessoCriado(reforma)), publicados);
+        assertEquals(List.of(carro, reforma), documentos.pedidos);
+    }
+
+    @Test
+    void falhaNoPdfNaoDesfazACriacao() {
+        documentos.simularFalha = true;
+
+        var processo = criarAuto("ABC1D23");
+
+        assertEquals(List.of(processo), auto.gravados);
+        assertEquals(List.of(processo), documentos.pedidos);
     }
 
     @Test
@@ -122,13 +131,13 @@ class MotorDeProcessamentoTest {
     }
 
     @Test
-    void regraDoSegmentoVioladaNaoGravaNemPublica() {
+    void regraDoSegmentoVioladaNaoGravaNemPedeDocumento() {
         var erro = assertThrows(RegraVioladaException.class,
                 () -> motor.criar(new Solicitacao<>(ANA, new BigDecimal("50000"), new DadosAuto("placa"))));
 
         assertEquals("Placa inválida", erro.getMessage());
         assertTrue(auto.gravados.isEmpty());
-        assertTrue(publicados.isEmpty());
+        assertTrue(documentos.pedidos.isEmpty());
         assertEquals(0, sequencia.get());
     }
 
@@ -140,7 +149,7 @@ class MotorDeProcessamentoTest {
 
         assertEquals("Situação cadastral irregular para o CPF " + CPF_IRREGULAR, erro.getMessage());
         assertTrue(auto.gravados.isEmpty());
-        assertTrue(publicados.isEmpty());
+        assertTrue(documentos.pedidos.isEmpty());
         assertEquals(0, sequencia.get());
     }
 
@@ -177,7 +186,7 @@ class MotorDeProcessamentoTest {
                 p -> Avaliacao.aprovado());
         assertThrows(IllegalStateException.class, () -> new MotorDeProcessamento(List.of(auto, outroAuto),
                 situacaoCadastral, sequencia::incrementAndGet, banco, Fakes.semTransacao(), Clock.systemUTC(),
-                publicados::add));
+                documentos));
     }
 
     // Ciclo de vida: o mesmo para todos os segmentos; cada um só decide aprovar ou recusar

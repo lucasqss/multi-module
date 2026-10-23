@@ -1,4 +1,4 @@
-package com.example.processo.impressao.dto;
+package com.example.processo.integracoes.pdf.dto;
 
 import com.example.processo.core.motor.domain.model.Processo;
 

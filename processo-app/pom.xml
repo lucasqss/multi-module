@@ -34,11 +34,6 @@
             <groupId>com.example</groupId>
             <artifactId>integracoes</artifactId>
         </dependency>
-        <!-- Descartável: remover esta dependência tira a impressão do deploy sem tocar no resto -->
-        <dependency>
-            <groupId>com.example</groupId>
-            <artifactId>impressao</artifactId>
-        </dependency>
         <!-- Já chega pelo core/query, mas é declarado aqui porque o report-aggregate do JaCoCo só considera as
              dependências DIRETAS: módulo fora desta lista fica fora da cobertura agregada -->
         <dependency>

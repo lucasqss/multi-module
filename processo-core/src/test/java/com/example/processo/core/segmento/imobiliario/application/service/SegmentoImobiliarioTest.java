@@ -2,7 +2,6 @@ package com.example.processo.core.segmento.imobiliario.application.service;
 
 import com.example.processo.core.Fakes;
 import com.example.processo.core.motor.application.service.MotorDeProcessamento;
-import com.example.processo.core.motor.domain.event.ProcessoCriado;
 import com.example.processo.core.motor.domain.exception.RegraVioladaException;
 import com.example.processo.core.motor.domain.model.Avaliacao;
 import com.example.processo.core.motor.domain.model.Processo;
@@ -51,11 +50,11 @@ class SegmentoImobiliarioTest {
     }
 
     final ProcessosEmMemoria processos = new ProcessosEmMemoria();
-    final List<ProcessoCriado> publicados = new ArrayList<>();
+    final Fakes.DocumentosEmMemoria documentos = new Fakes.DocumentosEmMemoria();
     final SegmentoImobiliario segmento = new SegmentoImobiliario(processos);
     final MotorDeProcessamento motor = new MotorDeProcessamento(List.of(segmento),
             cpf -> true, new AtomicLong(41)::incrementAndGet, new Fakes.BancoEmMemoria(), Fakes.semTransacao(), Clock.fixed(Instant.from(HOJE.atStartOfDay(ZoneOffset.UTC)),
-            ZoneOffset.UTC), publicados::add);
+            ZoneOffset.UTC), documentos);
 
     static Solicitacao<DadosImobiliarios> solicitacao(String valor, TipoImovel tipo, String avaliacao) {
         return solicitacao(valor, new DadosImobiliarios("12345", tipo, new BigDecimal(avaliacao), "SP"));
@@ -76,7 +75,7 @@ class SegmentoImobiliarioTest {
         assertEquals("IMO-2026-000042", processo.numero());
         assertEquals(SegmentoImobiliario.CODIGO, processo.segmento());
         assertEquals(List.of(processo), processos.dados);
-        assertEquals(List.of(new ProcessoCriado(processo)), publicados);
+        assertEquals(List.of(processo), documentos.pedidos);
     }
 
     @Test

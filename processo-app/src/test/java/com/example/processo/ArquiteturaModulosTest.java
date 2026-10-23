@@ -28,7 +28,6 @@ class ArquiteturaModulosTest {
 
     private static final String CORE = "com.example.processo.core";
     private static final String QUERY = "com.example.processo.query";
-    private static final String IMPRESSAO = "com.example.processo.impressao";
     private static final String INTEGRACOES = "com.example.processo.integracoes";
     private static final String APP = "com.example.processo.app";
 
@@ -41,7 +40,6 @@ class ArquiteturaModulosTest {
             "processo-core", CORE,
             "processo-query", QUERY,
             "integracoes", INTEGRACOES,
-            "impressao", IMPRESSAO,
             "processo-app", APP);
 
     private static final JavaClasses CLASSES = new ClassFileImporter()
@@ -67,14 +65,6 @@ class ArquiteturaModulosTest {
                 .check(CLASSES);
         noClasses().that().resideInAPackage(QUERY + "..")
                 .should().dependOnClassesThat().resideInAPackage(CORE + "..")
-                .check(CLASSES);
-    }
-
-    @Test
-    void ninguemDependeDaImpressao() {
-        // Descartável: apagar o módulo não pode quebrar a compilação de nenhum outro
-        noClasses().that().resideOutsideOfPackage(IMPRESSAO + "..")
-                .should().dependOnClassesThat().resideInAPackage(IMPRESSAO + "..")
                 .check(CLASSES);
     }
 
@@ -110,9 +100,9 @@ class ArquiteturaModulosTest {
 
     @Test
     void httpSoNasBordas() {
-        // REST de entrada só no app; impressão e integrações são clientes HTTP de sistemas externos
+        // REST de entrada só no app; as integrações são clientes HTTP de sistemas externos
         noClasses().that().resideInAPackage("com.example..")
-                .and().resideOutsideOfPackages(APP + "..", IMPRESSAO + "..", INTEGRACOES + "..")
+                .and().resideOutsideOfPackages(APP + "..", INTEGRACOES + "..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "jakarta.ws.rs..", "org.jboss.resteasy..", "io.quarkus.rest..", "org.eclipse.microprofile.rest..")
                 .check(CLASSES);

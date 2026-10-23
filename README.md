@@ -43,7 +43,7 @@ Exemplo de **processos de dois tipos (imobiliário e veicular) com um motor úni
 | `processo-query` | Consultas somente leitura que devolvem projeções: listagem de todos os segmentos e detalhe de cada tipo |
 | `integracoes` | Integrações de saída, um pacote por sistema externo: implementam ports do core e traduzem o modelo externo (anticorrupção). Exemplo: `cadastro`, consultado no ato da criação |
 | `impressao` | Ponte para o sistema de PDF: pede o documento de abertura de todo processo criado, de qualquer segmento |
-| `processo-app` | Todo o REST (`adapter/inbound/rest`: resources, DTOs, mappers e tratamento de erros), a montagem do deploy único, os ITs e o ArchUnit entre módulos |
+| `processo-app` | Todo o REST (`adapter/inbound/rest`: resources, DTOs e tratamento de erros), a montagem do deploy único, os ITs e o ArchUnit entre módulos |
 
 ### Convenção de pastas
 
@@ -52,7 +52,7 @@ Cada contexto (o motor e cada segmento) segue a mesma estrutura hexagonal:
 ```
 domain/        model · state · rule · exception · event         Java puro
 application/   port/out · port/spi · service (o motor e os segmentos)
-adapter/       inbound/rest/{resource, dto, mapper, exception}   (no processo-app)
+adapter/       inbound/rest/{resource, dto, exception}           (no processo-app)
                outbound/persistence/{repository, mapper}
 config/        producers CDI
 ```
@@ -161,8 +161,7 @@ com `Unsatisfied dependency for type ...SituacaoCadastral`, em vez de falhar em 
 3. **No `processo-query`**: a consulta de detalhe na filha. A listagem já inclui o segmento novo.
 4. **No `processo-app`**, em `adapter/inbound/rest`:
    - `resource/`: os endpoints de criação e detalhe;
-   - `dto/`: o request;
-   - `mapper/`: o request → `Solicitacao`.
+   - `dto/`: o request, com `paraSolicitacao()`.
 5. **Nos testes**: um `Tipo` novo em `CicloDeVidaPorTipoIT.tipos()`.
 
 O motor, a máquina de estados, os endpoints de ciclo de vida e a impressão não mudam. O commit que adicionou o

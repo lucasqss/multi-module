@@ -315,7 +315,7 @@
       <tr><td><code>application/port/out</code></td><td>O que a aplicação precisa de fora: persistência, sistemas externos, transação.</td></tr>
       <tr><td><code>application/port/spi</code></td><td>Ponto de extensão do motor (<code>Segmento</code>).</td></tr>
       <tr><td><code>application/service</code></td><td>O motor (ponto de entrada do core, injetado pelo REST) e as implementações do SPI (os segmentos).</td></tr>
-      <tr><td><code>adapter/inbound/rest</code></td><td><code>resource/</code> (endpoints), <code>dto/</code> (contratos de request e response), <code>mapper/</code> (dto ↔ domínio), <code>exception/</code> (exceção → HTTP). Fica no <code>processo-app</code>.</td></tr>
+      <tr><td><code>adapter/inbound/rest</code></td><td><code>resource/</code> (endpoints), <code>dto/</code> (contratos de request e response, com a conversão de/para o domínio), <code>exception/</code> (exceção → HTTP). Fica no <code>processo-app</code>.</td></tr>
       <tr><td><code>adapter/outbound/persistence</code></td><td><code>repository/</code> (Jakarta Data; implementa o port de persistência) e <code>mapper/</code> (entidade ↔ domínio).</td></tr>
       <tr><td><code>config</code></td><td>Producers CDI (ex.: <code>Clock</code>).</td></tr>
     </tbody>
@@ -325,7 +325,11 @@
     motor não conhece os segmentos), <code>SituacaoCadastral</code> (o core não conhece o REST Client) e o evento
     <code>ProcessoCriado</code> (a impressão pode ser apagada). Dentro de um contexto, injeta-se a classe: uma interface
     com uma única implementação no mesmo módulo é indireção sem retorno. Por isso o REST injeta o
-    <code>MotorDeProcessamento</code>, e o repository Jakarta Data implementa o port sem uma classe adapter no meio.</div>
+    <code>MotorDeProcessamento</code>, e o repository Jakarta Data implementa o port sem uma classe adapter no meio.
+    <br><br><strong>Mapper só quando a conversão tem lógica.</strong> Conversão de uma linha é método do próprio DTO
+    (<code>request.paraSolicitacao()</code>, <code>ProcessoCriadoResponse.de(p)</code>, <code>resposta.regular()</code>,
+    <code>Documento.deAbertura(p)</code>). Classe em <code>mapper/</code> fica para domínio ↔ entidade JPA, que tem
+    tradução de enums e monta pai e filha.</div>
 <pre><code>multi-module/
 ├─ pom.xml                     agregador: BOM Quarkus, versões, hibernate-processor, jandex, JaCoCo, Sonar
 ├─ docker-compose.yml          Oracle para rodar o jar fora dos testes
@@ -340,8 +344,7 @@
 │  ├─ motor/
 │  │  ├─ domain/
 │  │  │  ├─ model/       Processo&lt;D&gt; (Context do State), Solicitacao&lt;D&gt;, Proponente, DadosDoSegmento, Avaliacao
-│  │  │  ├─ state/       Situacao, EstadoDoProcesso (State), Aberto, EmProcessamento, Concluido, Recusado,
-│  │  │  │               Cancelado (ConcreteStates), TransicaoInvalidaException
+│  │  │  ├─ state/       Situacao (State: um enum, cada constante é um estado), TransicaoInvalidaException
 │  │  │  ├─ rule/        Especificacao, RegrasComuns
 │  │  │  ├─ exception/   RegraViolada, ProcessoNaoEncontrado, ConflitoDeSituacao, SistemaExternoIndisponivel
 │  │  │  └─ event/       ProcessoCriado
@@ -365,15 +368,14 @@
 │  └─ dto/               ResumoProcesso, DetalheImobiliario, DetalheVeicular
 ├─ integracoes/  (com.example.processo.integracoes)
 │  └─ cadastro/          client/ CadastroClient, CadastroClientSimulado · dto/ RespostaCadastro
-│                        · mapper/ CadastroMapper · adapter/ SituacaoCadastralAdapter
+│                        · adapter/ SituacaoCadastralAdapter
 ├─ impressao/  (com.example.processo.impressao)
-│  └─ listener/ ImpressaoDeProcessos · client/ SistemaDePdf · dto/ Documento · mapper/ DocumentoMapper
+│  └─ listener/ ImpressaoDeProcessos · client/ SistemaDePdf · dto/ Documento
 └─ processo-app/  (com.example.processo.app)
    ├─ adapter/inbound/rest/
    │  ├─ resource/       ProcessoImobiliarioResource, ProcessoVeicularResource, ProcessosResource
    │  ├─ dto/            NovoProcessoImobiliarioRequest, ImovelRequest, NovoProcessoVeicularRequest, VeiculoRequest,
    │  │                  ProponenteRequest, ProcessoCriadoResponse, SituacaoResponse, ErroResponse
-   │  ├─ mapper/         ProcessoImobiliarioRestMapper, ProcessoVeicularRestMapper, ProcessoRestMapper
    │  └─ exception/      TratadorDeErros
    ├─ application.properties
    └─ test/              ArquiteturaModulosTest, CicloDeVidaPorTipoIT, CriarProcessoImobiliarioIT,
@@ -533,26 +535,34 @@ SEQ_NUMERO_PROCESSO   sequence única de numeração</code></pre>
     <thead><tr><th>Papel</th><th>Classe</th><th>O que faz</th></tr></thead>
     <tbody>
       <tr><td>Context</td><td><code>Processo&lt;D&gt;</code></td><td>Guarda a <code>Situacao</code> (o valor persistido) e delega cada evento ao estado correspondente. Imutável: cada evento devolve uma cópia na nova situação.</td></tr>
-      <tr><td>State</td><td><code>EstadoDoProcesso</code></td><td><code>sealed interface</code> com um método por evento. Por padrão todo evento lança <code>TransicaoInvalidaException</code>.</td></tr>
-      <tr><td>ConcreteStates</td><td><code>Aberto</code>, <code>EmProcessamento</code>, <code>Concluido</code>, <code>Recusado</code>, <code>Cancelado</code></td><td>Cada um sobrescreve só as transições que permite. Os finais não sobrescrevem nada.</td></tr>
+      <tr><td>State</td><td><code>enum Situacao</code></td><td>Um método por evento. Por padrão todo evento lança <code>TransicaoInvalidaException</code>.</td></tr>
+      <tr><td>ConcreteStates</td><td>as constantes <code>ABERTO</code>, <code>EM_PROCESSAMENTO</code>, <code>CONCLUIDO</code>, <code>RECUSADO</code>, <code>CANCELADO</code></td><td>Cada uma sobrescreve só as transições que permite. As finais não sobrescrevem nada.</td></tr>
     </tbody>
   </table></div>
-<pre><code>final class Aberto implements EstadoDoProcesso {
-    public Situacao situacao() { return Situacao.ABERTO; }
-    public EstadoDoProcesso iniciarProcessamento() { return EM_PROCESSAMENTO; }
-    public EstadoDoProcesso cancelar() { return CANCELADO; }
-    // concluir() e recusar() herdam o default: "Processo ABERTO não pode ser concluído"
+<pre><code>public enum Situacao {
+    ABERTO {
+        public Situacao iniciarProcessamento() { return EM_PROCESSAMENTO; }
+        public Situacao cancelar() { return CANCELADO; }
+    },
+    EM_PROCESSAMENTO {
+        public Situacao concluir() { return CONCLUIDO; }
+        public Situacao recusar() { return RECUSADO; }
+    },
+    CONCLUIDO, RECUSADO, CANCELADO;
+
+    public Situacao concluir() { throw new TransicaoInvalidaException(this, "concluído"); }
+    // iniciarProcessamento(), recusar() e cancelar(): o mesmo
 }
 
 // No Context:
-public Processo&lt;D&gt; cancelar() { return em(EstadoDoProcesso.de(situacao).cancelar(), null); }</code></pre>
+public Processo&lt;D&gt; cancelar() { return em(situacao.cancelar(), null); }</code></pre>
   <ul>
     <li><strong>Pacote autocontido:</strong> o <code>estado</code> não depende de nada do resto do domínio (tem a própria
       exceção), então não forma ciclo com o <code>Processo</code>, que o usa.</li>
-    <li><strong>Persistência:</strong> só a <code>Situacao</code> vai para o banco. <code>EstadoDoProcesso.de(situacao)</code>
-      devolve o objeto de comportamento.</li>
-    <li><strong>Teste:</strong> o <code>EstadoDoProcessoTest</code> é uma tabela com todos os estados × todos os eventos.
-      Uma transição nova é uma linha na tabela e um método num estado.</li>
+    <li><strong>Um enum, não uma classe por estado:</strong> é o mesmo padrão, com a máquina inteira num arquivo. O valor
+      persistido e o comportamento são o mesmo objeto, então não há tradução entre os dois.</li>
+    <li><strong>Teste:</strong> o <code>SituacaoTest</code> é uma tabela com todos os estados × todos os eventos.
+      Uma transição nova é uma linha na tabela e um método numa constante.</li>
     <li><strong>Erros:</strong> transição inválida responde <code>422</code>, e conflito de concorrência
       (compare-and-set) responde <code>409</code>.</li>
   </ul>
@@ -595,8 +605,8 @@ public Processo&lt;D&gt; cancelar() { return em(EstadoDoProcesso.de(situacao).ca
     <li><code>CadastroClient</code> é o REST Client real (<code>GET /situacoes/{documento}</code>), com endereço em
       <code>quarkus.rest-client.cadastro.url</code> (variável <code>CADASTRO_URL</code>).</li>
     <li><code>RespostaCadastro</code> (<code>dto/</code>) é o modelo do sistema externo e não sai do pacote <code>cadastro</code>.</li>
-    <li><code>SituacaoCadastralAdapter</code> (<code>adapter/</code>) implementa o port, e o <code>CadastroMapper</code>
-      (<code>mapper/</code>) converte a resposta em <code>true</code> ou <code>false</code>. Erro HTTP, de rede ou timeout vira <code>SistemaExternoIndisponivelException</code> (do domínio),
+    <li><code>SituacaoCadastralAdapter</code> (<code>adapter/</code>) implementa o port, e
+      <code>RespostaCadastro.regular()</code> converte a resposta em <code>true</code> ou <code>false</code>. Erro HTTP, de rede ou timeout vira <code>SistemaExternoIndisponivelException</code> (do domínio),
       e a resposta é <code>503</code>.</li>
     <li><code>CadastroClientSimulado</code> substitui o cliente só no <code>quarkus:dev</code>:</li>
   </ul>
@@ -677,8 +687,7 @@ public class CadastroClientSimulado implements CadastroClient { ... }   // sempr
       <p>Core e query não se enxergam. Ninguém depende da impressão, das integrações nem do app. As integrações só
         usam o domínio e os <code>port/out</code> do core e não se enxergam entre si. O <code>jpa-core</code> não conhece o
         resto. HTTP só no app, na impressão e nas integrações. O app entra no core pelo motor, nunca
-        pelos ports de saída, SPI ou adapters, e não usa entidades JPA. No REST, <code>dto</code> não conhece <code>resource</code> nem
-        <code>mapper</code>. Não há ciclos entre pacotes, e toda classe pertence a um módulo registrado.</p>
+        pelos ports de saída, SPI ou adapters, e não usa entidades JPA. No REST, <code>dto</code> não conhece <code>resource</code>. Não há ciclos entre pacotes, e toda classe pertence a um módulo registrado.</p>
     </div>
   </div>
 </section>
@@ -744,7 +753,7 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
     <li><code>processo-query</code>: projeção e consulta de detalhe na filha. A listagem já inclui o segmento novo.</li>
     <li><code>processo-app</code>, em <code>adapter/inbound/rest</code>: <code>resource/</code> com
       <code>POST /processos/&lt;segmento&gt;</code> e <code>GET .../{id}</code>, o request em <code>dto/</code> e o
-      request → <code>Solicitacao</code> em <code>mapper/</code>.</li>
+      <code>paraSolicitacao()</code> no próprio request.</li>
     <li>Testes unitários do segmento no motor real e um <code>Tipo</code> novo em
       <code>CicloDeVidaPorTipoIT.tipos()</code>. O motor, a máquina de estados, a impressão e os endpoints de ciclo de
       vida não mudam. O commit do veicular é o exemplo.</li>
@@ -756,8 +765,8 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
     <li>Pacote <code>integracoes.&lt;sistema&gt;</code>:
       <ul>
         <li><code>client/</code>: o REST Client;</li>
-        <li><code>dto/</code>: o modelo do sistema externo;</li>
-        <li><code>mapper/</code>: modelo externo → domínio;</li>
+        <li><code>dto/</code>: o modelo do sistema externo, com a conversão para o domínio (ou um
+          <code>mapper/</code>, se ela tiver lógica);</li>
         <li><code>adapter/</code>: implementa o port;</li>
         <li>simulação <code>@IfBuildProfile("dev")</code>, se quiser rodar o dev sem o sistema.</li>
       </ul></li>

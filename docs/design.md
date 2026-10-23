@@ -37,9 +37,10 @@ consultados pelo mesmo motor, para validar seis requisitos:
 
 ### Máquina de estados com o padrão State
 
-O `Processo` é o Context: guarda a `Situacao` (o valor persistido) e delega cada evento ao `EstadoDoProcesso`
-correspondente. Há uma classe por estado (`Aberto`, `EmProcessamento`, `Concluido`, `Recusado`, `Cancelado`), cada
-uma sobrescrevendo só as transições que permite; o `default` de todo evento lança `TransicaoInvalidaException`.
+O `Processo` é o Context: guarda a `Situacao` e delega cada evento a ela. O State é o próprio `enum Situacao`, e
+cada constante é um estado concreto que sobrescreve só as transições que permite; por padrão todo evento lança
+`TransicaoInvalidaException`. Um enum em vez de uma classe por estado: é o mesmo padrão, com a máquina inteira num
+arquivo, e o valor persistido e o comportamento são o mesmo objeto.
 
 - O pacote `motor.domain.state` é autocontido, com a própria exceção, para não formar ciclo com `domain.model`.
 - O processamento tem duas transações curtas, com a avaliação do tipo fora delas. A troca de situação é
@@ -158,7 +159,7 @@ Estrutura hexagonal, igual em todo contexto. As pastas estruturais têm nomes em
 | `application/port/out` | o que a aplicação precisa de fora (persistência, sistemas externos, transação) |
 | `application/port/spi` | ponto de extensão do motor (`Segmento`) |
 | `application/service` | o motor e as implementações do SPI (os segmentos) |
-| `adapter/inbound/rest` | `resource/` (endpoints), `dto/` (contratos de request/response), `mapper/` (dto ↔ domínio), `exception/` (exceção → HTTP) |
+| `adapter/inbound/rest` | `resource/` (endpoints), `dto/` (contratos de request/response, com a conversão de/para o domínio), `exception/` (exceção → HTTP) |
 | `adapter/outbound/persistence` | `repository/` (Jakarta Data, implementa o port de persistência) e `mapper/` (entidade ↔ domínio) |
 | `config` | producers CDI (ex.: `Clock`) |
 
@@ -171,13 +172,17 @@ contexto, injeta-se a classe: uma interface com uma única implementação no me
 isso o REST injeta o `MotorDeProcessamento` direto, e o repository Jakarta Data implementa o port de persistência
 sem uma classe adapter no meio.
 
+Na mesma linha, **mapper só quando a conversão tem lógica**. Conversão de uma linha é método do próprio DTO
+(`request.paraSolicitacao()`, `ProcessoCriadoResponse.de(p)`, `resposta.regular()`, `Documento.deAbertura(p)`).
+Classe em `mapper/` fica para domínio ↔ entidade JPA, que traduz enums e monta pai e filha.
+
 ## Core (`com.example.processo.core`)
 
 **Motor (`core.motor`)**
 
 - `domain`, Java puro:
   - `model`: `Processo<D>` (Context do State), `Solicitacao<D>`, `Proponente`, `DadosDoSegmento`, `Avaliacao`;
-  - `state`: `Situacao`, `EstadoDoProcesso` e os estados concretos;
+  - `state`: `Situacao` (o State, um enum) e `TransicaoInvalidaException`;
   - `rule`: `Especificacao`, `RegrasComuns` (nome obrigatório, CPF com dígitos verificadores, valor > 0);
   - `exception`: regra violada, processo não encontrado, conflito de situação, sistema externo indisponível;
   - `event`: `ProcessoCriado`.
@@ -219,19 +224,18 @@ sem uma classe adapter no meio.
   `ProcessosResource` (listagem pelo query; processar e cancelar pelo motor).
 - `dto/`: contratos de request (`NovoProcessoImobiliarioRequest`, `ImovelRequest`, `NovoProcessoVeicularRequest`,
   `VeiculoRequest`, `ProponenteRequest`) e de response (`ProcessoCriadoResponse`, `SituacaoResponse`,
-  `ErroResponse`). Os GETs devolvem direto as projeções do query, que já são o contrato de leitura.
-- `mapper/`: request → `Solicitacao` (`ProcessoImobiliarioRestMapper`, `ProcessoVeicularRestMapper`) e processo →
-  response (`ProcessoRestMapper`).
+  `ErroResponse`). Os requests convertem a si mesmos em `Solicitacao` (`paraSolicitacao()`) e os responses se
+  montam do processo (`de(p)`). Os GETs devolvem direto as projeções do query, que já são o contrato de leitura.
 - `exception/TratadorDeErros`: exceções do domínio → 422, 404, 409 e 503.
 
 ## Integrações (`com.example.processo.integracoes`)
 
-O pacote `cadastro` tem quatro subpacotes:
+O pacote `cadastro` tem três subpacotes:
 
 - `client/`: `CadastroClient`, o REST Client do sistema externo, e `CadastroClientSimulado`, a simulação do perfil
   dev, que responde sempre `REGULAR`;
-- `dto/`: `RespostaCadastro`, o modelo externo;
-- `mapper/`: `CadastroMapper`, que converte a resposta para o que o domínio entende;
+- `dto/`: `RespostaCadastro`, o modelo externo, com `regular()`, que converte a resposta para o que o domínio
+  entende;
 - `adapter/`: `SituacaoCadastralAdapter`, que implementa o port `SituacaoCadastral`.
 
 A simulação ocupa o lugar do REST Client sem que nenhum outro código saiba:
@@ -248,17 +252,17 @@ de lá, porque a simulação responde sempre `REGULAR`.
 
 - `listener/ImpressaoDeProcessos`: o observer do evento.
 - `client/SistemaDePdf`: o REST Client, `POST /documentos`, com o endereço em `quarkus.rest-client.sistema-pdf.url`.
-- `dto/Documento(modelo, referencia, processo)`.
-- `mapper/DocumentoMapper`: o modelo é `abertura-processo-<segmento>`, a referência é o número do processo e
-  `processo.dados` leva os campos do segmento.
+- `dto/Documento(modelo, referencia, processo)`. `Documento.deAbertura(p)` escolhe o modelo
+  `abertura-processo-<segmento>`, usa o número do processo como referência, e `processo.dados` leva os campos do
+  segmento.
 
 ## Testes
 
 | Onde | O quê | Docker |
 |---|---|---|
 | `processo-core` | tabela do State; regras comuns e CPF; motor com dois segmentos falsos (mesmo fluxo e ciclo de vida, numeração única, regra violada não grava nem publica, situação cadastral irregular, conflito, sistema externo só consultado no fim); segmentos imobiliário e veicular no motor real; ArchUnit de camadas e motor x segmentos | não |
-| `integracoes` | adapter e mapper da resposta externa; falha do cliente vira indisponibilidade | não |
-| `impressao` | `DocumentoMapper` | não |
+| `integracoes` | adapter e conversão da resposta externa; falha do cliente vira indisponibilidade | não |
+| `impressao` | `Documento.deAbertura` | não |
 | `processo-app` | ArchUnit entre módulos; `@QuarkusIntegrationTest` contra o jar, com Oracle e um sistema de PDF falso (`HttpServer` do JDK): ciclo de vida igual por tipo (inclusive processamento simultâneo), recusa por matrícula, numeração, regras, cadastro irregular e fora do ar, falha do PDF, detalhe e listagem | sim |
 
 ## Armadilhas

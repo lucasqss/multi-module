@@ -2,7 +2,7 @@ package com.example.processo.impressao.listener;
 
 import com.example.processo.core.motor.domain.event.ProcessoCriado;
 import com.example.processo.impressao.client.SistemaDePdf;
-import com.example.processo.impressao.mapper.DocumentoMapper;
+import com.example.processo.impressao.dto.Documento;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.event.TransactionPhase;
@@ -25,7 +25,7 @@ public class ImpressaoDeProcessos {
     }
 
     void aoCriar(@Observes(during = TransactionPhase.AFTER_SUCCESS) ProcessoCriado evento) {
-        var documento = DocumentoMapper.deAbertura(evento.processo());
+        var documento = Documento.deAbertura(evento.processo());
         try {
             sistemaDePdf.gerar(documento);
         } catch (RuntimeException e) {

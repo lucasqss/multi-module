@@ -132,12 +132,8 @@ class ArquiteturaModulosTest {
 
     @Test
     void restOrganizadoPorPapel() {
-        // resource → mapper → dto; o dto não conhece resource nem mapper
+        // resource → dto; o dto converte de/para o domínio, mas não conhece o resource
         noClasses().that().resideInAPackage(APP + ".adapter.inbound.rest.dto..")
-                .should().dependOnClassesThat().resideInAnyPackage(
-                        APP + ".adapter.inbound.rest.resource..", APP + ".adapter.inbound.rest.mapper..")
-                .check(CLASSES);
-        noClasses().that().resideInAPackage(APP + ".adapter.inbound.rest.mapper..")
                 .should().dependOnClassesThat().resideInAPackage(APP + ".adapter.inbound.rest.resource..")
                 .check(CLASSES);
     }

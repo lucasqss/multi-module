@@ -7,4 +7,9 @@ import com.example.processo.core.motor.domain.model.Processo;
  * Genérico para todos os segmentos: os dados próprios de cada um seguem em {@code processo.dados}.
  */
 public record Documento(String modelo, String referencia, Processo<?> processo) {
+
+    /** O modelo é escolhido pelo código do segmento; a referência é o número do processo. */
+    public static Documento deAbertura(Processo<?> processo) {
+        return new Documento("abertura-processo-" + processo.segmento().toLowerCase(), processo.numero(), processo);
+    }
 }

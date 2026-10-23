@@ -2,7 +2,6 @@ package com.example.processo.app.adapter.inbound.rest.resource;
 
 import com.example.jpacore.SituacaoProcesso;
 import com.example.processo.app.adapter.inbound.rest.dto.SituacaoResponse;
-import com.example.processo.app.adapter.inbound.rest.mapper.ProcessoRestMapper;
 import com.example.processo.core.motor.application.service.MotorDeProcessamento;
 import com.example.processo.query.dto.ResumoProcesso;
 import com.example.processo.query.repository.ProcessoQueries;
@@ -39,7 +38,7 @@ public class ProcessosResource {
     @POST
     @Path("{id}/processamento")
     public SituacaoResponse processar(@PathParam("id") UUID id) {
-        return ProcessoRestMapper.paraSituacao(motor.processar(id));
+        return SituacaoResponse.de(motor.processar(id));
     }
 
     @POST

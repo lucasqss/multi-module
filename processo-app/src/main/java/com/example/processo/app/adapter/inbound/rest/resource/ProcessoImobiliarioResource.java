@@ -2,8 +2,6 @@ package com.example.processo.app.adapter.inbound.rest.resource;
 
 import com.example.processo.app.adapter.inbound.rest.dto.NovoProcessoImobiliarioRequest;
 import com.example.processo.app.adapter.inbound.rest.dto.ProcessoCriadoResponse;
-import com.example.processo.app.adapter.inbound.rest.mapper.ProcessoImobiliarioRestMapper;
-import com.example.processo.app.adapter.inbound.rest.mapper.ProcessoRestMapper;
 import com.example.processo.core.motor.application.service.MotorDeProcessamento;
 import com.example.processo.query.dto.DetalheImobiliario;
 import com.example.processo.query.repository.ProcessoQueries;
@@ -36,8 +34,7 @@ public class ProcessoImobiliarioResource {
 
     @POST
     public Response criar(NovoProcessoImobiliarioRequest request) {
-        ProcessoCriadoResponse criado = ProcessoRestMapper.paraCriado(
-                motor.criar(ProcessoImobiliarioRestMapper.paraSolicitacao(request)));
+        var criado = ProcessoCriadoResponse.de(motor.criar(request.paraSolicitacao()));
         return Response.created(URI.create(CAMINHO + "/" + criado.id())).entity(criado).build();
     }
 

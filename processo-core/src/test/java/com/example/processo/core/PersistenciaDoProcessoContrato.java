@@ -79,6 +79,16 @@ public abstract class PersistenciaDoProcessoContrato {
         assertEquals(Optional.empty(), imobiliarios().porId(inexistente));
     }
 
+    /** Com os outros testes, toda situação passa pelo banco: um CHECK de SITUACAO desatualizado quebra aqui. */
+    @Test
+    void cancelamentoGrava() {
+        var processo = gravado(aleatorio(), "SP");
+
+        assertTrue(mudar(processo, Situacao.ABERTO, Situacao.CANCELADO, null));
+
+        assertEquals(Situacao.CANCELADO, imobiliarios().porId(processo.id()).orElseThrow().situacao());
+    }
+
     @Test
     void mudarSituacaoSoQuandoAindaEstaNaAnterior() {
         var processo = gravado(aleatorio(), "SP");

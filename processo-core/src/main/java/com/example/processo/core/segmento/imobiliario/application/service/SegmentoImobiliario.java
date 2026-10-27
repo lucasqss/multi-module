@@ -1,6 +1,6 @@
 package com.example.processo.core.segmento.imobiliario.application.service;
 
-import com.example.processo.core.motor.application.port.spi.Segmento;
+import com.example.processo.core.motor.application.port.spi.SegmentoBase;
 import com.example.processo.core.motor.domain.model.Avaliacao;
 import com.example.processo.core.motor.domain.model.Processo;
 import com.example.processo.core.motor.domain.model.Solicitacao;
@@ -8,15 +8,14 @@ import com.example.processo.core.motor.domain.rule.Especificacao;
 import com.example.processo.core.segmento.imobiliario.application.port.out.ProcessosImobiliarios;
 import com.example.processo.core.segmento.imobiliario.domain.model.DadosImobiliarios;
 import com.example.processo.core.segmento.imobiliario.domain.rule.RegrasImobiliarias;
-import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Singleton;
 
 import java.math.BigDecimal;
 import java.util.Optional;
-import java.util.UUID;
 
-/** Registro do segmento no motor: basta ser um bean que implementa {@link Segmento}. */
-@ApplicationScoped
-public class SegmentoImobiliario implements Segmento<DadosImobiliarios> {
+/** Registro do segmento no motor: basta ser um bean que implementa {@code Segmento}; a base cuida do repetitivo. */
+@Singleton
+public class SegmentoImobiliario extends SegmentoBase<DadosImobiliarios> {
 
     public static final String CODIGO = "IMOBILIARIO";
 
@@ -26,38 +25,14 @@ public class SegmentoImobiliario implements Segmento<DadosImobiliarios> {
     private final ProcessosImobiliarios processos;
 
     public SegmentoImobiliario(ProcessosImobiliarios processos) {
+        super(CODIGO, "IMO", DadosImobiliarios.class, processos);
         this.processos = processos;
-    }
-
-    @Override
-    public String codigo() {
-        return CODIGO;
-    }
-
-    @Override
-    public String prefixo() {
-        return "IMO";
-    }
-
-    @Override
-    public Class<DadosImobiliarios> tipoDosDados() {
-        return DadosImobiliarios.class;
     }
 
     /** Por último a regra que vai ao banco: só consulta quando a solicitação já passou nas outras. */
     @Override
     public Especificacao<Solicitacao<DadosImobiliarios>> regras() {
         return RegrasImobiliarias.TODAS.e(this::matriculaSemProcessoEmAndamento);
-    }
-
-    @Override
-    public void salvar(Processo<DadosImobiliarios> processo) {
-        processos.salvar(processo);
-    }
-
-    @Override
-    public Optional<Processo<DadosImobiliarios>> carregar(UUID id) {
-        return processos.porId(id);
     }
 
     @Override

@@ -279,7 +279,7 @@
     <thead><tr><th>Módulo</th><th>O que tem</th><th>Não pode depender de</th></tr></thead>
     <tbody>
       <tr><td><code>jpa-core</code></td><td>O schema: entidades, enums de coluna e migrations. Nenhuma regra.</td><td>nenhum outro módulo</td></tr>
-      <tr><td><code>processo-core</code></td><td>Toda a regra de escrita: o motor e os segmentos.</td><td>query, integrações, app, HTTP</td></tr>
+      <tr><td><code>processo-core</code></td><td>Toda a regra de escrita: o motor, os segmentos e os cadastros simples (<code>cadastro.*</code>).</td><td>query, integrações, app, HTTP</td></tr>
       <tr><td><code>processo-query</code></td><td>Consultas somente leitura que devolvem records.</td><td><code>processo-core</code></td></tr>
       <tr><td><code>integracoes</code></td><td>Um pacote por sistema externo (<code>cadastro</code>, <code>pdf</code>), implementando interfaces do core.</td><td>app, query, outro pacote de integração</td></tr>
       <tr><td><code>processo-app</code></td><td>REST, tratamento de erros, montagem do jar e testes de integração.</td><td>(ninguém depende dele)</td></tr>
@@ -325,12 +325,14 @@
 │  │  ├─ domain/       model/ Processo&lt;D&gt;, Solicitacao&lt;D&gt;, Cpf, Valor, Avaliacao · state/ Situacao
 │  │  │                rule/ Especificacao, RegrasComuns · exception/
 │  │  ├─ application/  port/out/ Processos, Numeracao, Transacoes, SituacaoCadastral, GeradorDeDocumentos
-│  │  │                port/spi/ Segmento · service/ MotorDeProcessamento
+│  │  │                port/spi/ Segmento, SegmentoBase · service/ MotorDeProcessamento
 │  │  ├─ adapter/      outbound/persistence/repository/ · outbound/transaction/
 │  │  └─ config/       Relogio
-│  └─ segmento/
-│     ├─ imobiliario/  domain/ · application/ · adapter/  (as mesmas pastas do motor)
-│     └─ veicular/     mesma estrutura
+│  ├─ segmento/
+│  │  ├─ imobiliario/  domain/ · application/ · adapter/  (as mesmas pastas do motor)
+│  │  └─ veicular/     mesma estrutura
+│  └─ cadastro/
+│     └─ agencia/      Agencia, Agencias (serviço), AgenciaRepository  (CRUD: pacote plano)
 ├─ processo-query/   repository/ ProcessoQueries · dto/ ResumoProcesso, Detalhe&lt;Tipo&gt;
 ├─ integracoes/      cadastro/ client/ · dto/ · adapter/ SituacaoCadastralAdapter
 │                    pdf/      client/ · dto/ Documento · adapter/ GeradorDeDocumentosAdapter
@@ -447,7 +449,10 @@ SEQ_NUMERO_PROCESSO   numeração única para todos os tipos</code></pre>
     Optional&lt;Processo&lt;D&gt;&gt; carregar(UUID id);        // lê pai + filha
     Avaliacao avaliar(Processo&lt;D&gt; processo);       // decisão do processamento
 }</code></pre>
-  <p>O motor recebe todos os beans <code>Segmento</code> pelo CDI, sem registro manual. Cada regra
+  <p>O segmento estende <code>SegmentoBase</code>, que já implementa código, prefixo, tipo, gravar e ler; ele só
+    escreve <code>regras()</code> e <code>avaliar()</code>. O motor recebe todos os segmentos pelo CDI, sem registro
+    manual. Cada endpoint de criação é do segmento (o corpo é dele), e todos entregam ao mesmo
+    <code>motor.criar</code>. Cada regra
     (<code>Especificacao</code>) devolve o motivo da violação; regras se compõem com <code>e(...)</code>, e a
     primeira que falha vira a mensagem do 422.</p>
   <div class="table-wrap"><table>
@@ -546,7 +551,7 @@ public class CadastroClientSimulado implements CadastroClient { ... }</code></pr
     <li><strong><code>ArquiteturaTest</code> (core):</strong> o motor não conhece segmentos, segmentos não se
       enxergam, <code>domain</code> é Java puro, <code>application</code> não conhece adapters.</li>
     <li><strong><code>ArquiteturaModulosTest</code> (app):</strong> core e query não se enxergam; ninguém depende de
-      integrações nem do app; HTTP só nas bordas; o app entra no core pelo motor; sem ciclos.</li>
+      integrações nem do app; HTTP só nas bordas; o app entra no core por serviços (o motor ou o de um cadastro); um canal de entrada não usa outro; sem ciclos.</li>
   </ul>
   <div class="table-wrap"><table>
     <thead><tr><th>Módulo</th><th>Testes</th><th>Docker</th></tr></thead>
@@ -561,6 +566,10 @@ public class CadastroClientSimulado implements CadastroClient { ... }</code></pr
     compare-and-set, motivo da recusa, matrícula em andamento) e roda duas vezes: contra os fakes, no core, e contra
     os repositories no Oracle, no app (o core publica os testes num test-jar). Ele já pegou uma divergência: o
     Oracle devolvia <code>500000</code> para <code>500000.00</code>. Port novo com fake ganha contrato novo.</div>
+  <div class="note"><strong>Guardas contra duplicação que não dá para evitar</strong>O jpa-core não pode depender do core,
+    então os enums de coluna repetem os do domínio. O <code>EnumsEspelhadosTest</code> falha se
+    <code>Situacao</code>/<code>SituacaoProcesso</code> ou os <code>TipoImovel</code> divergirem, e o contrato no Oracle
+    grava todas as situações, então um CHECK desatualizado também quebra.</div>
 <pre><code>mvn -pl processo-core,integracoes -am test   # unitários, sem Docker
 mvn verify                                    # tudo: contrato no Oracle e ITs
 mvn install -DskipTests &amp;&amp; mvn -pl processo-app quarkus:dev   # dev: Oracle via Dev Services</code></pre>
@@ -588,8 +597,9 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
   <h3>Novo tipo de processo</h3>
   <ol>
     <li><code>jpa-core</code>: entidade filha (<code>@DiscriminatorValue</code>) e a migration.</li>
-    <li><code>processo-core/segmento/&lt;tipo&gt;</code>: o record de dados, as regras, a interface de persistência,
-      o bean <code>Segmento</code> (com <code>avaliar</code>), o repository e o mapper.</li>
+    <li><code>processo-core/segmento/&lt;tipo&gt;</code>: o record de dados, as regras, o port de persistência
+      (estende <code>PersistenciaDoSegmento</code>), o segmento (estende <code>SegmentoBase</code>: só
+      <code>regras()</code> e <code>avaliar()</code>), o repository e o mapper.</li>
     <li><code>processo-query</code>: a consulta de detalhe. A listagem já inclui o tipo novo.</li>
     <li><code>processo-app</code>: resource com <code>POST</code> e <code>GET {id}</code>, e o request com
       <code>paraSolicitacao()</code>.</li>
@@ -612,6 +622,18 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
     <li>Teste com o canal em memória, como o <code>NovosProcessosPorFilaTest</code>.</li>
     <li>Dependência pesada ou canal descartável: módulo de entrada próprio, registrado como qualquer módulo novo.</li>
   </ol>
+  <h3>Novo cadastro (CRUD)</h3>
+  <p>Entidade que é só cadastro, sem fluxo, estados nem variação por tipo, vai pelo caminho curto
+    (<a href="adr/0012-cadastro-simples-sem-motor.md">ADR 0012</a>). Modelo: agências.</p>
+  <ol>
+    <li><code>jpa-core</code>: entidade e migration.</li>
+    <li><code>processo-core/cadastro/&lt;nome&gt;</code>, pacote plano: record válido por construção, repository Jakarta
+      Data e um serviço <code>@ApplicationScoped</code> com <code>@Transactional</code> nas escritas.</li>
+    <li><code>processo-app/.../inbound/rest</code>: resource com POST, GET, PUT e DELETE, e os requests em
+      <code>dto/</code>. A resposta pode ser o próprio record.</li>
+    <li>Um IT do ciclo completo, como o <code>AgenciasIT</code>.</li>
+  </ol>
+  <p>Quando aparecer fluxo, estados ou variação por tipo, promova para o modelo do processo.</p>
   <h3>Nova consulta</h3>
   <p>Método com <code>@Query</code> e <code>select new</code> em <code>ProcessoQueries</code>, record em
     <code>dto/</code> e endpoint no app.</p>
@@ -648,6 +670,13 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
       Services isso está desligado; em produção é a operação do broker que decide.</li>
     <li><strong>Servidor falso nos ITs</strong> roda na JVM do teste; o mapa de <code>start()</code> vira configuração do
       jar, que roda em outro processo.</li>
+    <li><strong>Conjunto de test resources:</strong> <code>@QuarkusTest</code> com conjuntos diferentes de
+      <code>@WithTestResource</code> reinicia o app (e o Oracle). Teste novo reaproveita o conjunto dos existentes.</li>
+    <li><strong>Sessão stateless:</strong> sem cascade nem cache de 1º nível; toda gravação é explícita.</li>
+    <li><strong>ArchUnit com JUnit 6:</strong> o engine <code>archunit-junit5</code> não roda sob o JUnit 6 do BOM. Use a
+      API core (<code>check</code>) dentro de um <code>@Test</code> comum.</li>
+    <li><strong>Base de bean sem construtor vazio:</strong> bean <code>@ApplicationScoped</code> precisa de proxy, que
+      exige construtor sem argumentos também na superclasse. Por isso os segmentos são <code>@Singleton</code>.</li>
     <li><strong>Colunas</strong> precisam de nome explícito: o Quarkus não converte <code>dataAbertura</code> em
       <code>DATA_ABERTURA</code>.</li>
     <li><strong><code>Unsatisfied dependency</code> de bean que existe:</strong> POM pai velho no
@@ -673,8 +702,8 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
 </section>
 
 <footer>
-  Guia da branch <code>processo-imobiliario</code>. Decisões em <a href="adr/README.md">docs/adr</a>; detalhes por módulo em
-  <a href="design.md">design.md</a>; uso rápido no <a href="../README.md">README</a>.
+  Guia da branch <code>processo-imobiliario</code>. O porquê das decisões em <a href="adr/README.md">docs/adr</a>; como
+  rodar no <a href="../README.md">README</a>.
 </footer>
 </main>
 </div>

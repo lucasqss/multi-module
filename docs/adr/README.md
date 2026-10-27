@@ -17,3 +17,4 @@ Uma ADR aceita não se edita; se a decisão mudar, escreve-se outra que a substi
 | [0009](0009-value-objects-validos-por-construcao.md) | Value objects válidos por construção | Aceita |
 | [0010](0010-erros-em-problem-details.md) | Erros em Problem Details (RFC 9457) | Aceita |
 | [0011](0011-entradas-por-canal-em-adapter-inbound.md) | Entradas por canal em `adapter/inbound` (REST, fila, agendamento) | Aceita |
+| [0012](0012-cadastro-simples-sem-motor.md) | Cadastro simples pelo caminho curto, sem motor | Aceita |

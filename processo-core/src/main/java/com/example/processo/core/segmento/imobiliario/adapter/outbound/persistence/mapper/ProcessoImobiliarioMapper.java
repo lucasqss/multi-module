@@ -9,7 +9,10 @@ import com.example.processo.core.motor.domain.model.Valor;
 import com.example.processo.core.motor.domain.state.Situacao;
 import com.example.processo.core.segmento.imobiliario.domain.model.DadosImobiliarios;
 
-/** Domínio ↔ entidade JPA do processo imobiliário (pai + filha numa entidade só). */
+/**
+ * Domínio ↔ entidade JPA do processo imobiliário (pai + filha numa entidade só). Valores monetários voltam com
+ * escala 2: o Oracle não guarda zeros à direita, e sem isso o processo lido não seria igual ao gravado.
+ */
 public final class ProcessoImobiliarioMapper {
 
     private ProcessoImobiliarioMapper() {
@@ -28,6 +31,6 @@ public final class ProcessoImobiliarioMapper {
                 new Proponente(e.getProponenteNome(), e.getProponenteCpf()), new Valor(e.getValor()),
                 Situacao.valueOf(e.getSituacao().name()), e.getMotivoRecusa(), e.getDataAbertura(),
                 new DadosImobiliarios(e.getMatricula(), DadosImobiliarios.TipoImovel.valueOf(e.getTipoImovel().name()),
-                        e.getValorAvaliacao(), e.getUf()));
+                        e.getValorAvaliacao().setScale(2), e.getUf()));
     }
 }

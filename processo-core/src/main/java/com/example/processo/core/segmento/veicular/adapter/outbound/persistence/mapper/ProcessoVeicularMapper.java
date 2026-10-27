@@ -8,7 +8,10 @@ import com.example.processo.core.motor.domain.model.Valor;
 import com.example.processo.core.motor.domain.state.Situacao;
 import com.example.processo.core.segmento.veicular.domain.model.DadosVeiculares;
 
-/** Domínio ↔ entidade JPA do processo veicular (pai + filha numa entidade só). */
+/**
+ * Domínio ↔ entidade JPA do processo veicular (pai + filha numa entidade só). Valores monetários voltam com escala
+ * 2: o Oracle não guarda zeros à direita.
+ */
 public final class ProcessoVeicularMapper {
 
     private ProcessoVeicularMapper() {
@@ -25,6 +28,6 @@ public final class ProcessoVeicularMapper {
         return new Processo<>(e.getId(), e.getNumero(), e.getSegmento(),
                 new Proponente(e.getProponenteNome(), e.getProponenteCpf()), new Valor(e.getValor()),
                 Situacao.valueOf(e.getSituacao().name()), e.getMotivoRecusa(), e.getDataAbertura(),
-                new DadosVeiculares(e.getPlaca(), e.getAnoFabricacao(), e.getValorFipe()));
+                new DadosVeiculares(e.getPlaca(), e.getAnoFabricacao(), e.getValorFipe().setScale(2)));
     }
 }

@@ -44,6 +44,8 @@ class ArquiteturaModulosTest {
 
     private static final JavaClasses CLASSES = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+            // O test-jar do core (fakes e contratos) também está no classpath de teste: não é código de produção
+            .withImportOption(local -> !local.contains("-tests.jar"))
             .importPackages("com.example");
 
     @Test

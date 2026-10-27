@@ -7,6 +7,8 @@ import com.example.processo.core.motor.domain.exception.SistemaExternoIndisponiv
 import com.example.processo.core.motor.domain.model.DadosDoSegmento;
 import com.example.processo.core.motor.domain.model.Processo;
 import com.example.processo.core.motor.domain.state.Situacao;
+import com.example.processo.core.segmento.imobiliario.application.port.out.ProcessosImobiliarios;
+import com.example.processo.core.segmento.imobiliario.domain.model.DadosImobiliarios;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -16,7 +18,10 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 
-/** Fakes dos ports do motor: o motor roda sem Quarkus, sem banco e sem transação. */
+/**
+ * Fakes dos ports: o motor e os segmentos rodam sem Quarkus, sem banco e sem transação. Os de persistência passam
+ * pelo mesmo contrato que os repositories reais ({@link PersistenciaDoProcessoContrato}), para não mentirem.
+ */
 public final class Fakes {
 
     private Fakes() {
@@ -75,6 +80,42 @@ public final class Fakes {
                                                                            String motivo) {
             return new Processo<>(p.id(), p.numero(), p.segmento(), p.proponente(), p.valor(), situacao, motivo,
                     p.dataAbertura(), p.dados());
+        }
+    }
+
+    /** O port do segmento imobiliário sobre o mesmo mapa do {@link BancoEmMemoria}, como a tabela filha sobre a pai. */
+    public static class ProcessosImobiliariosEmMemoria implements ProcessosImobiliarios {
+
+        private final BancoEmMemoria banco;
+
+        public ProcessosImobiliariosEmMemoria(BancoEmMemoria banco) {
+            this.banco = banco;
+        }
+
+        @Override
+        public boolean existeEmAndamentoParaMatricula(String matricula, String uf) {
+            return gravados().stream().anyMatch(p -> (p.situacao() == Situacao.ABERTO
+                    || p.situacao() == Situacao.EM_PROCESSAMENTO)
+                    && p.dados().matricula().equals(matricula) && p.dados().uf().equals(uf));
+        }
+
+        @Override
+        public void salvar(Processo<DadosImobiliarios> processo) {
+            banco.processos.put(processo.id(), processo);
+        }
+
+        @Override
+        public Optional<Processo<DadosImobiliarios>> porId(UUID id) {
+            return gravados().stream().filter(p -> p.id().equals(id)).findFirst();
+        }
+
+        /** Os processos imobiliários gravados, na ordem de gravação. */
+        @SuppressWarnings("unchecked")
+        public List<Processo<DadosImobiliarios>> gravados() {
+            return banco.processos.values().stream()
+                    .filter(p -> p.dados() instanceof DadosImobiliarios)
+                    .map(p -> (Processo<DadosImobiliarios>) p)
+                    .toList();
         }
     }
 }

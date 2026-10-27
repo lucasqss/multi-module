@@ -4,12 +4,9 @@ import com.example.processo.core.Fakes;
 import com.example.processo.core.motor.application.service.MotorDeProcessamento;
 import com.example.processo.core.motor.domain.exception.RegraVioladaException;
 import com.example.processo.core.motor.domain.model.Avaliacao;
-import com.example.processo.core.motor.domain.model.Processo;
 import com.example.processo.core.motor.domain.model.Proponente;
 import com.example.processo.core.motor.domain.model.Solicitacao;
 import com.example.processo.core.motor.domain.model.Valor;
-import com.example.processo.core.motor.domain.state.Situacao;
-import com.example.processo.core.segmento.imobiliario.application.port.out.ProcessosImobiliarios;
 import com.example.processo.core.segmento.imobiliario.domain.model.DadosImobiliarios.TipoImovel;
 import com.example.processo.core.segmento.imobiliario.domain.model.DadosImobiliarios;
 import org.junit.jupiter.api.Test;
@@ -19,10 +16,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,26 +30,12 @@ class SegmentoImobiliarioTest {
     static final LocalDate HOJE = LocalDate.of(2026, 10, 19);
     static final Proponente ANA = new Proponente("Ana Souza", "52998224725");
 
-    static class ProcessosEmMemoria implements ProcessosImobiliarios {
-        final List<Processo<DadosImobiliarios>> dados = new ArrayList<>();
-
-        public boolean existeEmAndamentoParaMatricula(String matricula, String uf) {
-            return dados.stream().anyMatch(p -> (p.situacao() == Situacao.ABERTO || p.situacao() == Situacao.EM_PROCESSAMENTO)
-                    && p.dados().matricula().equals(matricula) && p.dados().uf().equals(uf));
-        }
-
-        public void salvar(Processo<DadosImobiliarios> processo) { dados.add(processo); }
-
-        public Optional<Processo<DadosImobiliarios>> porId(UUID id) {
-            return dados.stream().filter(p -> p.id().equals(id)).findFirst();
-        }
-    }
-
-    final ProcessosEmMemoria processos = new ProcessosEmMemoria();
+    final Fakes.BancoEmMemoria banco = new Fakes.BancoEmMemoria();
+    final Fakes.ProcessosImobiliariosEmMemoria processos = new Fakes.ProcessosImobiliariosEmMemoria(banco);
     final Fakes.DocumentosEmMemoria documentos = new Fakes.DocumentosEmMemoria();
     final SegmentoImobiliario segmento = new SegmentoImobiliario(processos);
     final MotorDeProcessamento motor = new MotorDeProcessamento(List.of(segmento),
-            cpf -> true, new AtomicLong(41)::incrementAndGet, new Fakes.BancoEmMemoria(), Fakes.semTransacao(), Clock.fixed(Instant.from(HOJE.atStartOfDay(ZoneOffset.UTC)),
+            cpf -> true, new AtomicLong(41)::incrementAndGet, banco, Fakes.semTransacao(), Clock.fixed(Instant.from(HOJE.atStartOfDay(ZoneOffset.UTC)),
             ZoneOffset.UTC), documentos);
 
     static Solicitacao<DadosImobiliarios> solicitacao(String valor, TipoImovel tipo, String avaliacao) {
@@ -75,7 +56,7 @@ class SegmentoImobiliarioTest {
 
         assertEquals("IMO-2026-000042", processo.numero());
         assertEquals(SegmentoImobiliario.CODIGO, processo.segmento());
-        assertEquals(List.of(processo), processos.dados);
+        assertEquals(List.of(processo), processos.gravados());
         assertEquals(List.of(processo), documentos.pedidos);
     }
 
@@ -96,7 +77,7 @@ class SegmentoImobiliarioTest {
         assertEquals("Já existe processo em andamento para a matrícula 777/SP", motivo(
                 solicitacao("100000", new DadosImobiliarios("777", TipoImovel.RESIDENCIAL, new BigDecimal("500000"), "SP"))));
         motor.criar(solicitacao("100000", new DadosImobiliarios("777", TipoImovel.RESIDENCIAL, new BigDecimal("500000"), "RJ")));
-        assertEquals(2, processos.dados.size());
+        assertEquals(2, processos.gravados().size());
     }
 
     @Test
@@ -110,7 +91,7 @@ class SegmentoImobiliarioTest {
                 motivo(solicitacao("1000", new DadosImobiliarios("12", null, avaliacao, "SP"))));
         assertEquals("Valor de avaliação do imóvel deve ser maior que zero",
                 motivo(solicitacao("1000", new DadosImobiliarios("12", TipoImovel.COMERCIAL, BigDecimal.ZERO, "SP"))));
-        assertTrue(processos.dados.isEmpty());
+        assertTrue(processos.gravados().isEmpty());
     }
 
     @Test

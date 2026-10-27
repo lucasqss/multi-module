@@ -175,6 +175,9 @@
   <p>Neste guia</p>
   <ol>
     <li><a href="#visao">Em um minuto</a></li>
+    <li><a href="#comece">Comece por aqui</a></li>
+    <li><a href="#glossario">Glossário</a></li>
+    <li><a href="#onde">Onde coloco…?</a></li>
     <li><a href="#modulos">Módulos</a></li>
     <li><a href="#pacotes">Pastas e pacotes</a></li>
     <li><a href="#fluxos">Fluxos</a></li>
@@ -220,9 +223,95 @@
       (herança JPA <code>JOINED</code>).</p></div>
     <div class="card"><h4>Escrita e leitura separadas</h4><p><code>processo-core</code> escreve,
       <code>processo-query</code> lê. Um não enxerga o outro.</p></div>
-    <div class="card"><h4>Bordas trocáveis</h4><p>REST no app; cadastro e PDF atrás de interfaces, em
-      <code>integracoes</code>.</p></div>
+    <div class="card"><h4>Bordas trocáveis</h4><p>Entradas (REST, fila) no app; cadastro e PDF atrás de interfaces,
+      em <code>integracoes</code>.</p></div>
+    <div class="card"><h4>CRUD sem cerimônia</h4><p>O que é só cadastro (agências) vai pelo caminho curto: serviço e
+      repository, sem motor.</p></div>
+    <div class="card"><h4>Regras viram teste</h4><p>As fronteiras entre módulos e camadas são testes do ArchUnit: quebrou a
+      regra, quebrou o build.</p></div>
   </div>
+</section>
+
+<!-- comece -->
+<section id="comece">
+  <h2>Comece por aqui</h2>
+  <p>Três documentos, cada um com um papel: este guia explica <strong>como</strong> está organizado, as
+    <a href="adr/README.md">ADRs</a> dizem <strong>por quê</strong>, e o <a href="../AGENTS.md">AGENTS.md</a> lista as
+    <strong>regras</strong> e receitas em checklist, para pessoas e para modelos de IA. Cada pacote principal também
+    tem um <code>package-info.java</code> com o papel dele e o que pode ou não depender.</p>
+  <p>Para entender o código, leia nesta ordem (uns 30 minutos):</p>
+  <ol class="steps">
+    <li><strong><code>MotorDeProcessamento</code></strong> (core/motor/application/service): o fluxo inteiro de criar,
+      processar e cancelar. Observe o que roda dentro e fora das transações curtas.</li>
+    <li><strong><code>Situacao</code></strong> (core/motor/domain/state): a máquina de estados num enum. Cada constante
+      aceita só as próprias transições.</li>
+    <li><strong><code>Segmento</code> e <code>SegmentoBase</code></strong> (core/motor/application/port/spi): o
+      contrato de um tipo de processo e o que já vem pronto.</li>
+    <li><strong><code>SegmentoVeicular</code></strong> e <strong><code>RegrasVeiculares</code></strong>: um tipo
+      completo, em poucas linhas. Compare com o imobiliário, que tem uma regra que consulta o banco.</li>
+    <li><strong><code>Cpf</code> e <code>Valor</code></strong> (core/motor/domain/model): value objects válidos por
+      construção.</li>
+    <li><strong><code>ProcessoVeicularResource</code></strong> e <strong><code>NovoProcessoVeicularRequest</code></strong>
+      (app/adapter/inbound/rest): a entrada HTTP só traduz e chama o motor.</li>
+    <li><strong><code>NovosProcessosImobiliarios</code></strong> (app/adapter/inbound/messaging): a mesma criação por fila,
+      com idempotência e ack/nack pelo tipo do erro.</li>
+    <li><strong><code>Agencias</code></strong> (core/cadastro/agencia): o caminho curto de um CRUD, para comparar.</li>
+    <li><strong><code>ArquiteturaModulosTest</code></strong> (app, testes): as fronteiras escritas como teste.</li>
+    <li><strong><code>CicloDeVidaPorTipoIT</code></strong> (app, testes): o mesmo cenário de ponta a ponta para cada tipo,
+      inclusive 8 processamentos simultâneos.</li>
+  </ol>
+</section>
+
+<!-- glossario -->
+<section id="glossario">
+  <h2>Glossário</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Termo</th><th>No projeto</th></tr></thead>
+    <tbody>
+      <tr><td>Processo</td><td>O pedido que nasce <code>ABERTO</code> e termina concluído, recusado ou cancelado. <code>Processo&lt;D&gt;</code> no domínio; <code>PROCESSO</code> + tabela filha no banco.</td></tr>
+      <tr><td>Segmento</td><td>Um tipo de processo (imobiliário, veicular): dados, regras, decisão do processamento e a tabela filha. Implementa <code>Segmento&lt;D&gt;</code>.</td></tr>
+      <tr><td>Motor</td><td>O <code>MotorDeProcessamento</code>: o fluxo e o ciclo de vida iguais para todos os segmentos.</td></tr>
+      <tr><td>Solicitação</td><td>O pedido de abertura antes das regras (<code>Solicitacao&lt;D&gt;</code>), sem id, número nem data.</td></tr>
+      <tr><td>Avaliação</td><td>A decisão do segmento no processamento: aprovado ou recusado com motivo (<code>Avaliacao</code>).</td></tr>
+      <tr><td>Cadastro simples</td><td>Entidade só de CRUD, sem fluxo (agências). Vai pelo caminho curto, sem motor.</td></tr>
+      <tr><td>Port</td><td>Interface do que o core precisa de fora (<code>application/port/out</code>): banco, transação, sistema externo.</td></tr>
+      <tr><td>SPI</td><td>Interface que o core oferece para ser estendido (<code>application/port/spi</code>): o <code>Segmento</code>.</td></tr>
+      <tr><td>Adapter</td><td>Quem implementa um port com tecnologia (repository Jakarta Data, REST Client) ou recebe uma entrada (resource, consumer).</td></tr>
+      <tr><td>Value object</td><td>Record que só existe válido (<code>Cpf</code>, <code>Valor</code>, <code>Agencia</code>): valida no construtor.</td></tr>
+      <tr><td>Especificação</td><td>Uma regra (<code>Especificacao&lt;T&gt;</code>) que devolve o motivo da violação; compõe com <code>e(...)</code>.</td></tr>
+      <tr><td>Compare-and-set</td><td>Trocar a situação só se ela ainda for a anterior (<code>update ... where SITUACAO = :de</code>). Zero linhas = conflito (409).</td></tr>
+      <tr><td>Chave de idempotência</td><td>Identificador do pedido (o id da mensagem) que garante que a mesma criação, repetida, não gera outro processo.</td></tr>
+      <tr><td>Problem Details</td><td>Formato padrão de erro (RFC 9457): <code>application/problem+json</code> com <code>type</code>, <code>title</code>, <code>status</code>, <code>detail</code>.</td></tr>
+      <tr><td>Dev Services</td><td>Containers que o Quarkus sobe sozinho no dev e nos testes (Oracle, Artemis). Desligam se a URL for configurada.</td></tr>
+      <tr><td>Teste de contrato</td><td>O mesmo teste rodando contra o fake e contra a implementação real de um port (<code>PersistenciaDoProcessoContrato</code>).</td></tr>
+      <tr><td>Fake</td><td>Implementação em memória de um port, para testar o motor sem Quarkus nem banco (<code>Fakes</code>).</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- onde -->
+<section id="onde">
+  <h2>Onde coloco…?</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Preciso de…</th><th>Vai em</th><th>Exemplo</th></tr></thead>
+    <tbody>
+      <tr><td>Regra para todo tipo de processo</td><td><code>core/motor/domain/rule/RegrasComuns</code></td><td>nome obrigatório</td></tr>
+      <tr><td>Regra de um tipo</td><td><code>core/segmento/&lt;tipo&gt;/domain/rule</code></td><td><code>RegrasVeiculares</code></td></tr>
+      <tr><td>Decisão do processamento de um tipo</td><td><code>avaliar()</code> do segmento</td><td><code>SegmentoVeicular</code></td></tr>
+      <tr><td>Valor de domínio com validação</td><td>record em <code>core/motor/domain/model</code></td><td><code>Cpf</code>, <code>Valor</code></td></tr>
+      <tr><td>Estado ou transição</td><td><code>Situacao</code> + enum espelhado no jpa-core + CHECK numa migration</td><td><code>Situacao</code></td></tr>
+      <tr><td>Erro de negócio novo</td><td>exceção em <code>domain/exception</code> + método no <code>TratadorDeErros</code></td><td><code>ConflitoDeSituacaoException</code></td></tr>
+      <tr><td>Chamada a sistema externo</td><td>port em <code>application/port/out</code> + <code>integracoes/&lt;sistema&gt;</code></td><td><code>GeradorDeDocumentos</code> → <code>integracoes/pdf</code></td></tr>
+      <tr><td>Endpoint HTTP</td><td><code>app/adapter/inbound/rest/resource</code> + <code>rest/dto</code></td><td><code>ProcessoVeicularResource</code></td></tr>
+      <tr><td>Consumo de fila</td><td><code>app/adapter/inbound/messaging/consumer</code> + <code>messaging/dto</code></td><td><code>NovosProcessosImobiliarios</code></td></tr>
+      <tr><td>Consulta de processos</td><td><code>ProcessoQueries</code> + record em <code>query/dto</code></td><td><code>ResumoProcesso</code></td></tr>
+      <tr><td>Cadastro simples (CRUD)</td><td><code>core/cadastro/&lt;nome&gt;</code> + resource</td><td><code>Agencias</code>, <code>AgenciasResource</code></td></tr>
+      <tr><td>Tabela ou coluna</td><td>entidade no <code>jpa-core</code> + migration nova</td><td><code>V5__agencia.sql</code></td></tr>
+      <tr><td>Decisão de arquitetura</td><td>ADR nova em <code>docs/adr</code></td><td><code>0000-modelo.md</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>As receitas completas, em checklist, estão na seção <a href="#receitas">Receitas</a> e no
+    <a href="../AGENTS.md">AGENTS.md</a>.</p>
 </section>
 
 <!-- 2 -->
@@ -575,6 +664,15 @@ mvn verify                                    # tudo: contrato no Oracle e ITs
 mvn install -DskipTests &amp;&amp; mvn -pl processo-app quarkus:dev   # dev: Oracle via Dev Services</code></pre>
   <p>No dev: Swagger UI em <code>/q/swagger-ui</code>. Em qualquer ambiente: contrato em <code>/q/openapi</code> e
     health em <code>/q/health</code> (o readiness confere o banco).</p>
+  <h3>Definição de pronto</h3>
+  <ul>
+    <li><code>mvn verify</code> verde, sem teste pulado ou afrouxado.</li>
+    <li>Comportamento novo tem teste: unitário no core (motor e segmentos rodam sem Quarkus, com os fakes) e IT se
+      passa por HTTP, fila ou banco.</li>
+    <li>Decisão nova ou mudada: ADR.</li>
+    <li>Estrutura, regra ou receita mudou: <code>AGENTS.md</code> e este guia atualizados (e o README, se mudou API ou
+      comando).</li>
+  </ul>
 </section>
 
 <!-- 11 -->

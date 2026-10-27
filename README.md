@@ -79,10 +79,12 @@ AMQP_HOST=localhost AMQP_PORT=5672 AMQP_USERNAME=artemis AMQP_PASSWORD=artemis \
 java -jar processo-app/target/quarkus-app/quarkus-run.jar
 ```
 
-## Documentação
+## Para quem chega
 
-- [`docs/guia.html`](docs/guia.html) (abra no navegador): **como** está organizado. Módulos, pastas, fluxos, modelo
-  de dados, integrações, testes, build e Sonar, receitas (tipo novo, integração, canal de entrada, cadastro) e
-  armadilhas.
-- [`docs/adr/`](docs/adr/README.md): **por que** cada decisão, uma por arquivo. Decisão nova = ADR nova, a partir do
-  [modelo](docs/adr/0000-modelo.md).
+| Você é… | Comece por |
+|---|---|
+| Pessoa nova na equipe | [`docs/guia.html`](docs/guia.html) (abra no navegador): seções "Comece por aqui" (ordem de leitura do código), "Glossário" e "Onde coloco…?". Depois, **como** está organizado: módulos, fluxos, modelo de dados, integrações, testes, receitas e armadilhas. |
+| Modelo de IA, ou quem vai mudar código | [`AGENTS.md`](AGENTS.md): regras invioláveis (e o teste que garante cada uma), onde colocar cada coisa, receitas em checklist, o que não fazer e a definição de pronto. O `CLAUDE.md` importa o mesmo arquivo. |
+| Quem quer entender uma decisão | [`docs/adr/`](docs/adr/README.md): **por que** cada decisão, uma por arquivo. Decisão nova = ADR nova, a partir do [modelo](docs/adr/0000-modelo.md). |
+
+Cada pacote principal também tem um `package-info.java` com o papel dele e o que pode ou não depender.

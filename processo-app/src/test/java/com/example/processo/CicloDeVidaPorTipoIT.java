@@ -86,9 +86,9 @@ class CicloDeVidaPorTipoIT {
 
         given().get(tipo.caminho() + "/" + id).then().statusCode(200).body("situacao", equalTo("CONCLUIDO"));
         given().post("/processos/" + id + "/processamento").then().statusCode(422)
-                .body("motivo", equalTo("Processo CONCLUIDO não pode ser processado"));
+                .body("detail", equalTo("Processo CONCLUIDO não pode ser processado"));
         given().post("/processos/" + id + "/cancelamento").then().statusCode(422)
-                .body("motivo", equalTo("Processo CONCLUIDO não pode ser cancelado"));
+                .body("detail", equalTo("Processo CONCLUIDO não pode ser cancelado"));
     }
 
     @ParameterizedTest
@@ -114,7 +114,7 @@ class CicloDeVidaPorTipoIT {
 
         given().get(tipo.caminho() + "/" + id).then().body("situacao", equalTo("CANCELADO"));
         given().post("/processos/" + id + "/processamento").then().statusCode(422)
-                .body("motivo", equalTo("Processo CANCELADO não pode ser processado"));
+                .body("detail", equalTo("Processo CANCELADO não pode ser processado"));
     }
 
     /**

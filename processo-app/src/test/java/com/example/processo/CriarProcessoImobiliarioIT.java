@@ -122,9 +122,23 @@ class CriarProcessoImobiliarioIT {
     }
 
     @Test
+    void errosNoFormatoProblemDetails() {
+        criar("12345678900", "1000.00", matricula(), "RESIDENCIAL", "500000.00").statusCode(422)
+                .contentType("application/problem+json")
+                .body("type", equalTo("/problemas/regra-violada"))
+                .body("title", equalTo("Regra de negócio violada"))
+                .body("status", equalTo(422))
+                .body("detail", equalTo("CPF inválido: 12345678900"));
+        given().get("/processos/imobiliarios/00000000-0000-0000-0000-000000000000").then().statusCode(404)
+                .contentType("application/problem+json")
+                .body("type", equalTo("/problemas/nao-encontrado"))
+                .body("status", equalTo(404));
+    }
+
+    @Test
     void paginacaoForaDosLimites() {
         given().queryParam("tamanho", 0).get("/processos").then().statusCode(400)
-                .body("motivo", equalTo("pagina deve ser >= 1 e tamanho entre 1 e 100"));
+                .body("detail", equalTo("pagina deve ser >= 1 e tamanho entre 1 e 100"));
         given().queryParam("tamanho", 101).get("/processos").then().statusCode(400);
         given().queryParam("pagina", 0).get("/processos").then().statusCode(400);
     }
@@ -136,7 +150,7 @@ class CriarProcessoImobiliarioIT {
         criar(matricula).statusCode(201);
 
         criar(matricula).statusCode(422)
-                .body("motivo", equalTo("Já existe processo em andamento para a matrícula " + matricula + "/SP"));
+                .body("detail", equalTo("Já existe processo em andamento para a matrícula " + matricula + "/SP"));
     }
 
     @Test
@@ -150,21 +164,21 @@ class CriarProcessoImobiliarioIT {
     @Test
     void regrasDoMotorEDoSegmentoRespondem422() {
         criar("12345678900", "1000.00", matricula(), "RESIDENCIAL", "500000.00").statusCode(422)
-                .body("motivo", equalTo("CPF inválido: 12345678900"));
+                .body("detail", equalTo("CPF inválido: 12345678900"));
         criar("52998224725", "300000.01", matricula(), "COMERCIAL", "500000.00").statusCode(422)
-                .body("motivo", equalTo("Valor excede 60% da avaliação para imóvel comercial (máximo 300000.00)"));
+                .body("detail", equalTo("Valor excede 60% da avaliação para imóvel comercial (máximo 300000.00)"));
     }
 
     @Test
     void situacaoCadastralIrregularNoSistemaExternoRecusa() {
         criar(CadastroFalso.CPF_IRREGULAR, "1000.00", matricula(), "RESIDENCIAL", "500000.00").statusCode(422)
-                .body("motivo", equalTo("Situação cadastral irregular para o CPF " + CadastroFalso.CPF_IRREGULAR));
+                .body("detail", equalTo("Situação cadastral irregular para o CPF " + CadastroFalso.CPF_IRREGULAR));
     }
 
     @Test
     void sistemaDeCadastroForaDoArResponde503() {
         criar(CadastroFalso.CPF_SISTEMA_FORA, "1000.00", matricula(), "RESIDENCIAL", "500000.00").statusCode(503)
-                .body("motivo", equalTo("Sistema de cadastro indisponível; tente novamente mais tarde"));
+                .body("detail", equalTo("Sistema de cadastro indisponível; tente novamente mais tarde"));
     }
 
     @Test

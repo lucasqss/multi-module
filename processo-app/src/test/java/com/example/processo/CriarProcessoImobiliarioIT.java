@@ -65,12 +65,11 @@ class CriarProcessoImobiliarioIT {
 
         var pedido = pedidoDePdf(resposta.path("numero"));
         assertEquals("abertura-processo-imobiliario", pedido.getString("modelo"));
-        assertEquals(resposta.<String>path("id"), pedido.getString("processo.id"));
-        assertEquals("IMOBILIARIO", pedido.getString("processo.segmento"));
-        assertEquals("ABERTO", pedido.getString("processo.situacao"));
-        assertEquals("52998224725", pedido.getString("processo.proponente.cpf"));
-        assertEquals(matricula, pedido.getString("processo.dados.matricula"));
-        assertEquals("RESIDENCIAL", pedido.getString("processo.dados.tipoImovel"));
+        assertEquals("IMOBILIARIO", pedido.getString("segmento"));
+        assertEquals("Ana Souza", pedido.getString("proponente"));
+        assertEquals("52998224725", pedido.getString("cpf"));
+        assertEquals(matricula, pedido.getString("campos.matricula"));
+        assertEquals("RESIDENCIAL", pedido.getString("campos.tipoImovel"));
     }
 
     @Test

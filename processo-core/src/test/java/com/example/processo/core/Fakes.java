@@ -60,6 +60,20 @@ public final class Fakes {
         public final Map<UUID, Processo<?>> processos = new LinkedHashMap<>();
         /** Faz o compare-and-set falhar, como se outra requisição tivesse mudado o processo antes. */
         public boolean simularConflito;
+        public final Map<String, UUID> chaves = new LinkedHashMap<>();
+
+        @Override
+        public Optional<UUID> porChave(String chave) {
+            return Optional.ofNullable(chaves.get(chave));
+        }
+
+        /** Como a PK da tabela: a mesma chave não é registrada duas vezes. */
+        @Override
+        public void registrarChave(String chave, UUID processoId) {
+            if (chaves.putIfAbsent(chave, processoId) != null) {
+                throw new IllegalStateException("Chave de idempotência já registrada: " + chave);
+            }
+        }
 
         @Override
         public Optional<String> segmentoDe(UUID id) {

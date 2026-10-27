@@ -121,6 +121,40 @@ class MotorDeProcessamentoTest {
     }
 
     @Test
+    void mesmaChaveDevolveOProcessoJaCriado() {
+        var solicitacao = new Solicitacao<>(ANA, new Valor("50000"), new DadosAuto("ABC1D23"));
+
+        var primeiro = motor.criar(solicitacao, "msg-1");
+        var reentregue = motor.criar(solicitacao, "msg-1");
+
+        assertEquals(primeiro, reentregue);
+        assertEquals(1, sequencia.get(), "não gera outro número");
+        assertEquals(List.of(primeiro), auto.gravados);
+        assertEquals(List.of(primeiro), documentos.pedidos, "não pede outro PDF");
+        assertEquals(List.of(ANA.cpf()), consultados, "não consulta o cadastro de novo");
+    }
+
+    @Test
+    void chavesDiferentesCriamProcessosDiferentes() {
+        var solicitacao = new Solicitacao<>(ANA, new Valor("50000"), new DadosAuto("ABC1D23"));
+
+        var primeiro = motor.criar(solicitacao, "msg-1");
+        var segundo = motor.criar(solicitacao, "msg-2");
+
+        assertEquals(List.of(primeiro, segundo), auto.gravados);
+        assertEquals(primeiro.id(), banco.chaves.get("msg-1"));
+        assertEquals(segundo.id(), banco.chaves.get("msg-2"));
+    }
+
+    @Test
+    void recusaNaoRegistraAChave() {
+        assertThrows(RegraVioladaException.class,
+                () -> motor.criar(new Solicitacao<>(ANA, new Valor("50000"), new DadosAuto("placa")), "msg-1"));
+
+        assertTrue(banco.chaves.isEmpty(), "a mesma mensagem corrigida ainda pode criar o processo");
+    }
+
+    @Test
     void processoNasceAbertoComOsDadosDaSolicitacao() {
         var processo = motor.criar(new Solicitacao<>(ANA, new Valor("50000"), new DadosAuto("ABC1D23")));
 

@@ -1,7 +1,10 @@
 package com.example.processo.core.motor.adapter.outbound.persistence.repository;
 
+import com.example.jpacore.ChaveIdempotenciaEntity;
 import com.example.processo.core.motor.application.port.out.Processos;
 import com.example.processo.core.motor.domain.state.Situacao;
+import jakarta.data.repository.Find;
+import jakarta.data.repository.Insert;
 import jakarta.data.repository.Query;
 import jakarta.data.repository.Repository;
 import org.hibernate.annotations.processing.SQL;
@@ -22,6 +25,22 @@ public interface ProcessoRepository extends Processos {
      */
     @SQL("update PROCESSO set SITUACAO = :para, MOTIVO_RECUSA = :motivo where ID = :id and SITUACAO = :de")
     int atualizarSituacao(UUID id, String de, String para, String motivo);
+
+    @Find
+    Optional<ChaveIdempotenciaEntity> buscarChave(String chave);
+
+    @Insert
+    void inserirChave(ChaveIdempotenciaEntity chave);
+
+    @Override
+    default Optional<UUID> porChave(String chave) {
+        return buscarChave(chave).map(ChaveIdempotenciaEntity::getProcessoId);
+    }
+
+    @Override
+    default void registrarChave(String chave, UUID processoId) {
+        inserirChave(new ChaveIdempotenciaEntity(chave, processoId));
+    }
 
     @Override
     default Optional<String> segmentoDe(UUID id) {

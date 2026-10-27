@@ -5,8 +5,17 @@ import com.example.processo.core.motor.domain.state.Situacao;
 import java.util.Optional;
 import java.util.UUID;
 
-/** O que o motor precisa do processo sem conhecer o segmento: o tipo dele e a troca de situação. */
+/**
+ * O que o motor precisa do processo sem conhecer o segmento: o tipo dele, a troca de situação e a chave de
+ * idempotência de quem pediu a criação.
+ */
 public interface Processos {
+
+    /** O processo já criado com esta chave de idempotência, se houver. */
+    Optional<UUID> porChave(String chave);
+
+    /** Liga a chave ao processo; falha se a chave já existir (duas criações simultâneas com a mesma chave). */
+    void registrarChave(String chave, UUID processoId);
 
     /** Código do segmento (discriminador) do processo, se ele existir. */
     Optional<String> segmentoDe(UUID id);

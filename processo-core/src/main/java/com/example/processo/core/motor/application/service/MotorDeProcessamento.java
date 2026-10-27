@@ -29,11 +29,13 @@ import java.util.UUID;
 /**
  * Motor único: o mesmo fluxo de criação e o mesmo ciclo de vida para todos os segmentos. O que varia (dados,
  * regras, prefixo, gravação, decisão do processamento) vem do {@link Segmento}; os estados e as transições são do
- * motor, pelo padrão State ({@code domain.state}). É o ponto de entrada do core: o REST o injeta direto.
+ * motor, pelo padrão State ({@code domain.state}). É o ponto de entrada do core: toda borda de entrada (REST, fila)
+ * o injeta direto.
  *
  * <pre>
  * criar:     regras comuns → regras do segmento → situação cadastral (externo)  | fora de transação
- *            → número → abrir → segmento grava                                    | transação curta
+ *            (com chave de idempotência já usada: devolve o processo existente, antes de tudo)
+ *            → número → abrir → segmento grava (+ chave)                          | transação curta
  *            → pede o PDF de abertura (externo; falha só vai para o log)          | depois do commit
  * processar: carregar → ABERTO → EM_PROCESSAMENTO                                 | transação curta
  *            → segmento avalia                                                    | fora de transação
@@ -84,13 +86,32 @@ public class MotorDeProcessamento {
     }
 
     public <D extends DadosDoSegmento> Processo<D> criar(Solicitacao<D> solicitacao) {
+        return criar(solicitacao, null);
+    }
+
+    /**
+     * Cria de forma idempotente: com uma {@code chave} já usada (ex.: o id de uma mensagem reentregue), devolve o
+     * processo criado da primeira vez, sem reaplicar regras, gerar número nem pedir PDF. Duas criações simultâneas
+     * com a mesma chave: a segunda falha ao gravar a chave, e quem tentar de novo cai neste caminho.
+     */
+    public <D extends DadosDoSegmento> Processo<D> criar(Solicitacao<D> solicitacao, String chave) {
         var segmento = segmentoDe(solicitacao.dados());
+        if (chave != null) {
+            var existente = processos.porChave(chave);
+            if (existente.isPresent()) {
+                return segmento.carregar(existente.get()).orElseThrow(() -> new IllegalStateException(
+                        "Chave " + chave + " já criou um processo de outro segmento"));
+            }
+        }
         // A chamada ao sistema externo vem por último: só acontece se a solicitação passou em todas as outras regras
         RegrasComuns.<D>todas().e(segmento.regras()).e(this::cadastroRegular).exigir(solicitacao);
 
         Processo<D> processo = transacoes.executar(() -> {
             var aberto = Processo.abrir(numero(segmento), segmento.codigo(), solicitacao, LocalDate.now(relogio));
             segmento.salvar(aberto);
+            if (chave != null) {
+                processos.registrarChave(chave, aberto.id());
+            }
             return aberto;
         });
 

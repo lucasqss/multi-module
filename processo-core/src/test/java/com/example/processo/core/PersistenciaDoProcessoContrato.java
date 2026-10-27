@@ -20,11 +20,12 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Contrato dos ports de persistência: o que o motor e o segmento esperam de {@link Processos} e
- * {@link ProcessosImobiliarios}. Roda contra os fakes ({@code PersistenciaEmMemoriaTest}, aqui) e contra os
+ * {@link ProcessosImobiliarios}, inclusive a chave de idempotência. Roda contra os fakes ({@code PersistenciaEmMemoriaTest}, aqui) e contra os
  * repositories no Oracle ({@code PersistenciaOracleTest}, no processo-app). Se um fake passar a se comportar
  * diferente do banco, um dos dois quebra; os testes do motor, que usam o fake, continuam valendo.
  *
@@ -98,6 +99,26 @@ public abstract class PersistenciaDoProcessoContrato {
         var recusado = imobiliarios().porId(processo.id()).orElseThrow();
         assertEquals(Situacao.RECUSADO, recusado.situacao());
         assertEquals("Valor alto", recusado.motivoRecusa());
+    }
+
+    @Test
+    void chaveDeIdempotenciaLigaAoProcessoUmaVezSo() {
+        var chave = "msg-" + aleatorio();
+        assertEquals(Optional.empty(), processos().porChave(chave));
+
+        var processo = gravado(aleatorio(), "SP");
+        transacoes().executar(() -> {
+            processos().registrarChave(chave, processo.id());
+            return null;
+        });
+        assertEquals(Optional.of(processo.id()), processos().porChave(chave));
+
+        var outro = gravado(aleatorio(), "SP");
+        assertThrows(RuntimeException.class, () -> transacoes().executar(() -> {
+            processos().registrarChave(chave, outro.id());
+            return null;
+        }), "a mesma chave não liga a dois processos");
+        assertEquals(Optional.of(processo.id()), processos().porChave(chave));
     }
 
     @Test

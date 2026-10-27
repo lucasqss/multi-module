@@ -195,7 +195,7 @@
 <header>
   <h1>Guia do projeto Processo</h1>
   <p class="sub">Processos de vários tipos com um motor único, em Maven multi-module: onde fica cada coisa, por quê,
-    e como estender.</p>
+    e como estender. O porquê de cada decisão, em detalhe, está nas <a href="adr/README.md">ADRs</a>.</p>
   <div class="chips">
     <span class="chip">Java 25</span>
     <span class="chip">Quarkus 3.33</span>
@@ -312,12 +312,17 @@
       <li><strong>Mapper só quando a conversão tem lógica:</strong> conversão de uma linha é método do DTO
         (<code>request.paraSolicitacao()</code>, <code>ProcessoCriadoResponse.de(p)</code>). Classe em
         <code>mapper/</code> só para domínio ↔ entidade.</li>
-    </ul></div>
+      <li><strong>Valor de domínio nasce válido:</strong> <code>Cpf</code> e <code>Valor</code> validam no construtor.
+        São criados onde o texto entra (DTO do REST, mapper de persistência); dali para dentro, ninguém valida de
+        novo.</li>
+    </ul>
+    Cada regra tem a sua ADR (<a href="adr/0005-interface-so-onde-ha-costura-real.md">0005</a>,
+    <a href="adr/0009-value-objects-validos-por-construcao.md">0009</a>).</div>
 <pre><code>multi-module/
 ├─ jpa-core/         ProcessoEntity (pai) e uma entidade filha por tipo · db/migration/ V1..V3
 ├─ processo-core/
 │  ├─ motor/
-│  │  ├─ domain/       model/ Processo&lt;D&gt;, Solicitacao&lt;D&gt;, Avaliacao · state/ Situacao
+│  │  ├─ domain/       model/ Processo&lt;D&gt;, Solicitacao&lt;D&gt;, Cpf, Valor, Avaliacao · state/ Situacao
 │  │  │                rule/ Especificacao, RegrasComuns · exception/
 │  │  ├─ application/  port/out/ Processos, Numeracao, Transacoes, SituacaoCadastral, GeradorDeDocumentos
 │  │  │                port/spi/ Segmento · service/ MotorDeProcessamento
@@ -343,18 +348,23 @@
 }</code></pre>
   <ol class="steps">
     <li><strong>REST:</strong> o resource converte o JSON (<code>request.paraSolicitacao()</code>) e chama
-      <code>motor.criar</code>.</li>
+      <code>motor.criar</code>. CPF e valor inválidos já param aqui, ao virar <code>Cpf</code> e
+      <code>Valor</code>.</li>
     <li><strong>Segmento:</strong> o motor escolhe pelo tipo dos dados (<code>DadosImobiliarios</code> →
       <code>SegmentoImobiliario</code>).</li>
-    <li><strong>Regras, fora de transação:</strong> primeiro as comuns (nome, CPF, valor), depois as do segmento
+    <li><strong>Regras, fora de transação:</strong> primeiro as comuns (nome), depois as do segmento
       (limite da avaliação, matrícula sem processo em andamento) e por último o sistema de cadastro, para não
       chamá-lo à toa.</li>
     <li><strong>Transação curta:</strong> gera o número (<code>IMO-2026-000042</code>) e grava pai e filha.</li>
     <li><strong>Depois do commit:</strong> o motor pede o PDF de abertura (<code>GeradorDeDocumentos</code>). Se o
       sistema falhar, só loga: o processo já está gravado.</li>
   </ol>
-  <p>Respostas: <code>201 {"id", "numero"}</code>; regra violada <code>422 {"motivo"}</code>; cadastro fora do ar
+  <p>Respostas: <code>201 {"id", "numero"}</code>; regra violada <code>422</code>; cadastro fora do ar
     <code>503</code>. O veicular é igual, com <code>veiculo</code> (placa, ano, FIPE) no corpo.</p>
+  <p>Todo erro sai em Problem Details (RFC 9457), como <code>application/problem+json</code>; o cliente decide pelo
+    <code>type</code>, e o <code>detail</code> é a mensagem para o usuário:</p>
+<pre><code>{"type": "/problemas/regra-violada", "title": "Regra de negócio violada", "status": 422,
+ "detail": "CPF inválido: 12345678900"}</code></pre>
 
   <h3>Processar e cancelar (iguais para todos os tipos)</h3>
   <ol class="steps">
@@ -520,13 +530,18 @@ public class CadastroClientSimulado implements CadastroClient { ... }</code></pr
   <div class="table-wrap"><table>
     <thead><tr><th>Módulo</th><th>Testes</th><th>Docker</th></tr></thead>
     <tbody>
-      <tr><td><code>processo-core</code></td><td>Tabela de estados × eventos, regras, motor com segmentos falsos, cada segmento no motor real.</td><td>não</td></tr>
+      <tr><td><code>processo-core</code></td><td>Tabela de estados × eventos, <code>Cpf</code> e <code>Valor</code>, regras, motor com segmentos falsos, cada segmento no motor real, contrato dos ports contra os fakes.</td><td>não</td></tr>
       <tr><td><code>integracoes</code></td><td>Conversão da resposta do cadastro, documento enviado ao PDF, falha do cliente vira indisponibilidade.</td><td>não</td></tr>
-      <tr><td><code>processo-app</code></td><td>ITs contra o jar com Oracle: o mesmo ciclo de vida para cada tipo (inclusive 8 processamentos simultâneos, só um vence), os casos da criação, a paginação e health/OpenAPI.</td><td>sim</td></tr>
+      <tr><td><code>processo-app</code></td><td>ITs contra o jar com Oracle: o mesmo ciclo de vida para cada tipo (inclusive 8 processamentos simultâneos, só um vence), os casos da criação, a paginação, os erros em Problem Details e health/OpenAPI. Contrato dos ports contra o Oracle (<code>PersistenciaOracleTest</code>).</td><td>sim</td></tr>
     </tbody>
   </table></div>
+  <div class="note"><strong>Teste de contrato: o fake não pode mentir</strong>Os testes do motor usam fakes dos ports de
+    persistência. O <code>PersistenciaDoProcessoContrato</code> descreve o que o motor espera deles (ida e volta,
+    compare-and-set, motivo da recusa, matrícula em andamento) e roda duas vezes: contra os fakes, no core, e contra
+    os repositories no Oracle, no app (o core publica os testes num test-jar). Ele já pegou uma divergência: o
+    Oracle devolvia <code>500000</code> para <code>500000.00</code>. Port novo com fake ganha contrato novo.</div>
 <pre><code>mvn -pl processo-core,integracoes -am test   # unitários, sem Docker
-mvn verify                                    # tudo, com os ITs
+mvn verify                                    # tudo: contrato no Oracle e ITs
 mvn install -DskipTests &amp;&amp; mvn -pl processo-app quarkus:dev   # dev: Oracle via Dev Services</code></pre>
   <p>No dev: Swagger UI em <code>/q/swagger-ui</code>. Em qualquer ambiente: contrato em <code>/q/openapi</code> e
     health em <code>/q/health</code> (o readiness confere o banco).</p>
@@ -570,6 +585,10 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
   <h3>Nova consulta</h3>
   <p>Método com <code>@Query</code> e <code>select new</code> em <code>ProcessoQueries</code>, record em
     <code>dto/</code> e endpoint no app.</p>
+  <h3>Nova decisão de arquitetura</h3>
+  <p>Copie <a href="adr/0000-modelo.md">docs/adr/0000-modelo.md</a> com o próximo número, preencha contexto, decisão
+    e consequências, e acrescente no <a href="adr/README.md">índice</a>. ADR aceita não se edita: se a decisão
+    mudar, escreva outra que a substitui.</p>
   <h3>Novo módulo Maven</h3>
   <p>Registre em quatro lugares: <code>&lt;module&gt;</code> e <code>dependencyManagement</code> no POM pai,
     dependência no app, <code>jandex-maven-plugin</code> (se tiver beans) e <code>MODULOS</code> no
@@ -614,8 +633,8 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
 </section>
 
 <footer>
-  Guia da branch <code>processo-imobiliario</code>. Decisões detalhadas em <a href="design.md">design.md</a>; uso rápido no
-  <a href="../README.md">README</a>.
+  Guia da branch <code>processo-imobiliario</code>. Decisões em <a href="adr/README.md">docs/adr</a>; detalhes por módulo em
+  <a href="design.md">design.md</a>; uso rápido no <a href="../README.md">README</a>.
 </footer>
 </main>
 </div>

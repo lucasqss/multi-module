@@ -18,6 +18,8 @@ consultados pelo mesmo motor, para validar seis requisitos:
 
 ## Decisões
 
+O porquê de cada decisão, com contexto e consequências, está nas [ADRs](adr/README.md). Aqui, o resumo.
+
 | Tema | Decisão |
 |---|---|
 | Módulos | `jpa-core`, `processo-core`, `processo-query`, `integracoes`, `processo-app` |
@@ -36,7 +38,9 @@ consultados pelo mesmo motor, para validar seis requisitos:
 | Operação | `quarkus-smallrye-openapi` (`/q/openapi`, Swagger UI no dev) e `quarkus-smallrye-health` (`/q/health`) |
 | Persistência | Jakarta Data sobre `StatelessSession`, HQL validado em compilação pelo Hibernate Processor |
 | Deploy | Único, via `processo-app` |
-| Testes | Unitários sem Quarkus (motor com segmentos falsos; segmento plugado no motor real com fake do port); ArchUnit no core e entre módulos; `@QuarkusIntegrationTest` contra o jar com Oracle do Dev Services e um sistema de PDF falso |
+| Valores de domínio | `Cpf` e `Valor` válidos por construção, criados na borda (DTO, mapper) |
+| Erros | Problem Details (RFC 9457) com `type` fixo por problema |
+| Testes | Unitários sem Quarkus (motor com segmentos falsos; segmento plugado no motor real com fake do port); contrato dos ports de persistência contra fakes e Oracle; ArchUnit no core e entre módulos; `@QuarkusIntegrationTest` contra o jar com Oracle do Dev Services e um sistema de PDF falso |
 
 ### Máquina de estados com o padrão State
 
@@ -179,9 +183,10 @@ Classe em `mapper/` fica para domínio ↔ entidade JPA, que traduz enums e mont
 **Motor (`core.motor`)**
 
 - `domain`, Java puro:
-  - `model`: `Processo<D>` (Context do State), `Solicitacao<D>`, `Proponente`, `DadosDoSegmento`, `Avaliacao`;
+  - `model`: `Processo<D>` (Context do State), `Solicitacao<D>`, `Proponente`, `Cpf` e `Valor` (value objects
+    válidos por construção), `DadosDoSegmento`, `Avaliacao`;
   - `state`: `Situacao` (o State, um enum) e `TransicaoInvalidaException`;
-  - `rule`: `Especificacao`, `RegrasComuns` (nome obrigatório, CPF com dígitos verificadores, valor > 0);
+  - `rule`: `Especificacao`, `RegrasComuns` (nome obrigatório; CPF e valor são validados pelos value objects);
   - `exception`: regra violada, processo não encontrado, conflito de situação, sistema externo indisponível.
 - `application`:
   - `port/out`: `Processos`, `Numeracao`, `Transacoes`, `SituacaoCadastral` e `GeradorDeDocumentos` (os dois
@@ -222,10 +227,11 @@ Classe em `mapper/` fica para domínio ↔ entidade JPA, que traduz enums e mont
   `ProcessosResource` (listagem pelo query; processar e cancelar pelo motor).
 - `dto/`: contratos de request (`NovoProcessoImobiliarioRequest`, `ImovelRequest`, `NovoProcessoVeicularRequest`,
   `VeiculoRequest`, `ProponenteRequest`) e de response (`ProcessoCriadoResponse`, `SituacaoResponse`,
-  `ErroResponse`). Os requests convertem a si mesmos em `Solicitacao` (`paraSolicitacao()`) e os responses se
+  `Problema`). Os requests convertem a si mesmos em `Solicitacao` (`paraSolicitacao()`) e os responses se
   montam do processo (`de(p)`). Os GETs devolvem direto as projeções do query, que já são o contrato de leitura.
 - `dto/PaginaResponse`: a página da listagem (`itens`, `pagina`, `tamanho`, `total`).
-- `exception/TratadorDeErros`: exceções do domínio → 422, 404, 409 e 503; paginação inválida → 400.
+- `exception/TratadorDeErros`: exceções → Problem Details (`application/problem+json`, `type` fixo por problema):
+  422, 404, 409, 503 e 400 (paginação inválida).
 
 ## Integrações (`com.example.processo.integracoes`)
 
@@ -263,9 +269,9 @@ Mesmo molde do cadastro:
 
 | Onde | O quê | Docker |
 |---|---|---|
-| `processo-core` | tabela do State; regras comuns e CPF; motor com dois segmentos falsos (mesmo fluxo e ciclo de vida, numeração única, regra violada não grava nem pede PDF, falha no PDF não desfaz a criação, situação cadastral irregular, conflito, sistema externo só consultado no fim); segmentos imobiliário e veicular no motor real; ArchUnit de camadas e motor x segmentos | não |
+| `processo-core` | tabela do State; `Cpf`, `Valor` e regras comuns; contrato dos ports de persistência contra os fakes; motor com dois segmentos falsos (mesmo fluxo e ciclo de vida, numeração única, regra violada não grava nem pede PDF, falha no PDF não desfaz a criação, situação cadastral irregular, conflito, sistema externo só consultado no fim); segmentos imobiliário e veicular no motor real; ArchUnit de camadas e motor x segmentos | não |
 | `integracoes` | adapters do cadastro e do PDF, `Documento.deAbertura`; falha do cliente vira indisponibilidade | não |
-| `processo-app` | ArchUnit entre módulos; `@QuarkusIntegrationTest` contra o jar, com Oracle e um sistema de PDF falso (`HttpServer` do JDK): ciclo de vida igual por tipo (inclusive processamento simultâneo), recusa por matrícula, numeração, regras, cadastro irregular e fora do ar, falha do PDF, detalhe, listagem paginada, health e OpenAPI | sim |
+| `processo-app` | ArchUnit entre módulos; contrato dos ports de persistência contra o Oracle (`@QuarkusTest`); `@QuarkusIntegrationTest` contra o jar, com Oracle e um sistema de PDF falso (`HttpServer` do JDK): ciclo de vida igual por tipo (inclusive processamento simultâneo), recusa por matrícula, numeração, regras, cadastro irregular e fora do ar, falha do PDF, detalhe, listagem paginada, erros em Problem Details, health e OpenAPI | sim |
 
 ## Armadilhas
 

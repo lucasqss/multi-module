@@ -72,7 +72,8 @@ motor, e cada repository Jakarta Data implementa o port de persistência, conver
 | `GET /processos?situacao=ABERTO&pagina=1&tamanho=20` | query | listagem paginada de todos os segmentos, só com os campos comuns: `{"itens", "pagina", "tamanho", "total"}`; filtro opcional, tamanho até 100 |
 | `GET /q/openapi`, `GET /q/health` | app | contrato da API (Swagger UI em `/q/swagger-ui` no dev) e health (readiness com o banco) |
 
-Códigos de erro, todos com corpo `{"motivo": "..."}`:
+Códigos de erro, todos em Problem Details (RFC 9457, `application/problem+json`) com `type`, `title`, `status` e `detail`
+([ADR 0010](docs/adr/0010-erros-em-problem-details.md)):
 
 | Código | Quando |
 |---|---|
@@ -98,7 +99,7 @@ Exemplo de corpo do `POST`:
 POST /processos/imobiliarios                                     (processo-app)
   → MotorDeProcessamento.criar(Solicitacao<DadosImobiliarios>)   (processo-core, o mesmo para todos os segmentos)
       1. escolhe o Segmento pela classe dos dados
-      2. regras comuns (nome, CPF, valor > 0)
+      2. regras comuns (nome; CPF e valor já chegam válidos como Cpf e Valor)
       3. regras do segmento (matrícula, UF, tipo, avaliação, limite de 80%/60%, matrícula sem processo aberto)
       3b. situação cadastral do CPF no sistema externo (port SituacaoCadastral → integracoes.cadastro)
       ── até aqui fora de transação; daqui em diante, transação curta ──
@@ -207,4 +208,6 @@ Mesmo arranjo validado na branch `sonar-multi-module`: `target/` padrão em cada
 
 - [`docs/guia.html`](docs/guia.html): guia completo da estrutura (módulos, fluxos, modelo de dados, integrações,
   regras de arquitetura, receitas e pontos em aberto). Abra no navegador.
-- [`docs/design.md`](docs/design.md): decisões e armadilhas.
+- [`docs/adr/`](docs/adr/README.md): as decisões de arquitetura, uma por arquivo (contexto, decisão, consequências).
+  Decisão nova = ADR nova, a partir do [modelo](docs/adr/0000-modelo.md).
+- [`docs/design.md`](docs/design.md): detalhes por módulo e armadilhas.

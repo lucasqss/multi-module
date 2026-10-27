@@ -123,11 +123,15 @@ class ArquiteturaModulosTest {
     }
 
     @Test
-    void restOrganizadoPorPapel() {
-        // resource → dto; o dto converte de/para o domínio, mas não conhece o resource
-        noClasses().that().resideInAPackage(APP + ".adapter.inbound.rest.dto..")
-                .should().dependOnClassesThat().resideInAPackage(APP + ".adapter.inbound.rest.resource..")
+    void entradasOrganizadasPorCanalEPapel() {
+        // Cada canal de entrada (rest, messaging, ...) tem seu dto; o dto converte de/para o domínio, mas não conhece
+        // quem o recebe (resource, consumer)
+        noClasses().that().resideInAPackage(APP + ".adapter.inbound.(*).dto..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        APP + ".adapter.inbound.(*).resource..", APP + ".adapter.inbound.(*).consumer..")
                 .check(CLASSES);
+        // Um canal não usa as classes de outro: a fila não reaproveita o corpo do REST, e vice-versa
+        slices().matching(APP + ".adapter.inbound.(*)..").should().notDependOnEachOther().check(CLASSES);
     }
 
     private static Optional<String> modulo(JavaClass classe) {

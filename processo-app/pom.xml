@@ -57,6 +57,11 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-smallrye-health</artifactId>
         </dependency>
+        <!-- Entrada por fila (adapter/inbound/messaging): AMQP 1.0, Artemis pelo Dev Services no dev e nos testes -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-messaging-amqp</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -68,6 +73,12 @@
             <groupId>com.example</groupId>
             <artifactId>processo-core</artifactId>
             <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <!-- Troca os canais da fila por memória no teste do consumidor, sem broker -->
+        <dependency>
+            <groupId>io.smallrye.reactive</groupId>
+            <artifactId>smallrye-reactive-messaging-in-memory</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

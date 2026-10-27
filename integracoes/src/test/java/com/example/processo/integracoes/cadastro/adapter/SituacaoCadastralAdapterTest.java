@@ -1,6 +1,7 @@
 package com.example.processo.integracoes.cadastro.adapter;
 
 import com.example.processo.core.motor.domain.exception.SistemaExternoIndisponivelException;
+import com.example.processo.core.motor.domain.model.Cpf;
 import com.example.processo.integracoes.cadastro.client.CadastroClientSimulado;
 import com.example.processo.integracoes.cadastro.dto.RespostaCadastro;
 import jakarta.ws.rs.ProcessingException;
@@ -20,14 +21,14 @@ class SituacaoCadastralAdapterTest {
 
     @Test
     void regularSoQuandoOSistemaRespondeRegular() {
-        assertTrue(respondendo("REGULAR").regular("52998224725"));
-        assertFalse(respondendo("SUSPENSA").regular("52998224725"));
-        assertFalse(respondendo(null).regular("52998224725"));
+        assertTrue(respondendo("REGULAR").regular(new Cpf("52998224725")));
+        assertFalse(respondendo("SUSPENSA").regular(new Cpf("52998224725")));
+        assertFalse(respondendo(null).regular(new Cpf("52998224725")));
     }
 
     @Test
     void simulacaoDoDevSempreRespondeRegular() {
-        assertTrue(new SituacaoCadastralAdapter(new CadastroClientSimulado()).regular("52998224725"));
+        assertTrue(new SituacaoCadastralAdapter(new CadastroClientSimulado()).regular(new Cpf("52998224725")));
     }
 
     @Test
@@ -39,7 +40,7 @@ class SituacaoCadastralAdapterTest {
             throw new WebApplicationException(500);
         });
 
-        assertThrows(SistemaExternoIndisponivelException.class, () -> foraDoAr.regular("52998224725"));
-        assertThrows(SistemaExternoIndisponivelException.class, () -> erroHttp.regular("52998224725"));
+        assertThrows(SistemaExternoIndisponivelException.class, () -> foraDoAr.regular(new Cpf("52998224725")));
+        assertThrows(SistemaExternoIndisponivelException.class, () -> erroHttp.regular(new Cpf("52998224725")));
     }
 }

@@ -5,6 +5,7 @@ import com.example.processo.core.motor.domain.model.DadosDoSegmento;
 import com.example.processo.core.motor.domain.model.Processo;
 import com.example.processo.core.motor.domain.model.Proponente;
 import com.example.processo.core.motor.domain.model.Solicitacao;
+import com.example.processo.core.motor.domain.model.Valor;
 import com.example.processo.integracoes.pdf.dto.Documento;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.WebApplicationException;
@@ -25,7 +26,7 @@ class GeradorDeDocumentosAdapterTest {
     }
 
     static final Processo<DadosAuto> PROCESSO = Processo.abrir("AUT-2026-000007", "AUTO",
-            new Solicitacao<>(new Proponente("Ana Souza", "52998224725"), BigDecimal.TEN, new DadosAuto("ABC1D23")),
+            new Solicitacao<>(new Proponente("Ana Souza", "52998224725"), new Valor("10"), new DadosAuto("ABC1D23")),
             LocalDate.of(2026, 10, 19));
 
     @Test

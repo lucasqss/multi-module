@@ -2,7 +2,6 @@ package com.example.processo.core.motor.domain.model;
 
 import com.example.processo.core.motor.domain.state.Situacao;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -14,7 +13,7 @@ import java.util.UUID;
  * vale. Imutável: cada evento devolve uma cópia na nova situação.
  */
 public record Processo<D extends DadosDoSegmento>(UUID id, String numero, String segmento, Proponente proponente,
-                                                  BigDecimal valor, Situacao situacao, String motivoRecusa,
+                                                  Valor valor, Situacao situacao, String motivoRecusa,
                                                   LocalDate dataAbertura, D dados) {
 
     public static <D extends DadosDoSegmento> Processo<D> abrir(String numero, String segmento,

@@ -7,6 +7,7 @@ import com.example.processo.core.motor.domain.model.Avaliacao;
 import com.example.processo.core.motor.domain.model.Processo;
 import com.example.processo.core.motor.domain.model.Proponente;
 import com.example.processo.core.motor.domain.model.Solicitacao;
+import com.example.processo.core.motor.domain.model.Valor;
 import com.example.processo.core.motor.domain.state.Situacao;
 import com.example.processo.core.segmento.imobiliario.application.port.out.ProcessosImobiliarios;
 import com.example.processo.core.segmento.imobiliario.domain.model.DadosImobiliarios.TipoImovel;
@@ -61,7 +62,7 @@ class SegmentoImobiliarioTest {
     }
 
     static Solicitacao<DadosImobiliarios> solicitacao(String valor, DadosImobiliarios imovel) {
-        return new Solicitacao<>(ANA, new BigDecimal(valor), imovel);
+        return new Solicitacao<>(ANA, new Valor(valor), imovel);
     }
 
     String motivo(Solicitacao<DadosImobiliarios> solicitacao) {
@@ -114,9 +115,9 @@ class SegmentoImobiliarioTest {
 
     @Test
     void regrasComunsDoMotorValemParaOSegmento() {
-        var cpfInvalido = new Solicitacao<>(new Proponente("Ana Souza", "12345678900"), new BigDecimal("1000"),
+        var semNome = new Solicitacao<>(new Proponente(" ", "52998224725"), new Valor("1000"),
                 new DadosImobiliarios("12", TipoImovel.RESIDENCIAL, new BigDecimal("500000"), "SP"));
-        assertEquals("CPF inválido: 12345678900", motivo(cpfInvalido));
+        assertEquals("Nome do proponente é obrigatório", motivo(semNome));
     }
 
     @Test

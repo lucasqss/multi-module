@@ -62,7 +62,7 @@ public class SegmentoImobiliario implements Segmento<DadosImobiliarios> {
 
     @Override
     public Avaliacao avaliar(Processo<DadosImobiliarios> processo) {
-        return processo.valor().compareTo(LIMITE_AUTOMATICO) > 0
+        return processo.valor().quantia().compareTo(LIMITE_AUTOMATICO) > 0
                 ? Avaliacao.recusado("Valor acima de " + LIMITE_AUTOMATICO.toPlainString() + " exige análise manual")
                 : Avaliacao.aprovado();
     }

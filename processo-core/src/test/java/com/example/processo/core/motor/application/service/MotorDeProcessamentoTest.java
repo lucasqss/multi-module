@@ -7,16 +7,17 @@ import com.example.processo.core.motor.domain.exception.ConflitoDeSituacaoExcept
 import com.example.processo.core.motor.domain.exception.ProcessoNaoEncontradoException;
 import com.example.processo.core.motor.domain.exception.RegraVioladaException;
 import com.example.processo.core.motor.domain.model.Avaliacao;
+import com.example.processo.core.motor.domain.model.Cpf;
 import com.example.processo.core.motor.domain.model.DadosDoSegmento;
 import com.example.processo.core.motor.domain.model.Processo;
 import com.example.processo.core.motor.domain.model.Proponente;
 import com.example.processo.core.motor.domain.model.Solicitacao;
+import com.example.processo.core.motor.domain.model.Valor;
 import com.example.processo.core.motor.domain.rule.Especificacao;
 import com.example.processo.core.motor.domain.state.Situacao;
 import com.example.processo.core.motor.domain.state.TransicaoInvalidaException;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -83,14 +84,14 @@ class MotorDeProcessamentoTest {
     final Fakes.DocumentosEmMemoria documentos = new Fakes.DocumentosEmMemoria();
     /** CPF que o sistema externo falso considera irregular. */
     static final String CPF_IRREGULAR = "11144477735";
-    final List<String> consultados = new ArrayList<>();
-    final SituacaoCadastral situacaoCadastral = cpf -> consultados.add(cpf) && !cpf.equals(CPF_IRREGULAR);
+    final List<Cpf> consultados = new ArrayList<>();
+    final SituacaoCadastral situacaoCadastral = cpf -> consultados.add(cpf) && !cpf.numero().equals(CPF_IRREGULAR);
     final MotorDeProcessamento motor = new MotorDeProcessamento(List.of(auto, servico), situacaoCadastral,
             sequencia::incrementAndGet, banco, Fakes.semTransacao(),
             Clock.fixed(Instant.from(HOJE.atStartOfDay(ZoneOffset.UTC)), ZoneOffset.UTC), documentos);
 
     Processo<?> criarAuto(String placa) {
-        return motor.criar(new Solicitacao<>(ANA, new BigDecimal("50000"), new DadosAuto(placa)));
+        return motor.criar(new Solicitacao<>(ANA, new Valor("50000"), new DadosAuto(placa)));
     }
 
     Situacao situacaoNoBanco(Processo<?> processo) {
@@ -99,8 +100,8 @@ class MotorDeProcessamentoTest {
 
     @Test
     void mesmoMotorAtendeTodosOsSegmentosComNumeracaoUnica() {
-        var carro = motor.criar(new Solicitacao<>(ANA, new BigDecimal("50000"), new DadosAuto("ABC1D23")));
-        var reforma = motor.criar(new Solicitacao<>(ANA, new BigDecimal("8000"), new DadosServico("Reforma")));
+        var carro = motor.criar(new Solicitacao<>(ANA, new Valor("50000"), new DadosAuto("ABC1D23")));
+        var reforma = motor.criar(new Solicitacao<>(ANA, new Valor("8000"), new DadosServico("Reforma")));
 
         assertEquals("AUT-2026-000001", carro.numero());
         assertEquals("SRV-2026-000002", reforma.numero());
@@ -121,7 +122,7 @@ class MotorDeProcessamentoTest {
 
     @Test
     void processoNasceAbertoComOsDadosDaSolicitacao() {
-        var processo = motor.criar(new Solicitacao<>(ANA, new BigDecimal("50000"), new DadosAuto("ABC1D23")));
+        var processo = motor.criar(new Solicitacao<>(ANA, new Valor("50000"), new DadosAuto("ABC1D23")));
 
         assertEquals("AUTO", processo.segmento());
         assertEquals(Situacao.ABERTO, processo.situacao());
@@ -133,7 +134,7 @@ class MotorDeProcessamentoTest {
     @Test
     void regraDoSegmentoVioladaNaoGravaNemPedeDocumento() {
         var erro = assertThrows(RegraVioladaException.class,
-                () -> motor.criar(new Solicitacao<>(ANA, new BigDecimal("50000"), new DadosAuto("placa"))));
+                () -> motor.criar(new Solicitacao<>(ANA, new Valor("50000"), new DadosAuto("placa"))));
 
         assertEquals("Placa inválida", erro.getMessage());
         assertTrue(auto.gravados.isEmpty());
@@ -145,7 +146,7 @@ class MotorDeProcessamentoTest {
     void situacaoCadastralIrregularRecusaSemGerarNumero() {
         var irregular = new Proponente("Bruno Lima", CPF_IRREGULAR);
         var erro = assertThrows(RegraVioladaException.class,
-                () -> motor.criar(new Solicitacao<>(irregular, new BigDecimal("50000"), new DadosAuto("ABC1D23"))));
+                () -> motor.criar(new Solicitacao<>(irregular, new Valor("50000"), new DadosAuto("ABC1D23"))));
 
         assertEquals("Situação cadastral irregular para o CPF " + CPF_IRREGULAR, erro.getMessage());
         assertTrue(auto.gravados.isEmpty());
@@ -156,10 +157,10 @@ class MotorDeProcessamentoTest {
     @Test
     void sistemaExternoSoEhConsultadoSeAsOutrasRegrasPassarem() {
         assertThrows(RegraVioladaException.class,
-                () -> motor.criar(new Solicitacao<>(ANA, new BigDecimal("50000"), new DadosAuto("placa"))));
+                () -> motor.criar(new Solicitacao<>(ANA, new Valor("50000"), new DadosAuto("placa"))));
         assertTrue(consultados.isEmpty());
 
-        motor.criar(new Solicitacao<>(ANA, new BigDecimal("50000"), new DadosAuto("ABC1D23")));
+        motor.criar(new Solicitacao<>(ANA, new Valor("50000"), new DadosAuto("ABC1D23")));
         assertEquals(List.of(ANA.cpf()), consultados);
     }
 
@@ -167,7 +168,7 @@ class MotorDeProcessamentoTest {
     void regrasComunsVemAntesDasDoSegmento() {
         var semNome = new Proponente("", "52998224725");
         var erro = assertThrows(RegraVioladaException.class,
-                () -> motor.criar(new Solicitacao<>(semNome, new BigDecimal("50000"), new DadosAuto("placa"))));
+                () -> motor.criar(new Solicitacao<>(semNome, new Valor("50000"), new DadosAuto("placa"))));
 
         assertEquals("Nome do proponente é obrigatório", erro.getMessage());
     }
@@ -177,7 +178,7 @@ class MotorDeProcessamentoTest {
         record DadosRural(String car) implements DadosDoSegmento {
         }
         assertThrows(IllegalArgumentException.class,
-                () -> motor.criar(new Solicitacao<>(ANA, BigDecimal.TEN, new DadosRural("x"))));
+                () -> motor.criar(new Solicitacao<>(ANA, new Valor("10"), new DadosRural("x"))));
     }
 
     @Test
@@ -214,7 +215,7 @@ class MotorDeProcessamentoTest {
 
     @Test
     void mesmoCicloParaOutroSegmento() {
-        var reforma = motor.criar(new Solicitacao<>(ANA, new BigDecimal("8000"), new DadosServico("Reforma")));
+        var reforma = motor.criar(new Solicitacao<>(ANA, new Valor("8000"), new DadosServico("Reforma")));
 
         assertEquals(Situacao.CONCLUIDO, motor.processar(reforma.id()).situacao());
     }

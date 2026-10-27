@@ -41,7 +41,7 @@ public final class RegrasImobiliarias {
     private static final Especificacao<Solicitacao<DadosImobiliarios>> DENTRO_DO_LIMITE = s -> {
         var tipo = s.dados().tipoImovel();
         var limite = s.dados().valorAvaliacao().multiply(tipo.limiteDaAvaliacao).setScale(2, RoundingMode.DOWN);
-        return s.valor().compareTo(limite) <= 0
+        return s.valor().quantia().compareTo(limite) <= 0
                 ? Optional.empty()
                 : Optional.of("Valor excede " + percentual(tipo.limiteDaAvaliacao) + " da avaliação para imóvel "
                         + tipo.name().toLowerCase() + " (máximo " + limite.toPlainString() + ")");

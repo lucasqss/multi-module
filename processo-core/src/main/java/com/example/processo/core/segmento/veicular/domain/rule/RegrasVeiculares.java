@@ -34,7 +34,7 @@ public final class RegrasVeiculares {
 
     private static final Especificacao<Solicitacao<DadosVeiculares>> DENTRO_DO_LIMITE = s -> {
         var limite = s.dados().valorFipe().multiply(LIMITE_DA_FIPE).setScale(2, RoundingMode.DOWN);
-        return s.valor().compareTo(limite) <= 0
+        return s.valor().quantia().compareTo(limite) <= 0
                 ? Optional.empty()
                 : Optional.of("Valor excede 90% da FIPE (máximo " + limite.toPlainString() + ")");
     };

@@ -7,6 +7,7 @@ import com.example.processo.core.motor.domain.model.Avaliacao;
 import com.example.processo.core.motor.domain.model.Processo;
 import com.example.processo.core.motor.domain.model.Proponente;
 import com.example.processo.core.motor.domain.model.Solicitacao;
+import com.example.processo.core.motor.domain.model.Valor;
 import com.example.processo.core.segmento.veicular.application.port.out.ProcessosVeiculares;
 import com.example.processo.core.segmento.veicular.domain.model.DadosVeiculares;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,7 @@ class SegmentoVeicularTest {
             new AtomicLong(6)::incrementAndGet, new Fakes.BancoEmMemoria(), Fakes.semTransacao(), RELOGIO, p -> { });
 
     static Solicitacao<DadosVeiculares> solicitacao(String valor, String placa, Integer ano, String fipe) {
-        return new Solicitacao<>(ANA, new BigDecimal(valor),
+        return new Solicitacao<>(ANA, new Valor(valor),
                 new DadosVeiculares(placa, ano, fipe == null ? null : new BigDecimal(fipe)));
     }
 

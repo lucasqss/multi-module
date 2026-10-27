@@ -20,7 +20,7 @@ public record Documento(String modelo, String referencia, String segmento, Strin
     /** O modelo é escolhido pelo código do segmento; a referência é o número do processo. */
     public static Documento deAbertura(Processo<?> processo) {
         return new Documento("abertura-processo-" + processo.segmento().toLowerCase(), processo.numero(),
-                processo.segmento(), processo.proponente().nome(), processo.proponente().cpf(), processo.valor(),
+                processo.segmento(), processo.proponente().nome(), processo.proponente().cpf().numero(), processo.valor().quantia(),
                 processo.dataAbertura(), campos(processo.dados()));
     }
 

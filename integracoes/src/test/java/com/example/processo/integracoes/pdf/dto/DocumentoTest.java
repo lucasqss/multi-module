@@ -4,6 +4,7 @@ import com.example.processo.core.motor.domain.model.DadosDoSegmento;
 import com.example.processo.core.motor.domain.model.Processo;
 import com.example.processo.core.motor.domain.model.Proponente;
 import com.example.processo.core.motor.domain.model.Solicitacao;
+import com.example.processo.core.motor.domain.model.Valor;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -22,13 +23,13 @@ class DocumentoTest {
     @Test
     void pedidoNoFormatoDoSistemaDePdf() {
         var processo = Processo.abrir("AUT-2026-000007", "AUTO",
-                new Solicitacao<>(new Proponente("Ana Souza", "52998224725"), BigDecimal.TEN,
+                new Solicitacao<>(new Proponente("Ana Souza", "52998224725"), new Valor("10"),
                         new DadosAuto("ABC1D23", Cor.AZUL)),
                 LocalDate.of(2026, 10, 19));
 
         var documento = Documento.deAbertura(processo);
 
         assertEquals(new Documento("abertura-processo-auto", "AUT-2026-000007", "AUTO", "Ana Souza", "52998224725",
-                BigDecimal.TEN, LocalDate.of(2026, 10, 19), Map.of("placa", "ABC1D23", "cor", "AZUL")), documento);
+                new BigDecimal("10.00"), LocalDate.of(2026, 10, 19), Map.of("placa", "ABC1D23", "cor", "AZUL")), documento);
     }
 }

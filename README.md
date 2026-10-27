@@ -41,7 +41,7 @@ Exemplo de **processos de dois tipos (imobiliário e veicular) com um motor úni
 | `processo-core` | Toda a lógica de negócio da escrita, sem HTTP: o `motor` (criar, processar e cancelar únicos, máquina de estados no padrão State, regras comuns, numeração, SPI `Segmento`) e os segmentos (`segmento.imobiliario`, `segmento.veicular`: dados, regras, decisão do processamento e persistência da filha) |
 | `processo-query` | Consultas somente leitura que devolvem projeções: listagem de todos os segmentos e detalhe de cada tipo |
 | `integracoes` | Integrações de saída, um pacote por sistema externo: implementam ports do core e traduzem o modelo externo (anticorrupção). Exemplos: `cadastro`, consultado no ato da criação, e `pdf`, que gera o documento de abertura |
-| `processo-app` | Todo o REST (`adapter/inbound/rest`: resources, DTOs e tratamento de erros), a montagem do deploy único, os ITs e o ArchUnit entre módulos |
+| `processo-app` | Todas as entradas, uma pasta por canal em `adapter/inbound` (`rest/`: resources, DTOs e erros; `messaging/`: consumidor de fila), a montagem do deploy único, os ITs e o ArchUnit entre módulos |
 
 ### Convenção de pastas
 
@@ -50,7 +50,7 @@ Cada contexto (o motor e cada segmento) segue a mesma estrutura hexagonal:
 ```
 domain/        model · state · rule · exception                 Java puro
 application/   port/out · port/spi · service (o motor e os segmentos)
-adapter/       inbound/rest/{resource, dto, exception}           (no processo-app)
+adapter/       inbound/<canal>: rest/{resource, dto, exception}, messaging/{consumer, dto}   (no processo-app)
                outbound/persistence/{repository, mapper}
 config/        producers CDI
 ```
@@ -70,6 +70,7 @@ motor, e cada repository Jakarta Data implementa o port de persistência, conver
 | `POST /processos/{id}/cancelamento` | core | cancela um processo `ABERTO`; responde `204` |
 | `GET /processos/imobiliarios/{id}`, `GET /processos/veiculares/{id}` | query | detalhe com os campos do pai e da filha, incluindo situação e motivo da recusa |
 | `GET /processos?situacao=ABERTO&pagina=1&tamanho=20` | query | listagem paginada de todos os segmentos, só com os campos comuns: `{"itens", "pagina", "tamanho", "total"}`; filtro opcional, tamanho até 100 |
+| fila `processos.imobiliarios.novos` (AMQP) | core | cria processo imobiliário por mensagem; o `id` da mensagem é a chave de idempotência; resposta (`criado` ou `recusado`) em `processos.imobiliarios.respostas` |
 | `GET /q/openapi`, `GET /q/health` | app | contrato da API (Swagger UI em `/q/swagger-ui` no dev) e health (readiness com o banco) |
 
 Códigos de erro, todos em Problem Details (RFC 9457, `application/problem+json`) com `type`, `title`, `status` e `detail`
@@ -125,7 +126,7 @@ Falha no sistema de PDF (erro ou timeout de 2 s) não desfaz o processo: o motor
 |---|---|---|
 | O negócio precisa da resposta no meio do fluxo | port no domínio do core, implementado em `integracoes.<sistema>` | `SituacaoCadastral` → `integracoes.cadastro` |
 | Passo do fluxo sem resposta para o negócio | port chamado pelo motor, implementado em `integracoes.<sistema>`; falha só loga | `GeradorDeDocumentos` → `integracoes.pdf` |
-| O sistema externo nos chama | entrada no `processo-app`, ou módulo próprio se for descartável | REST do app |
+| O sistema externo nos chama (API, fila) | `adapter/inbound/<canal>` no `processo-app`, ou módulo de entrada próprio se trouxer dependência pesada ou for descartável ([ADR 0011](docs/adr/0011-entradas-por-canal-em-adapter-inbound.md)) | REST do app, consumidor da fila |
 
 Como está o exemplo:
 
@@ -189,6 +190,7 @@ docker compose up -d --wait
 QUARKUS_DATASOURCE_JDBC_URL=jdbc:oracle:thin:@localhost:1521/FREEPDB1 \
 QUARKUS_DATASOURCE_USERNAME=processo QUARKUS_DATASOURCE_PASSWORD=processo \
 SISTEMA_PDF_URL=http://localhost:8089 CADASTRO_URL=http://localhost:8090 \
+AMQP_HOST=localhost AMQP_PORT=5672 AMQP_USERNAME=artemis AMQP_PASSWORD=artemis \
 java -jar processo-app/target/quarkus-app/quarkus-run.jar
 ```
 

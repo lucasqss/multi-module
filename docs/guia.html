@@ -300,7 +300,7 @@
       <tr><td><code>application/port/spi</code></td><td>O contrato que cada segmento implementa (<code>Segmento</code>).</td></tr>
       <tr><td><code>application/service</code></td><td>O motor e os segmentos.</td></tr>
       <tr><td><code>adapter/outbound/persistence</code></td><td><code>repository/</code> (Jakarta Data) e <code>mapper/</code> (domínio ↔ entidade).</td></tr>
-      <tr><td><code>adapter/inbound/rest</code></td><td>No app: <code>resource/</code>, <code>dto/</code> e <code>exception/</code> (exceção → HTTP).</td></tr>
+      <tr><td><code>adapter/inbound/&lt;canal&gt;</code></td><td>No app, toda forma de iniciar algo, uma pasta por canal: <code>rest/</code> (<code>resource/</code>, <code>dto/</code>, <code>exception/</code>), <code>messaging/</code> (<code>consumer/</code>, <code>dto/</code>), <code>scheduler/</code>. Só traduzem e chamam o motor.</td></tr>
       <tr><td><code>config</code></td><td>Producers CDI, como o <code>Clock</code>.</td></tr>
     </tbody>
   </table></div>
@@ -334,7 +334,8 @@
 ├─ processo-query/   repository/ ProcessoQueries · dto/ ResumoProcesso, Detalhe&lt;Tipo&gt;
 ├─ integracoes/      cadastro/ client/ · dto/ · adapter/ SituacaoCadastralAdapter
 │                    pdf/      client/ · dto/ Documento · adapter/ GeradorDeDocumentosAdapter
-└─ processo-app/     adapter/inbound/rest/ resource/ · dto/ · exception/ TratadorDeErros</code></pre>
+└─ processo-app/     adapter/inbound/rest/      resource/ · dto/ · exception/ TratadorDeErros
+                     adapter/inbound/messaging/ consumer/ NovosProcessosImobiliarios · dto/</code></pre>
 </section>
 
 <!-- 4 -->
@@ -382,6 +383,26 @@
     inválida dá <code>422</code> e processo inexistente <code>404</code>.</p>
   <div class="note"><strong>Por que não lock pessimista?</strong>Ele prenderia a conexão durante a avaliação, que pode
     chamar sistemas externos. O compare-and-set garante o mesmo sem travar.</div>
+
+  <h3>Criar por fila</h3>
+  <p>A mesma criação, por outro canal: o <code>NovosProcessosImobiliarios</code> consome
+    <code>processos.imobiliarios.novos</code> (AMQP 1.0), chama <code>motor.criar(solicitacao, idDaMensagem)</code> e
+    responde em <code>processos.imobiliarios.respostas</code>. A mensagem tem layout próprio do canal, plano como um
+    registro do mainframe:</p>
+<pre><code>{"id": "msg-123", "nome": "Ana Souza", "cpf": "52998224725", "valor": 400000.00, "matricula": "12345",
+ "tipoImovel": "RESIDENCIAL", "valorAvaliacao": 500000.00, "uf": "SP"}</code></pre>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Resultado</th><th>Resposta</th><th>Mensagem</th></tr></thead>
+    <tbody>
+      <tr><td>criado, ou já criado antes com o mesmo <code>id</code></td><td><code>criado</code>, com id e número</td><td>ack</td></tr>
+      <tr><td>regra violada ou mensagem malformada</td><td><code>recusado</code>, com o motivo</td><td>ack: reentregar não muda o resultado</td></tr>
+      <tr><td>sistema externo fora do ar, banco, qualquer outra falha</td><td>nenhuma</td><td>nack: o broker reentrega</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note"><strong>Fila reentrega: idempotência não é opcional</strong>O <code>id</code> da mensagem é a chave
+    de idempotência. O motor grava a chave junto com o processo (<code>PROCESSO_IDEMPOTENCIA</code>) e, numa
+    reentrega, devolve o processo já criado, sem reaplicar regras, gerar número nem pedir PDF. Por que e como, na
+    <a href="adr/0011-entradas-por-canal-em-adapter-inbound.md">ADR 0011</a>.</div>
 
   <h3>Consultar</h3>
   <p><code>GET /processos?situacao=ABERTO&amp;pagina=1&amp;tamanho=20</code> lista todos os tipos a partir da tabela
@@ -477,7 +498,7 @@ public Processo&lt;D&gt; cancelar() { return em(situacao.cancelar(), null); }</c
     <thead><tr><th>Situação</th><th>Onde fica</th><th>Exemplo</th></tr></thead>
     <tbody>
       <tr><td>O fluxo precisa da resposta</td><td>interface em <code>port/out</code> do core, implementada em <code>integracoes.&lt;sistema&gt;</code></td><td>cadastro, PDF</td></tr>
-      <tr><td>O sistema externo nos chama</td><td>REST no <code>processo-app</code></td><td>os resources</td></tr>
+      <tr><td>O sistema externo nos chama (API, fila)</td><td><code>adapter/inbound/&lt;canal&gt;</code> no <code>processo-app</code>; módulo de entrada próprio se trouxer dependência pesada ou for descartável</td><td>resources, consumidor da fila</td></tr>
     </tbody>
   </table></div>
 
@@ -582,6 +603,15 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
       <code>adapter/</code> e, se quiser, a simulação de dev.</li>
     <li>URL em <code>application.properties</code> e um servidor falso no IT (<code>@WithTestResource</code>).</li>
   </ol>
+  <h3>Nova forma de iniciar um processo</h3>
+  <ol>
+    <li>Pasta do canal em <code>processo-app/.../adapter/inbound/&lt;canal&gt;</code>, com o <code>dto/</code> do formato do
+      canal (<code>paraSolicitacao()</code>) e quem recebe (<code>resource/</code>, <code>consumer/</code>, job).</li>
+    <li>Chame o motor. Fora do HTTP, <code>@ActivateRequestContext</code>; em fila, passe o id da mensagem como chave
+      de idempotência e decida ack/nack pelo tipo do erro, como o <code>NovosProcessosImobiliarios</code>.</li>
+    <li>Teste com o canal em memória, como o <code>NovosProcessosPorFilaTest</code>.</li>
+    <li>Dependência pesada ou canal descartável: módulo de entrada próprio, registrado como qualquer módulo novo.</li>
+  </ol>
   <h3>Nova consulta</h3>
   <p>Método com <code>@Query</code> e <code>select new</code> em <code>ProcessoQueries</code>, record em
     <code>dto/</code> e endpoint no app.</p>
@@ -605,7 +635,17 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
     <li><strong><code>NUMBER</code> do Oracle</strong> perde zeros à direita (<code>400000.00</code> volta
       <code>400000</code>). Compare números, não texto.</li>
     <li><strong>Enum inválido em <code>@QueryParam</code></strong> responde 404, não 400.</li>
-    <li><strong>URL do banco em <code>%prod</code></strong> desliga o Dev Services nos ITs.</li>
+    <li><strong>URL do banco em <code>%prod</code></strong> desliga o Dev Services nos ITs. O mesmo vale para
+      <code>amqp-host</code>: em prod, o broker vem só por variável de ambiente (<code>AMQP_HOST</code>,
+      <code>AMQP_PORT</code>, <code>AMQP_USERNAME</code>, <code>AMQP_PASSWORD</code>).</li>
+    <li><strong>Consumidor sem request context:</strong> fora do HTTP, ler pela <code>StatelessSession</code> fora de
+      transação falha (<code>ContextNotActiveException</code>). Use <code>@ActivateRequestContext</code>.</li>
+    <li><strong>Fila virou tópico:</strong> sem <code>capabilities=queue</code>, o Artemis cria o endereço como
+      multicast, e mensagens enviadas para a fila não chegam ao consumidor.</li>
+    <li><strong>JSON chega como texto:</strong> sem content-type JSON, o connector AMQP entrega <code>String</code>, não
+      <code>JsonObject</code>. O consumidor aceita os dois.</li>
+    <li><strong>Broker parado por disco:</strong> o Artemis bloqueia produtores com o disco acima de 90%. No Dev
+      Services isso está desligado; em produção é a operação do broker que decide.</li>
     <li><strong>Servidor falso nos ITs</strong> roda na JVM do teste; o mapa de <code>start()</code> vira configuração do
       jar, que roda em outro processo.</li>
     <li><strong>Colunas</strong> precisam de nome explícito: o Quarkus não converte <code>dataAbertura</code> em

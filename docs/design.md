@@ -144,7 +144,7 @@ O `ArquiteturaModulosTest` do app garante que:
 - o `jpa-core` não conhece o resto;
 - HTTP só aparece no app e nas integrações;
 - o app entra no core pelo motor (`application.service`) e pelos tipos do domínio, nunca pelos ports de saída, SPI ou adapters; não usa entidades JPA;
-- no REST, o `dto` não conhece o `resource`;
+- em cada canal de entrada, o `dto` não conhece quem o recebe (`resource`, `consumer`), e um canal não usa as classes de outro;
 - não há ciclos entre pacotes;
 - toda classe pertence a um módulo registrado.
 
@@ -221,7 +221,11 @@ Classe em `mapper/` fica para domínio ↔ entidade JPA, que traduz enums e mont
 - `dto/`: as projeções `ResumoProcesso`, `DetalheImobiliario` e `DetalheVeicular`. São records top-level e planos,
   porque o `select new` não instancia records aninhados.
 
-## App (`com.example.processo.app.adapter.inbound.rest`)
+## App (`com.example.processo.app.adapter.inbound`)
+
+Uma pasta por canal de entrada ([ADR 0011](adr/0011-entradas-por-canal-em-adapter-inbound.md)).
+
+**`rest/`**
 
 - `resource/`: `ProcessoImobiliarioResource` e `ProcessoVeicularResource` (criar pelo motor, detalhe pelo query) e
   `ProcessosResource` (listagem pelo query; processar e cancelar pelo motor).
@@ -232,6 +236,17 @@ Classe em `mapper/` fica para domínio ↔ entidade JPA, que traduz enums e mont
 - `dto/PaginaResponse`: a página da listagem (`itens`, `pagina`, `tamanho`, `total`).
 - `exception/TratadorDeErros`: exceções → Problem Details (`application/problem+json`, `type` fixo por problema):
   422, 404, 409, 503 e 400 (paginação inválida).
+
+**`messaging/`**
+
+- `consumer/NovosProcessosImobiliarios`: consome `processos.imobiliarios.novos` (AMQP 1.0), chama
+  `motor.criar(solicitacao, idDaMensagem)` e responde em `processos.imobiliarios.respostas`. Criado (ou já criado
+  pela mesma chave): responde e confirma. Regra violada ou mensagem malformada: responde `recusado` e confirma.
+  Outra falha: nack para reentrega. `@ActivateRequestContext` porque fora do HTTP não há request context; aceita o
+  JSON como `JsonObject`, texto ou bytes.
+- `dto/NovoProcessoImobiliarioMensagem` (layout plano do canal, com `paraSolicitacao()`) e `dto/RespostaNovoProcesso`.
+- Broker: em prod por `AMQP_HOST`/`AMQP_PORT`/`AMQP_USERNAME`/`AMQP_PASSWORD`; no dev e nos testes, Dev Services
+  com a imagem `apache/activemq-artemis`. Canais anycast (`capabilities=queue`).
 
 ## Integrações (`com.example.processo.integracoes`)
 
@@ -271,7 +286,7 @@ Mesmo molde do cadastro:
 |---|---|---|
 | `processo-core` | tabela do State; `Cpf`, `Valor` e regras comuns; contrato dos ports de persistência contra os fakes; motor com dois segmentos falsos (mesmo fluxo e ciclo de vida, numeração única, regra violada não grava nem pede PDF, falha no PDF não desfaz a criação, situação cadastral irregular, conflito, sistema externo só consultado no fim); segmentos imobiliário e veicular no motor real; ArchUnit de camadas e motor x segmentos | não |
 | `integracoes` | adapters do cadastro e do PDF, `Documento.deAbertura`; falha do cliente vira indisponibilidade | não |
-| `processo-app` | ArchUnit entre módulos; contrato dos ports de persistência contra o Oracle (`@QuarkusTest`); `@QuarkusIntegrationTest` contra o jar, com Oracle e um sistema de PDF falso (`HttpServer` do JDK): ciclo de vida igual por tipo (inclusive processamento simultâneo), recusa por matrícula, numeração, regras, cadastro irregular e fora do ar, falha do PDF, detalhe, listagem paginada, erros em Problem Details, health e OpenAPI | sim |
+| `processo-app` | ArchUnit entre módulos; contrato dos ports de persistência contra o Oracle (`@QuarkusTest`); consumidor da fila com canais em memória (criado, reentrega sem duplicar, recusado, malformado, nack);  `@QuarkusIntegrationTest` contra o jar, com Oracle e um sistema de PDF falso (`HttpServer` do JDK): ciclo de vida igual por tipo (inclusive processamento simultâneo), recusa por matrícula, numeração, regras, cadastro irregular e fora do ar, falha do PDF, detalhe, listagem paginada, erros em Problem Details, health e OpenAPI | sim |
 
 ## Armadilhas
 

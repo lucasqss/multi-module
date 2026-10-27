@@ -111,9 +111,10 @@ class ArquiteturaModulosTest {
     }
 
     @Test
-    void appEntraNoCorePeloMotor() {
-        // O REST chama o motor (application.service) e usa os tipos do domínio. Ports de saída, SPI e adapters ficam
-        // por trás. Entidades JPA também: a leitura usa as projeções do query (enums do jpa-core são permitidos).
+    void appEntraNoCorePorServicos() {
+        // As entradas chamam serviços do core (o motor, ou o serviço de um cadastro simples) e usam os tipos do
+        // domínio. Ports de saída, SPI e adapters ficam por trás. Entidades JPA também: a leitura usa as projeções do
+        // query ou os records do cadastro (enums do jpa-core são permitidos).
         noClasses().that().resideInAPackage(APP + "..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         CORE + "..application.port.out..", CORE + "..application.port.spi..",

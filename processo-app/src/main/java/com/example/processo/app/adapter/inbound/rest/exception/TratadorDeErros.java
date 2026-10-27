@@ -1,6 +1,7 @@
 package com.example.processo.app.adapter.inbound.rest.exception;
 
 import com.example.processo.app.adapter.inbound.rest.dto.Problema;
+import com.example.processo.core.cadastro.agencia.AgenciaNaoEncontradaException;
 import com.example.processo.core.motor.domain.exception.ConflitoDeSituacaoException;
 import com.example.processo.core.motor.domain.exception.ProcessoNaoEncontradoException;
 import com.example.processo.core.motor.domain.exception.RegraVioladaException;
@@ -29,6 +30,11 @@ public class TratadorDeErros {
 
     @ServerExceptionMapper
     public Response naoEncontrado(ProcessoNaoEncontradoException e) {
+        return problema(404, "nao-encontrado", "Recurso não encontrado", e.getMessage());
+    }
+
+    @ServerExceptionMapper
+    public Response naoEncontrado(AgenciaNaoEncontradaException e) {
         return problema(404, "nao-encontrado", "Recurso não encontrado", e.getMessage());
     }
 

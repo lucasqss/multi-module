@@ -54,7 +54,8 @@ Pacote raiz `<pacote-base>`:
 - JPA e Hibernate só em `modelo` e `persistencia`; `@Entity` só nelas; `@Repository` só na persistência.
 - A API não devolve entidade, nem dentro de `List` ou `Optional`.
 - Transação (`@Transactional`, `QuarkusTransaction`) só no negócio.
-- Nomes pelo papel: `*Resource`, `*Client`, `*Integracao`, `*Service` e `<PontoDeExtensao>*`.
+- Nomes pelo papel: `*Resource`, `*Client`, `*Integracao`, `*Service` e `<PontoDeExtensao>*`; testes `*BancoTest`
+  (`@QuarkusTest`) e `*IT` (`@QuarkusIntegrationTest`).
 - Interface só com mais de uma implementação real: o ponto de extensão e os clientes HTTP. Garantido por revisão.
 
 ## Onde coloco…?
@@ -116,12 +117,13 @@ Exemplos completos de cada item: `docs/kit-camadas/MODELOS.md`.
 ## Comandos
 
 ```bash
-mvn test -DexcludedGroups=banco   # testes puros + ArchUnit, sem Docker
+mvn test -Prapido                 # testes puros + ArchUnit, sem Docker
 mvn verify                        # tudo: @QuarkusTest com Oracle (Dev Services), ITs contra o jar, cobertura
 mvn quarkus:dev                   # dev; sistemas externos simulados
 ```
 
-Todo `@QuarkusTest` leva `@Tag("banco")` e usa o mesmo conjunto de `@WithTestResource` dos outros.
+Todo `@QuarkusTest` termina em `BancoTest` (é o que o tira do `-Prapido`) e usa o mesmo conjunto de
+`@WithTestResource` dos outros; todo `@QuarkusIntegrationTest` termina em `IT`.
 
 ## Definição de pronto
 

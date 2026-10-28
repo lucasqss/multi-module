@@ -252,15 +252,18 @@ Formato de cada decisão: **o quê**, **por quê**, **como aplicar** e **o que g
   - mudança de schema é sempre uma migration nova;
   - colunas com nome explícito (`@Column(name = "DATA_ABERTURA")`).
 
-### 2.19 Testes em três níveis e a tag `banco`
+### 2.19 Testes em três níveis, separados pelo nome
 
 - **Testes puros**, sem Quarkus: regras, estados, value objects, integração com o cliente em lambda e ArchUnit.
-  Rodam com `mvn test -DexcludedGroups=banco`, sem Docker.
-- **`@QuarkusTest` + `@Tag("banco")`**: motor e repositories com o Oracle do Dev Services e os sistemas externos
+  Rodam com `mvn test -Prapido`, sem Docker (o profile `rapido` está no `pom.xml` de `MODELOS.md`).
+- **`@QuarkusTest`, com nome terminando em `BancoTest`**: motor e repositories com o Oracle do Dev Services e os sistemas externos
   falsos. Todos usam **o mesmo conjunto** de `@WithTestResource`; um conjunto diferente reinicia o app.
 - **`@QuarkusIntegrationTest` (`*IT`)**: contra o jar, pela API; parametrizado por tipo; com um cenário de
   concorrência.
 - **Não há fakes** dos repositories: o banco real roda nos `@QuarkusTest`.
+- **Por que nome e não tag do JUnit:** o Quarkus sobe o Dev Services já ao *descobrir* uma classe `@QuarkusTest`, antes
+  de qualquer filtro por tag; então `-DexcludedGroups` não evita o Docker. O surefire filtra pelo nome antes da
+  descoberta. O `ArquiteturaTest.testesPeloNome` garante a convenção.
 
 ### 2.20 Cobertura com três fontes
 
@@ -337,6 +340,7 @@ Adapte nomes e regras ao domínio do projeto alvo, mas mantenha a forma.
   - `quarkus-jacoco` em teste;
   - ArchUnit `archunit`, não o `archunit-junit5`;
   - `smallrye-reactive-messaging-in-memory` se houver fila;
+  - o profile `rapido`, que exclui `**/*BancoTest.java`;
   - propriedades do Sonar (`sonar.java.source` é obrigatória).
 - **`application.properties`:** veja `MODELOS.md`.
   - **Nunca** ponha URL do banco, `amqp-host` ou credenciais: isso desliga o Dev Services e vaza ambiente. Em
@@ -450,7 +454,7 @@ Cada item é um commit:
 ### Fase 5 — Testes e cobertura
 
 - **Testes puros** para regras, estados, value objects e integrações.
-- **`@QuarkusTest` + `@Tag("banco")`** para o motor e os repositories, todos com o mesmo conjunto de
+- **`@QuarkusTest` (`*BancoTest`)** para o motor e os repositories, todos com o mesmo conjunto de
   `@WithTestResource`.
 - **Cobertura** com as três fontes, conferindo `target/site/jacoco/jacoco.xml`.
 - **`MIGRACAO = false`.** Apague `archunit_store` e `archunit.properties`. Tudo verde.
@@ -517,6 +521,8 @@ Cada item é um commit:
 - **Imagem do Artemis**: a padrão do Dev Services vem do quay.io. Se for bloqueado, use `apache/activemq-artemis` com
   `ARTEMIS_USER`/`ARTEMIS_PASSWORD`.
 - **`@QuarkusTest` com conjuntos diferentes de `@WithTestResource`** reinicia o app e o Oracle.
+- **Tag do JUnit não tira `@QuarkusTest` do Docker**: o Quarkus sobe o Dev Services já ao descobrir a classe, antes
+  do filtro por tag. Separe pelo nome (`*BancoTest`) e exclua no surefire (profile `rapido`).
 - **Servidor falso nos ITs** roda na JVM do teste; o mapa de `start()` vira configuração do jar.
 - **ArchUnit**: use a API core (`check`) dentro de `@Test`. O engine `archunit-junit5` não roda sob o JUnit 6 do BOM
   e executaria 0 testes.

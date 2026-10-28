@@ -14,7 +14,6 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.common.WithTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -34,11 +33,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * idempotência. Cada teste grava processos próprios (número e matrícula aleatórios): o banco é compartilhado.
  */
 @QuarkusTest
-@Tag("banco") // sobe o Oracle (Dev Services): fica fora de mvn test -DexcludedGroups=banco
 @WithTestResource(FilaEmMemoria.class)
 @WithTestResource(CadastroFalso.class)
 @WithTestResource(SistemaDePdfFalso.class)
-class ProcessoRepositoryTest {
+class ProcessoRepositoryBancoTest {
 
     @Inject
     ProcessoRepository processos;

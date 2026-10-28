@@ -250,4 +250,25 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- mvn test -Prapido: só os testes puros e o ArchUnit, sem Docker. Os *BancoTest (@QuarkusTest) ficam de fora
+             pelo nome, e não por tag, porque o Quarkus já sobe o Dev Services ao descobrir uma classe @QuarkusTest,
+             antes de qualquer filtro do JUnit -->
+        <profile>
+            <id>rapido</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/*BancoTest.java</exclude>
+                            </excludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

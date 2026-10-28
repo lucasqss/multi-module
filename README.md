@@ -65,7 +65,7 @@ Pré-requisitos: Java 25, Maven 3.9+, Docker.
 
 ```bash
 # Testes puros: regras, estados, integrações e ArchUnit (sem Docker)
-mvn test -DexcludedGroups=banco
+mvn test -Prapido
 
 # Tudo: testes com Oracle, teste da fila e ITs (Dev Services sobe Oracle e Artemis no Docker)
 mvn verify

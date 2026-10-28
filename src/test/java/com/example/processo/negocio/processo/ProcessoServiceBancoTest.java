@@ -17,7 +17,6 @@ import io.quarkus.test.common.WithTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.vertx.core.json.JsonObject;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -39,12 +38,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * chaves próprias: o banco é compartilhado com os outros testes.
  */
 @QuarkusTest
-@Tag("banco") // sobe o Oracle (Dev Services): fica fora de mvn test -DexcludedGroups=banco
 // O mesmo conjunto de recursos dos outros @QuarkusTest: o app (e o Oracle) sobe uma vez só
 @WithTestResource(FilaEmMemoria.class)
 @WithTestResource(CadastroFalso.class)
 @WithTestResource(SistemaDePdfFalso.class)
-class ProcessoServiceTest {
+class ProcessoServiceBancoTest {
 
     static final String ANO = Integer.toString(LocalDate.now().getYear());
 

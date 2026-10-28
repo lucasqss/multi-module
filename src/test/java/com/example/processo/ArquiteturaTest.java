@@ -12,6 +12,8 @@ import jakarta.data.repository.Repository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
 import jakarta.persistence.Entity;
+import io.quarkus.test.junit.QuarkusIntegrationTest;
+import io.quarkus.test.junit.QuarkusTest;
 import jakarta.ws.rs.Path;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 import org.junit.jupiter.api.Test;
@@ -162,6 +164,17 @@ class ArquiteturaTest {
                 .and().doNotImplement(Modalidade.class)
                 .should().haveSimpleNameEndingWith("Service")
                 .check(CLASSES);
+    }
+
+
+    @Test
+    void testesPeloNome() {
+        // @QuarkusTest sobe o Oracle: o nome *BancoTest é o que o tira do mvn test -Prapido (o filtro por tag não
+        // serve, porque o Quarkus sobe o Dev Services já na descoberta). @QuarkusIntegrationTest roda no failsafe: *IT
+        var testes = new ClassFileImporter().withImportOption(ImportOption.Predefined.ONLY_INCLUDE_TESTS)
+                .importPackages(BASE);
+        classes().that().areAnnotatedWith(QuarkusTest.class).should().haveSimpleNameEndingWith("BancoTest").check(testes);
+        classes().that().areAnnotatedWith(QuarkusIntegrationTest.class).should().haveSimpleNameEndingWith("IT").check(testes);
     }
 
     @Test

@@ -2,7 +2,8 @@
 
 Arquivos completos do projeto de referência (pacote `com.example.processo`), que compilam e passam nos testes. Troque o pacote e os nomes do domínio; mantenha a forma. O porquê de cada um está no `GUIA.md`.
 
-> Gerado por `gerar-modelos.py` a partir do commit `7f8be47` do repositório de referência. Não edite à mão.
+> Gerado por `gerar-modelos.py` a partir do código do repositório de referência. Não edite à mão: mude o código
+> de lá e rode o script de novo.
 
 ## Índice
 
@@ -22,7 +23,7 @@ Arquivos completos do projeto de referência (pacote `com.example.processo`), qu
 14. [Migrations](#14-migrations)
 15. [Configuração](#15-configuração)
 16. [Testes puros](#16-testes-puros)
-17. [Testes com o banco (@QuarkusTest + @Tag("banco"))](#17-testes-com-o-banco-quarkustest--tagbanco)
+17. [Testes com o banco (@QuarkusTest, *BancoTest)](#17-testes-com-o-banco-quarkustest-bancotest)
 18. [Infraestrutura de teste](#18-infraestrutura-de-teste)
 19. [Testes de integração (contra o jar)](#19-testes-de-integração-contra-o-jar)
 
@@ -2260,6 +2261,27 @@ O POM completo (um módulo, hibernate-processor, JaCoCo com três fontes, failsa
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- mvn test -Prapido: só os testes puros e o ArchUnit, sem Docker. Os *BancoTest (@QuarkusTest) ficam de fora
+             pelo nome, e não por tag, porque o Quarkus já sobe o Dev Services ao descobrir uma classe @QuarkusTest,
+             antes de qualquer filtro do JUnit -->
+        <profile>
+            <id>rapido</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/*BancoTest.java</exclude>
+                            </excludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
 ```
 
@@ -2505,11 +2527,11 @@ class CadastroIntegracaoTest {
 }
 ```
 
-## 17. Testes com o banco (@QuarkusTest + @Tag("banco"))
+## 17. Testes com o banco (@QuarkusTest, *BancoTest)
 
 O motor e os repositories no Oracle do Dev Services, com o mesmo conjunto de @WithTestResource.
 
-### `src/test/java/com/example/processo/negocio/processo/ProcessoServiceTest.java`
+### `src/test/java/com/example/processo/negocio/processo/ProcessoServiceBancoTest.java`
 
 ```java
 package com.example.processo.negocio.processo;
@@ -2531,7 +2553,6 @@ import io.quarkus.test.common.WithTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.vertx.core.json.JsonObject;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -2553,12 +2574,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * chaves próprias: o banco é compartilhado com os outros testes.
  */
 @QuarkusTest
-@Tag("banco") // sobe o Oracle (Dev Services): fica fora de mvn test -DexcludedGroups=banco
 // O mesmo conjunto de recursos dos outros @QuarkusTest: o app (e o Oracle) sobe uma vez só
 @WithTestResource(FilaEmMemoria.class)
 @WithTestResource(CadastroFalso.class)
 @WithTestResource(SistemaDePdfFalso.class)
-class ProcessoServiceTest {
+class ProcessoServiceBancoTest {
 
     static final String ANO = Integer.toString(LocalDate.now().getYear());
 
@@ -2703,7 +2723,7 @@ class ProcessoServiceTest {
 }
 ```
 
-### `src/test/java/com/example/processo/persistencia/ProcessoRepositoryTest.java`
+### `src/test/java/com/example/processo/persistencia/ProcessoRepositoryBancoTest.java`
 
 ```java
 package com.example.processo.persistencia;
@@ -2722,7 +2742,6 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.common.WithTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -2742,11 +2761,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * idempotência. Cada teste grava processos próprios (número e matrícula aleatórios): o banco é compartilhado.
  */
 @QuarkusTest
-@Tag("banco") // sobe o Oracle (Dev Services): fica fora de mvn test -DexcludedGroups=banco
 @WithTestResource(FilaEmMemoria.class)
 @WithTestResource(CadastroFalso.class)
 @WithTestResource(SistemaDePdfFalso.class)
-class ProcessoRepositoryTest {
+class ProcessoRepositoryBancoTest {
 
     @Inject
     ProcessoRepository processos;
@@ -2835,7 +2853,7 @@ class ProcessoRepositoryTest {
 }
 ```
 
-### `src/test/java/com/example/processo/NovosProcessosPorFilaTest.java`
+### `src/test/java/com/example/processo/NovosProcessosPorFilaBancoTest.java`
 
 ```java
 package com.example.processo;
@@ -2851,7 +2869,6 @@ import jakarta.enterprise.inject.Any;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.reactive.messaging.Message;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -2869,11 +2886,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * resposta, o que é confirmado (ack) e o que volta para reentrega (nack).
  */
 @QuarkusTest
-@Tag("banco") // sobe o Oracle (Dev Services): fica fora de mvn test -DexcludedGroups=banco
 @WithTestResource(FilaEmMemoria.class)
 @WithTestResource(CadastroFalso.class)
 @WithTestResource(SistemaDePdfFalso.class)
-class NovosProcessosPorFilaTest {
+class NovosProcessosPorFilaBancoTest {
 
     @Inject
     @Any

@@ -2,7 +2,6 @@
 """Gera MODELOS.md a partir do código do projeto de referência, para os modelos nunca divergirem do código que
 compila e passa nos testes. Roda só no repositório de referência: python3 docs/kit-camadas/gerar-modelos.py"""
 import pathlib
-import subprocess
 
 RAIZ = pathlib.Path(__file__).resolve().parents[2]
 M = 'src/main/java/com/example/processo/'
@@ -66,10 +65,10 @@ SECOES = [
     ('Testes puros', 'Máquina de estados em tabela, regras e decisão de um tipo, integração com o cliente em lambda.',
      [T + 'modelo/SituacaoTest.java', T + 'negocio/veicular/ModalidadeVeicularTest.java',
       T + 'integracao/cadastro/CadastroIntegracaoTest.java']),
-    ('Testes com o banco (@QuarkusTest + @Tag("banco"))', 'O motor e os repositories no Oracle do Dev Services, '
+    ('Testes com o banco (@QuarkusTest, *BancoTest)', 'O motor e os repositories no Oracle do Dev Services, '
      'com o mesmo conjunto de @WithTestResource.',
-     [T + 'negocio/processo/ProcessoServiceTest.java', T + 'persistencia/ProcessoRepositoryTest.java',
-      T + 'NovosProcessosPorFilaTest.java']),
+     [T + 'negocio/processo/ProcessoServiceBancoTest.java', T + 'persistencia/ProcessoRepositoryBancoTest.java',
+      T + 'NovosProcessosPorFilaBancoTest.java']),
     ('Infraestrutura de teste', 'Sistemas externos falsos (servidor HTTP na JVM do teste) e a fila em memória.',
      [T + 'CadastroFalso.java', T + 'SistemaDePdfFalso.java', T + 'FilaEmMemoria.java']),
     ('Testes de integração (contra o jar)', 'O mesmo ciclo de vida para cada tipo, inclusive concorrência.',
@@ -80,13 +79,12 @@ LINGUAGEM = {'.java': 'java', '.sql': 'sql', '.xml': 'xml', '.properties': 'prop
 
 
 def main():
-    commit = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=RAIZ, capture_output=True,
-                            text=True).stdout.strip()
     partes = [
         '# Modelos de código\n',
         'Arquivos completos do projeto de referência (pacote `com.example.processo`), que compilam e passam nos testes. '
         'Troque o pacote e os nomes do domínio; mantenha a forma. O porquê de cada um está no `GUIA.md`.\n',
-        f'> Gerado por `gerar-modelos.py` a partir do commit `{commit}` do repositório de referência. Não edite à mão.\n',
+        '> Gerado por `gerar-modelos.py` a partir do código do repositório de referência. Não edite à mão: mude o código\n'
+        '> de lá e rode o script de novo.\n',
         '## Índice\n',
     ]
     partes += [f'{i}. [{titulo}](#{i}-{ancora(titulo)})' for i, (titulo, _, _) in enumerate(SECOES, 1)]

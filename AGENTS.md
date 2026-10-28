@@ -49,10 +49,11 @@ Pacote raiz `com.example.processo`:
 | A API não devolve entidade, nem dentro de `List`/`Optional` | `ArquiteturaTest.apiNaoDevolveEntidade` |
 | Transação (`@Transactional`, `QuarkusTransaction`) só no negócio | `ArquiteturaTest.transacaoSoNoNegocio` |
 | Nomes pelo papel: `*Resource`, `*Client`, `*Integracao`, `Modalidade*`, `*Service` | `ArquiteturaTest.nomesPeloPapel` |
+| Testes pelo nome: `@QuarkusTest` termina em `BancoTest`, `@QuarkusIntegrationTest` em `IT` | `ArquiteturaTest.testesPeloNome` |
 | A máquina de estados aceita só as transições da tabela | `SituacaoTest` |
 | O mesmo ciclo de vida para toda modalidade, inclusive concorrência | `CicloDeVidaPorTipoIT` |
-| Gravação polimórfica, compare-and-set e chave de idempotência funcionam no Oracle | `ProcessoRepositoryTest` |
-| O PDF leva só os atributos da modalidade, mesmo com o enhancement do Hibernate | `ProcessoServiceTest` |
+| Gravação polimórfica, compare-and-set e chave de idempotência funcionam no Oracle | `ProcessoRepositoryBancoTest` |
+| O PDF leva só os atributos da modalidade, mesmo com o enhancement do Hibernate | `ProcessoServiceBancoTest` |
 | Interface só com mais de uma implementação real (`Modalidade`, clientes HTTP) | revisão; [ADR 0014](docs/adr/0014-camadas-num-modulo-so.md) |
 
 ## Onde coloco…?
@@ -141,7 +142,7 @@ Siga `apresentacao/mensageria` ([ADR 0011](docs/adr/0011-entradas-por-canal-em-a
   - regra violada → responde recusado + ack; outra falha → nack;
   - aceite JSON como `JsonObject`, texto ou bytes.
 - [ ] Teste com o canal em memória, reaproveitando o conjunto de `@WithTestResource` dos testes existentes
-  (`NovosProcessosPorFilaTest`).
+  (`NovosProcessosPorFilaBancoTest`).
 
 ### Nova consulta
 
@@ -207,12 +208,14 @@ Siga `apresentacao/mensageria` ([ADR 0011](docs/adr/0011-entradas-por-canal-em-a
 Pré-requisitos: Java 25, Maven 3.9+, Docker (o Dev Services sobe Oracle e Artemis).
 
 ```bash
-mvn test -DexcludedGroups=banco   # testes puros (regras, estados, integrações, ArchUnit), sem Docker (~20 s)
+mvn test -Prapido                 # testes puros (regras, estados, integrações, ArchUnit), sem Docker (~20 s)
 mvn verify                        # tudo: testes com Oracle, fila, ArchUnit e ITs contra o jar (~3-4 min)
 mvn quarkus:dev                   # dev; Swagger UI em http://localhost:8080/q/swagger-ui
 ```
 
-Todo `@QuarkusTest` leva `@Tag("banco")`: é o que o deixa fora do comando rápido.
+Todo `@QuarkusTest` termina em `BancoTest` (e todo `@QuarkusIntegrationTest` em `IT`), o que o `ArquiteturaTest`
+garante: é pelo nome que o profile `rapido` o deixa de fora. Tag do JUnit não serve, porque o Quarkus sobe o Dev
+Services já ao descobrir uma classe `@QuarkusTest`, antes de qualquer filtro.
 
 ## Definição de pronto
 
@@ -248,6 +251,8 @@ Todo `@QuarkusTest` leva `@Tag("banco")`: é o que o deixa fora do comando rápi
   desligado; em produção, quem decide é a operação do broker.
 - **`@QuarkusTest` com conjuntos diferentes de `@WithTestResource`** reinicia o app e o Oracle: reaproveite o conjunto
   existente (`FilaEmMemoria`, `CadastroFalso`, `SistemaDePdfFalso`).
+- **Tag do JUnit não tira `@QuarkusTest` do Docker**: o Quarkus sobe o Dev Services já ao descobrir a classe, antes
+  do filtro por tag. Por isso a separação é pelo nome (`*BancoTest`), excluído no surefire pelo profile `rapido`.
 - **Servidor falso nos ITs** roda na JVM do teste; o mapa devolvido por `start()` vira configuração do jar, que roda
   em outro processo.
 - **Cobertura de classe transformada no jar**: o Quarkus muda no build os beans `@ApplicationScoped` sem construtor

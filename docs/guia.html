@@ -450,7 +450,7 @@ public enum Situacao {
       repetem o mesmo cenário para cada modalidade, inclusive 8 pedidos simultâneos. Eles também contam na cobertura do
       Sonar.</li>
   </ul>
-<pre><code>mvn test -DexcludedGroups=banco   # rápidos, sem Docker
+<pre><code>mvn test -Prapido   # rápidos, sem Docker
 mvn verify                        # tudo (precisa de Docker)</code></pre>
 </section>
 

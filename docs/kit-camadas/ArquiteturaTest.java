@@ -13,6 +13,8 @@ import jakarta.data.repository.Repository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
 import jakarta.persistence.Entity;
+import io.quarkus.test.junit.QuarkusIntegrationTest;
+import io.quarkus.test.junit.QuarkusTest;
 import jakarta.ws.rs.Path;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 import org.junit.jupiter.api.Test;
@@ -74,9 +76,13 @@ class ArquiteturaTest {
             .importPackages(BASE);
 
     private static void verificar(ArchRule regra) {
+        verificar(regra, CLASSES);
+    }
+
+    private static void verificar(ArchRule regra, JavaClasses classes) {
         // Regras sobre papéis que o projeto pode ainda não ter (ex.: fila) não falham por falta de classe
         var ajustada = regra.allowEmptyShould(true);
-        (MIGRACAO ? FreezingArchRule.freeze(ajustada) : ajustada).check(CLASSES);
+        (MIGRACAO ? FreezingArchRule.freeze(ajustada) : ajustada).check(classes);
     }
 
     @Test
@@ -190,6 +196,17 @@ class ArquiteturaTest {
                     .and().doNotImplement(PONTO_DE_EXTENSAO)
                     .should().haveSimpleNameEndingWith("Service"));
         }
+    }
+
+
+    @Test
+    void testesPeloNome() {
+        // @QuarkusTest sobe o Oracle: o nome *BancoTest é o que o tira do mvn test -Prapido (o filtro por tag não
+        // serve, porque o Quarkus sobe o Dev Services já na descoberta). @QuarkusIntegrationTest roda no failsafe: *IT
+        var testes = new ClassFileImporter().withImportOption(ImportOption.Predefined.ONLY_INCLUDE_TESTS)
+                .importPackages(BASE);
+        verificar(classes().that().areAnnotatedWith(QuarkusTest.class).should().haveSimpleNameEndingWith("BancoTest"), testes);
+        verificar(classes().that().areAnnotatedWith(QuarkusIntegrationTest.class).should().haveSimpleNameEndingWith("IT"), testes);
     }
 
     @Test

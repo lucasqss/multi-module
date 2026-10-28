@@ -67,7 +67,7 @@ mvn verify verde a cada commit, resumo e pare.
 
 ```text
 Siga a Fase 5 do docs/kit-camadas/GUIA.md: testes puros para regras, estados, value objects e integrações;
-@QuarkusTest com @Tag("banco") para o motor e os repositories (o mesmo conjunto de @WithTestResource); cobertura
+@QuarkusTest com nome *BancoTest para o motor e os repositories (o mesmo conjunto de @WithTestResource); cobertura
 com as três fontes. Depois troque MIGRACAO para false no ArquiteturaTest e apague o archunit_store e o
 archunit.properties. Me mostre a cobertura por pacote, a partir do target/site/jacoco/jacoco.xml.
 mvn verify verde, commit "Migração camadas — fase 5: testes e cobertura", resumo e pare.

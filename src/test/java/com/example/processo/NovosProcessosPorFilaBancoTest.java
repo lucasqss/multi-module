@@ -11,7 +11,6 @@ import jakarta.enterprise.inject.Any;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.reactive.messaging.Message;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -29,11 +28,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * resposta, o que é confirmado (ack) e o que volta para reentrega (nack).
  */
 @QuarkusTest
-@Tag("banco") // sobe o Oracle (Dev Services): fica fora de mvn test -DexcludedGroups=banco
 @WithTestResource(FilaEmMemoria.class)
 @WithTestResource(CadastroFalso.class)
 @WithTestResource(SistemaDePdfFalso.class)
-class NovosProcessosPorFilaTest {
+class NovosProcessosPorFilaBancoTest {
 
     @Inject
     @Any

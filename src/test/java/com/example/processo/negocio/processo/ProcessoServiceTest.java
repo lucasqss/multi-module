@@ -15,13 +15,17 @@ import com.example.processo.modelo.Valor;
 import com.example.processo.persistencia.repositorio.ProcessoRepository;
 import io.quarkus.test.common.WithTestResource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.vertx.core.json.JsonObject;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -68,8 +72,8 @@ class ProcessoServiceTest {
                 new BigDecimal("50000.00"));
     }
 
-    static long pedidosDePdf(String numero) {
-        return SistemaDePdfFalso.PEDIDOS.stream().filter(p -> p.contains("\"referencia\":\"" + numero + "\"")).count();
+    static List<String> pedidosDePdf(String numero) {
+        return SistemaDePdfFalso.PEDIDOS.stream().filter(p -> p.contains("\"referencia\":\"" + numero + "\"")).toList();
     }
 
     @Test
@@ -82,8 +86,11 @@ class ProcessoServiceTest {
         var gravado = assertInstanceOf(ProcessoImobiliario.class, repositorio.buscar(imovel.getId()).orElseThrow());
         assertEquals(Situacao.ABERTO, gravado.getSituacao());
         assertEquals(imovel.getMatricula(), gravado.getMatricula());
-        assertEquals(1, pedidosDePdf(imovel.getNumero()));
-        assertEquals(1, pedidosDePdf(veiculo.getNumero()));
+        assertEquals(1, pedidosDePdf(imovel.getNumero()).size());
+        assertEquals(1, pedidosDePdf(veiculo.getNumero()).size());
+        // Só os atributos da modalidade: nada do que o enhancement do Hibernate acrescenta à entidade no build
+        Map<String, Object> campos = new JsonObject(pedidosDePdf(imovel.getNumero()).getFirst()).getJsonObject("campos").getMap();
+        assertEquals(Set.of("matricula", "tipoImovel", "valorAvaliacao", "uf"), campos.keySet());
     }
 
     @Test
@@ -97,7 +104,7 @@ class ProcessoServiceTest {
 
         assertEquals(primeiro.getId(), reentregue.getId());
         assertEquals(primeiro.getNumero(), reentregue.getNumero());
-        assertEquals(1, pedidosDePdf(primeiro.getNumero()), "não pede outro PDF");
+        assertEquals(1, pedidosDePdf(primeiro.getNumero()).size(), "não pede outro PDF");
     }
 
     @Test
@@ -106,7 +113,7 @@ class ProcessoServiceTest {
 
         assertThrows(RegraVioladaException.class, () -> motor.criar(imobiliario(" ", "52998224725", matricula()), chave));
 
-        assertEquals(Optional.empty(), repositorio.buscarChave(chave), "a mesma mensagem corrigida ainda pode criar");
+        assertEquals(Optional.empty(), repositorio.processoDaChave(chave), "a mesma mensagem corrigida ainda pode criar");
     }
 
     @Test
@@ -142,7 +149,7 @@ class ProcessoServiceTest {
 
         var processo = motor.criar(imobiliario(matricula));
 
-        assertEquals(1, pedidosDePdf(processo.getNumero()));
+        assertEquals(1, pedidosDePdf(processo.getNumero()).size());
         assertEquals(Situacao.ABERTO, repositorio.buscar(processo.getId()).orElseThrow().getSituacao());
     }
 

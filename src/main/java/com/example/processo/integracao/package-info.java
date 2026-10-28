@@ -5,8 +5,8 @@
  *
  * <ul>
  *   <li><b>Pode usar:</b> {@code modelo}.</li>
- *   <li><b>Não pode:</b> as outras camadas, nem um sistema usar o outro. O formato do sistema externo não sai do
- *       pacote dele.</li>
+ *   <li><b>Não pode:</b> as outras camadas, nem um sistema usar o outro, nem JPA. O formato do sistema externo não
+ *       sai do pacote dele.</li>
  * </ul>
  */
 package com.example.processo.integracao;

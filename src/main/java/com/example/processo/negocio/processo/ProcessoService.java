@@ -2,7 +2,6 @@ package com.example.processo.negocio.processo;
 
 import com.example.processo.integracao.cadastro.CadastroIntegracao;
 import com.example.processo.integracao.pdf.PdfIntegracao;
-import com.example.processo.modelo.ChaveIdempotencia;
 import com.example.processo.modelo.Processo;
 import com.example.processo.modelo.SistemaExternoIndisponivelException;
 import com.example.processo.modelo.Situacao;
@@ -71,7 +70,7 @@ public class ProcessoService {
     public <P extends Processo> P criar(P processo, String chave) {
         var modalidade = modalidadeDe(processo);
         if (chave != null) {
-            var existente = repositorio.buscarChave(chave).flatMap(c -> repositorio.buscar(c.getProcessoId()));
+            var existente = repositorio.processoDaChave(chave).flatMap(repositorio::buscar);
             if (existente.isPresent()) {
                 return modalidade.tipo().cast(existente.get());
             }
@@ -84,7 +83,7 @@ public class ProcessoService {
             processo.abrir(numero(modalidade), LocalDate.now(relogio));
             repositorio.inserir(processo);
             if (chave != null) {
-                repositorio.inserirChave(new ChaveIdempotencia(chave, processo.getId()));
+                repositorio.registrarChave(chave, processo.getId());
             }
         });
 

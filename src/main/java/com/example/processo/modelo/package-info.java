@@ -1,6 +1,6 @@
 /**
  * O modelo: o vocabulário que todas as camadas usam. Entidades JPA ({@code Processo} e uma filha por modalidade,
- * herança JOINED; {@code Agencia}), a máquina de estados ({@code Situacao}, padrão State), os value objects válidos por
+ * herança JOINED; {@code Agencia}; tabelas só técnicas ficam na persistência), a máquina de estados ({@code Situacao}, padrão State), os value objects válidos por
  * construção ({@code Cpf}, {@code Valor}) e as exceções que atravessam as camadas.
  *
  * <ul>

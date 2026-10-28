@@ -3,7 +3,6 @@ package com.example.processo.persistencia;
 import com.example.processo.CadastroFalso;
 import com.example.processo.FilaEmMemoria;
 import com.example.processo.SistemaDePdfFalso;
-import com.example.processo.modelo.ChaveIdempotencia;
 import com.example.processo.modelo.Cpf;
 import com.example.processo.modelo.ProcessoImobiliario;
 import com.example.processo.modelo.Situacao;
@@ -100,12 +99,14 @@ class ProcessoRepositoryTest {
         var processo = gravado(aleatorio(), "SP");
         var outro = gravado(aleatorio(), "SP");
 
-        QuarkusTransaction.requiringNew().run(() -> processos.inserirChave(new ChaveIdempotencia(chave, processo.getId())));
+        assertEquals(Optional.empty(), processos.processoDaChave(chave));
 
-        assertEquals(processo.getId(), processos.buscarChave(chave).orElseThrow().getProcessoId());
+        QuarkusTransaction.requiringNew().run(() -> processos.registrarChave(chave, processo.getId()));
+
+        assertEquals(Optional.of(processo.getId()), processos.processoDaChave(chave));
         assertThrows(RuntimeException.class, () -> QuarkusTransaction.requiringNew()
-                .run(() -> processos.inserirChave(new ChaveIdempotencia(chave, outro.getId()))));
-        assertEquals(processo.getId(), processos.buscarChave(chave).orElseThrow().getProcessoId());
+                .run(() -> processos.registrarChave(chave, outro.getId())));
+        assertEquals(Optional.of(processo.getId()), processos.processoDaChave(chave));
     }
 
     @Test

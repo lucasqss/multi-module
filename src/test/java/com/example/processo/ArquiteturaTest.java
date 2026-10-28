@@ -1,20 +1,33 @@
 package com.example.processo;
 
+import com.example.processo.negocio.processo.Modalidade;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.lang.ArchCondition;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
+import jakarta.data.repository.Repository;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Alternative;
+import jakarta.persistence.Entity;
+import jakarta.ws.rs.Path;
+import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 import org.junit.jupiter.api.Test;
 
 import static com.tngtech.archunit.base.DescribedPredicate.alwaysTrue;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 /**
- * As camadas e quem pode usar quem. Com um módulo só, o compilador não impede que uma camada use outra; estas regras
- * fazem esse papel e quebram o build (ADR 0014).
+ * As fitness functions da arquitetura: as camadas e quem pode usar quem, onde o JPA pode aparecer, onde fica a
+ * transação e os nomes pelo papel. Com um módulo só, o compilador não impede nada disso; estas regras fazem esse
+ * papel e quebram o build (ADR 0014).
  *
  * <pre>
  * apresentacao  →  negocio  →  integracao
@@ -96,6 +109,62 @@ class ArquiteturaTest {
     }
 
     @Test
+    void jpaSoNoModeloENaPersistencia() {
+        // A entidade é o modelo (ADR 0014), mas o mapeamento e o acesso ao banco não passam disso: negócio, integração
+        // e apresentação usam as entidades pelos getters e métodos de evento, sem API do JPA ou do Hibernate
+        noClasses().that().resideOutsideOfPackages(MODELO, PERSISTENCIA)
+                .should().dependOnClassesThat().resideInAnyPackage("jakarta.persistence..", "org.hibernate..")
+                .check(CLASSES);
+    }
+
+    @Test
+    void entidadesNoModeloOuNaPersistenciaERepositoriesNaPersistencia() {
+        // Entidade de negócio no modelo; tabela só técnica (ex.: ChaveIdempotencia) na persistência
+        classes().that().areAnnotatedWith(Entity.class).should().resideInAnyPackage(MODELO, PERSISTENCIA).check(CLASSES);
+        classes().that().areAnnotatedWith(Repository.class).should().resideInAPackage(PERSISTENCIA).check(CLASSES);
+    }
+
+    @Test
+    void apiNaoDevolveEntidade() {
+        // O contrato da API não muda quando o schema muda: resource devolve response ou projeção, nem List<Entidade>
+        methods().that().areDeclaredInClassesThat().areAnnotatedWith(Path.class)
+                .and().areDeclaredInClassesThat().areNotInterfaces().and().arePublic()
+                .should(naoDevolverEntidade())
+                .check(CLASSES);
+    }
+
+    @Test
+    void transacaoSoNoNegocio() {
+        // Quem decide o tamanho da transação é o negócio: QuarkusTransaction no motor, @Transactional nos cadastros
+        noClasses().that().resideOutsideOfPackage(NEGOCIO)
+                .should().dependOnClassesThat().resideInAnyPackage("jakarta.transaction..", "io.quarkus.narayana..")
+                .check(CLASSES);
+    }
+
+    @Test
+    void nomesPeloPapel() {
+        // @Path em classe é endpoint de entrada; em interface com @RegisterRestClient, cliente de sistema externo
+        classes().that().areAnnotatedWith(Path.class).and().areNotInterfaces()
+                .should().haveSimpleNameEndingWith("Resource").andShould().resideInAPackage(BASE + ".apresentacao.rest..")
+                .check(CLASSES);
+        classes().that().areAnnotatedWith(RegisterRestClient.class)
+                .should().haveSimpleNameEndingWith("Client").andShould().resideInAPackage(INTEGRACAO)
+                .check(CLASSES);
+        // O que o negócio chama em cada sistema externo; as simulações do dev (@Alternative) ficam de fora
+        classes().that().resideInAPackage(INTEGRACAO).and().areAnnotatedWith(ApplicationScoped.class)
+                .and().areNotAnnotatedWith(Alternative.class)
+                .should().haveSimpleNameEndingWith("Integracao")
+                .check(CLASSES);
+        classes().that().implement(Modalidade.class)
+                .should().haveSimpleNameStartingWith("Modalidade").andShould().resideInAPackage(NEGOCIO)
+                .check(CLASSES);
+        classes().that().resideInAPackage(NEGOCIO).and().areAnnotatedWith(ApplicationScoped.class)
+                .and().doNotImplement(Modalidade.class)
+                .should().haveSimpleNameEndingWith("Service")
+                .check(CLASSES);
+    }
+
+    @Test
     void sistemasExternosNaoSeEnxergam() {
         slices().matching(BASE + ".integracao.(*)..").should().notDependOnEachOther().check(CLASSES);
     }
@@ -109,5 +178,19 @@ class ArquiteturaTest {
     @Test
     void semCiclos() {
         slices().matching(BASE + ".(**)").should().beFreeOfCycles().check(CLASSES);
+    }
+
+    /** Olha o tipo de retorno inteiro, inclusive os genéricos ({@code List<Agencia>}, {@code Optional<Processo>}). */
+    private static ArchCondition<JavaMethod> naoDevolverEntidade() {
+        return new ArchCondition<>("não devolver entidade JPA") {
+            @Override
+            public void check(JavaMethod metodo, ConditionEvents eventos) {
+                metodo.getReturnType().getAllInvolvedRawTypes().stream()
+                        .filter(tipo -> tipo.isAnnotatedWith(Entity.class))
+                        .forEach(entidade -> eventos.add(SimpleConditionEvent.violated(metodo,
+                                metodo.getFullName() + " devolve a entidade " + entidade.getSimpleName()
+                                        + ": use um response ou uma projeção")));
+            }
+        };
     }
 }

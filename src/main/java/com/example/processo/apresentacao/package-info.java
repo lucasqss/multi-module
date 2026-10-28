@@ -6,7 +6,8 @@
  * <ul>
  *   <li><b>Pode usar:</b> {@code negocio} (para gravar e processar), {@code persistencia.consulta} (para ler, sem
  *       serviço no meio) e {@code modelo}.</li>
- *   <li><b>Não pode:</b> {@code persistencia.repositorio}, {@code integracao}, nem um canal usar o outro.</li>
+ *   <li><b>Não pode:</b> {@code persistencia.repositorio}, {@code integracao}, nem um canal usar o outro. Nada de
+ *       JPA nem de transação; a resposta nunca é uma entidade.</li>
  * </ul>
  *
  * Regras em {@code ArquiteturaTest}; decisão na ADR 0014.

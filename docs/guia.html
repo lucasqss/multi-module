@@ -439,15 +439,16 @@ public enum Situacao {
 <section id="qualidade">
   <h2>Como sabemos que está certo</h2>
   <ul>
-    <li><strong>As regras de arquitetura são testes.</strong> "A apresentação não grava direto no banco" e "uma
-      modalidade não usa a outra" estão escritos no <code>ArquiteturaTest</code>. Quem quebrar uma regra quebra o
-      build.</li>
+    <li><strong>As regras de arquitetura são testes.</strong> "A apresentação não grava direto no banco", "uma
+      modalidade não usa a outra", "o JPA não sai do modelo e da persistência" e "a API nunca devolve uma entidade"
+      estão escritos no <code>ArquiteturaTest</code>. Quem quebrar uma regra quebra o build.</li>
     <li><strong>As regras de negócio são testadas sem banco.</strong> Estados, CPF, valor e as regras de cada
       modalidade rodam em Java puro, em segundos.</li>
     <li><strong>O motor e o banco são testados juntos.</strong> Com um Oracle de verdade, que o Quarkus sobe sozinho
       no Docker.</li>
     <li><strong>O sistema é testado de ponta a ponta.</strong> Os testes de integração sobem o programa pronto e
-      repetem o mesmo cenário para cada modalidade, inclusive 8 pedidos simultâneos.</li>
+      repetem o mesmo cenário para cada modalidade, inclusive 8 pedidos simultâneos. Eles também contam na cobertura do
+      Sonar.</li>
   </ul>
 <pre><code>mvn test -DexcludedGroups=banco   # rápidos, sem Docker
 mvn verify                        # tudo (precisa de Docker)</code></pre>
@@ -488,7 +489,6 @@ mvn verify                        # tudo (precisa de Docker)</code></pre>
       <tr><td>Corrida na regra da matrícula</td><td>Duas criações simultâneas passam juntas.</td><td>Lock, tabela de controle com chave única ou situação copiada para a filha.</td></tr>
       <tr><td>Sem histórico de transições</td><td>Não se sabe quem mudou o quê e quando.</td><td>Tabela de transições gravada junto do compare-and-set.</td></tr>
       <tr><td>PDF sem retentativa</td><td>Chamada síncrona depois do commit (timeout de 2 s); falha só vai para o log.</td><td>Outbox: tabela de pendências gravada na transação e reenviada por um job.</td></tr>
-      <tr><td>REST com 0% no Sonar</td><td>Só os ITs exercitam os resources, e eles rodam o jar em outro processo, sem cobertura.</td><td><code>@QuarkusTest</code> com RestAssured nos resources, se o gate exigir.</td></tr>
       <tr><td>Lacunas de numeração</td><td>Falha na gravação deixa número sem uso.</td><td>Aceitar, ou trocar a sequence por um contador travado na transação, se precisar ser contínua.</td></tr>
     </tbody>
   </table></div>

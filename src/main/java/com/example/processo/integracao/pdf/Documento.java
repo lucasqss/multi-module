@@ -1,9 +1,8 @@
 package com.example.processo.integracao.pdf;
 
 import com.example.processo.modelo.Processo;
-import jakarta.persistence.Column;
-
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
@@ -25,18 +24,28 @@ public record Documento(String modelo, String referencia, String segmento, Strin
     }
 
     /**
-     * Um campo por coluna da tabela da modalidade (os atributos com {@code @Column} da subclasse), na ordem declarada;
-     * enum vai pelo nome. Modalidade nova entra no PDF sem mudar esta classe.
+     * Um campo por atributo da modalidade (os declarados na subclasse de {@link Processo}), na ordem declarada; enum vai
+     * pelo nome. Modalidade nova entra no PDF sem mudar esta classe.
      */
     private static Map<String, Object> campos(Processo processo) {
         var campos = new LinkedHashMap<String, Object>();
         for (Field campo : processo.getClass().getDeclaredFields()) {
-            if (campo.isAnnotationPresent(Column.class)) {
+            if (daModalidade(campo)) {
                 Object valor = ler(campo, processo);
                 campos.put(campo.getName(), valor instanceof Enum<?> e ? e.name() : valor);
             }
         }
         return campos;
+    }
+
+    /**
+     * Fora ficam constantes ({@code SEGMENTO}) e o que o enhancement do Hibernate acrescenta à classe em tempo de build
+     * ({@code $$_hibernate_...}, sintéticos ou transientes).
+     */
+    private static boolean daModalidade(Field campo) {
+        int modificadores = campo.getModifiers();
+        return !Modifier.isStatic(modificadores) && !Modifier.isTransient(modificadores) && !campo.isSynthetic()
+                && !campo.getName().startsWith("$$");
     }
 
     private static Object ler(Field campo, Processo processo) {

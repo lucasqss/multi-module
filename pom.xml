@@ -93,6 +93,13 @@
             <artifactId>quarkus-junit</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Cobertura dos @QuarkusTest: instrumenta as classes antes das transformações do Quarkus (o agente comum não
+             reconhece classe transformada, como bean sem construtor vazio e entidade com enhancement) -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jacoco</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- Troca os canais da fila por memória no teste do consumidor, sem broker -->
         <dependency>
             <groupId>io.smallrye.reactive</groupId>
@@ -171,11 +178,15 @@
                 <configuration>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                        <!-- O jar que os ITs sobem roda com o agente do JaCoCo: a API (resources, consumidor) entra na
+                             cobertura sem teste duplicado -->
+                        <quarkus.test.arg-line>${jacoco.agent.it}</quarkus.test.arg-line>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
-            <!-- Cobertura dos testes unitários e @QuarkusTest em target/site/jacoco (jacoco.xml para o Sonar, index.html
-                 para pessoas). Os *IT ficam de fora: rodam contra o jar em outro processo, sem agente. -->
+            <!-- Cobertura em target/site/jacoco (jacoco.xml para o Sonar, index.html para pessoas), unindo em
+                 target/jacoco-merged.exec os testes puros (jacoco.exec), os @QuarkusTest (jacoco-quarkus.exec, do
+                 quarkus-jacoco) e os ITs (jacoco-it.exec, do agente no jar) -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
@@ -186,6 +197,40 @@
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
+                        <configuration>
+                            <!-- O que roda no Quarkus dos @QuarkusTest fica com o quarkus-jacoco -->
+                            <exclClassLoaders>*QuarkusClassLoader</exclClassLoaders>
+                        </configuration>
+                    </execution>
+                    <!-- Só preenche a propriedade jacoco.agent.it com o -javaagent; quem a usa é o failsafe -->
+                    <execution>
+                        <id>prepare-agent-integration</id>
+                        <goals>
+                            <goal>prepare-agent-integration</goal>
+                        </goals>
+                        <configuration>
+                            <propertyName>jacoco.agent.it</propertyName>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>merge</id>
+                        <phase>post-integration-test</phase>
+                        <goals>
+                            <goal>merge</goal>
+                        </goals>
+                        <configuration>
+                            <fileSets>
+                                <fileSet>
+                                    <directory>${project.build.directory}</directory>
+                                    <includes>
+                                        <include>jacoco.exec</include>
+                                        <include>jacoco-quarkus.exec</include>
+                                        <include>jacoco-it.exec</include>
+                                    </includes>
+                                </fileSet>
+                            </fileSets>
+                            <destFile>${project.build.directory}/jacoco-merged.exec</destFile>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>report</id>
@@ -194,6 +239,7 @@
                             <goal>report</goal>
                         </goals>
                         <configuration>
+                            <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
                             <!-- Metamodel e repositories gerados pelo Hibernate Processor (Processo_, ProcessoRepository_) -->
                             <excludes>
                                 <exclude>**/*_.class</exclude>

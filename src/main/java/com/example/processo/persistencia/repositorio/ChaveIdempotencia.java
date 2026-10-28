@@ -1,4 +1,4 @@
-package com.example.processo.modelo;
+package com.example.processo.persistencia.repositorio;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -7,10 +7,13 @@ import jakarta.persistence.Table;
 
 import java.util.UUID;
 
-/** Liga a chave de idempotência de quem pediu a criação (ex.: id da mensagem) ao processo criado. */
+/**
+ * Liga a chave de idempotência de quem pediu a criação (ex.: id da mensagem) ao processo criado. Tabela técnica, não
+ * vocabulário do negócio: só o {@link ProcessoRepository} a conhece.
+ */
 @Entity
 @Table(name = "PROCESSO_IDEMPOTENCIA")
-public class ChaveIdempotencia {
+class ChaveIdempotencia {
 
     @Id
     @Column(length = 100)
@@ -22,11 +25,11 @@ public class ChaveIdempotencia {
     protected ChaveIdempotencia() {
     }
 
-    public ChaveIdempotencia(String chave, UUID processoId) {
+    ChaveIdempotencia(String chave, UUID processoId) {
         this.chave = chave;
         this.processoId = processoId;
     }
 
-    public String getChave() { return chave; }
-    public UUID getProcessoId() { return processoId; }
+    String getChave() { return chave; }
+    UUID getProcessoId() { return processoId; }
 }

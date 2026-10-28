@@ -1,6 +1,5 @@
 package com.example.processo.persistencia.repositorio;
 
-import com.example.processo.modelo.ChaveIdempotencia;
 import com.example.processo.modelo.Processo;
 import com.example.processo.modelo.Situacao;
 import jakarta.data.repository.Find;
@@ -47,7 +46,16 @@ public interface ProcessoRepository {
     @Find
     Optional<ChaveIdempotencia> buscarChave(String chave);
 
-    /** Falha se a chave já existir (PK): duas criações simultâneas com a mesma chave não passam as duas. */
     @Insert
     void inserirChave(ChaveIdempotencia chave);
+
+    /** O processo já criado com esta chave de idempotência, se houver. */
+    default Optional<UUID> processoDaChave(String chave) {
+        return buscarChave(chave).map(ChaveIdempotencia::getProcessoId);
+    }
+
+    /** Falha se a chave já existir (PK): duas criações simultâneas com a mesma chave não passam as duas. */
+    default void registrarChave(String chave, UUID processoId) {
+        inserirChave(new ChaveIdempotencia(chave, processoId));
+    }
 }

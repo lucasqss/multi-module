@@ -42,9 +42,14 @@ Pacote raiz `com.example.processo`:
 | Modalidades não se enxergam; o motor não conhece modalidades | `ArquiteturaTest.modalidadesNaoSeEnxergam` |
 | Sistemas externos não se enxergam; canais de entrada não se enxergam | `ArquiteturaTest` |
 | HTTP só na apresentação e na integração; o modelo não conhece framework além do JPA | `ArquiteturaTest` |
+| JPA e Hibernate só em `modelo` e `persistencia`; `@Entity` só nelas; `@Repository` só na persistência | `ArquiteturaTest.jpaSoNoModeloENaPersistencia`, `entidadesNoModelo…` |
+| A API não devolve entidade, nem dentro de `List`/`Optional` | `ArquiteturaTest.apiNaoDevolveEntidade` |
+| Transação (`@Transactional`, `QuarkusTransaction`) só no negócio | `ArquiteturaTest.transacaoSoNoNegocio` |
+| Nomes pelo papel: `*Resource`, `*Client`, `*Integracao`, `Modalidade*`, `*Service` | `ArquiteturaTest.nomesPeloPapel` |
 | A máquina de estados aceita só as transições da tabela | `SituacaoTest` |
 | O mesmo ciclo de vida para toda modalidade, inclusive concorrência | `CicloDeVidaPorTipoIT` |
 | Gravação polimórfica, compare-and-set e chave de idempotência funcionam no Oracle | `ProcessoRepositoryTest` |
+| O PDF leva só os atributos da modalidade, mesmo com o enhancement do Hibernate | `ProcessoServiceTest` |
 | Interface só com mais de uma implementação real (`Modalidade`, clientes HTTP) | revisão; [ADR 0014](docs/adr/0014-camadas-num-modulo-so.md) |
 
 ## Onde coloco…?
@@ -183,6 +188,8 @@ Siga `apresentacao/mensageria` ([ADR 0011](docs/adr/0011-entradas-por-canal-em-a
 - Interface com uma única implementação: use a classe.
 - Regra de negócio em resource, consumidor ou DTO: eles só traduzem.
 - Gravar pela apresentação (resource → repository): grave pelo negócio.
+- API do JPA ou do Hibernate fora de `modelo` e `persistencia`: as outras camadas usam a entidade pelos getters e métodos de evento.
+- Tabela só técnica (ex.: `ChaveIdempotencia`) no `modelo`: ela fica na persistência, escondida atrás do repository.
 - Entidade na resposta da API: use um response.
 - Transação em volta do motor, ou chamada a sistema externo dentro de transação.
 - Tipos do modelo no formato de um sistema externo (`integracao/<sistema>`).
@@ -240,6 +247,10 @@ Todo `@QuarkusTest` leva `@Tag("banco")`: é o que o deixa fora do comando rápi
   existente (`FilaEmMemoria`, `CadastroFalso`, `SistemaDePdfFalso`).
 - **Servidor falso nos ITs** roda na JVM do teste; o mapa devolvido por `start()` vira configuração do jar, que roda
   em outro processo.
+- **Cobertura de classe transformada no jar**: o Quarkus muda no build os beans `@ApplicationScoped` sem construtor
+  vazio e as entidades (enhancement). O que só os ITs exercitam nessas classes não entra na cobertura (o JaCoCo avisa
+  "do not match"). Se o gate cobrar, cubra com `@QuarkusTest`: lá o `quarkus-jacoco` instrumenta antes da
+  transformação.
 - **ArchUnit** roda com a API core (`check`) dentro de `@Test` comum: o engine `archunit-junit5` não roda sob o JUnit 6
   do BOM.
 
@@ -257,6 +268,8 @@ Todo `@QuarkusTest` leva `@Tag("banco")`: é o que o deixa fora do comando rápi
   - Tudo está nas migrations de `src/main/resources/db/migration`.
 - **Sonar e cobertura:**
   - O CI roda `mvn clean verify` e depois o `sonar-maven-plugin` com `-DskipTests`.
-  - A cobertura vem de `target/site/jacoco/jacoco.xml` (testes unitários e `@QuarkusTest`). Os ITs contam como
-    testes, mas não como cobertura, porque rodam o jar em outro processo.
+  - A cobertura vem de `target/site/jacoco/jacoco.xml`. Ele une três fontes em `target/jacoco-merged.exec`:
+    - os testes puros, pelo agente do JaCoCo: `jacoco.exec`;
+    - os `@QuarkusTest`, pelo `quarkus-jacoco`: `jacoco-quarkus.exec`;
+    - os ITs, pelo agente no jar via `quarkus.test.arg-line` no failsafe: `jacoco-it.exec`.
   - `sonar.java.source` no POM é obrigatório: sem ele, o scanner 3.6 não entende records.

@@ -1,6 +1,6 @@
 # 0002. Motor único com SPI `Segmento`
 
-- **Status:** Aceita
+- **Status:** Aceita (o `Segmento` virou `Modalidade` na [0014](0014-camadas-num-modulo-so.md))
 - **Data:** 2026-10-19
 
 ## Contexto

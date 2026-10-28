@@ -1,6 +1,6 @@
 # 0003. Herança JOINED no banco, genéricos no domínio
 
-- **Status:** Aceita
+- **Status:** Substituída por [0014](0014-camadas-num-modulo-so.md) (a herança JOINED continua; os genéricos saíram)
 - **Data:** 2026-10-19
 
 ## Contexto

@@ -176,9 +176,9 @@
   <ol>
     <li><a href="#visao">Em um minuto</a></li>
     <li><a href="#comece">Comece por aqui</a></li>
-    <li><a href="#modulos">Os módulos</a></li>
+    <li><a href="#camadas">As camadas</a></li>
     <li><a href="#vida">A vida de um processo</a></li>
-    <li><a href="#motor">Motor, segmentos e estados</a></li>
+    <li><a href="#motor">Motor, modalidades e estados</a></li>
     <li><a href="#externos">Sistemas externos</a></li>
     <li><a href="#crud">Quando é só cadastro</a></li>
     <li><a href="#qualidade">Como sabemos que está certo</a></li>
@@ -196,26 +196,26 @@
     <span class="chip">Java 25</span>
     <span class="chip">Quarkus 3.33</span>
     <span class="chip">Oracle</span>
-    <span class="chip">Maven multi-module</span>
+    <span class="chip">Camadas num módulo só</span>
   </div>
 </header>
 
 <!-- 1 -->
 <section id="visao">
   <h2>Em um minuto</h2>
-  <p>O sistema cuida de <strong>processos</strong>: pedidos que nascem abertos e terminam concluídos, recusados ou
-    cancelados. Há dois tipos de processo, <strong>imobiliário</strong> e <strong>veicular</strong>, e os dois andam
-    pelo <strong>mesmo motor</strong>. O que muda de um tipo para outro fica num pedaço separado, o
-    <strong>segmento</strong>.</p>
+  <p>O sistema cuida de <strong>processos</strong> de crédito de consórcio: pedidos que nascem abertos e terminam
+    concluídos, recusados ou cancelados. Há duas <strong>modalidades</strong>, <strong>imobiliária</strong> e
+    <strong>veicular</strong>, e as duas andam pelo <strong>mesmo motor</strong>. O que muda de uma modalidade para
+    outra fica num pedaço separado.</p>
   <div class="grid2">
-    <div class="card"><h4>Um motor para todos</h4><p>Criar, processar e cancelar funcionam igual para qualquer tipo. O
-      veicular entrou sem mudar o motor.</p></div>
-    <div class="card"><h4>Tipos como peças</h4><p>Cada tipo traz só o que é dele: seus dados, suas regras e a decisão
-      de aprovar ou recusar.</p></div>
-    <div class="card"><h4>Escrever e ler separados</h4><p>Um módulo grava (<code>processo-core</code>), outro só
-      consulta (<code>processo-query</code>).</p></div>
-    <div class="card"><h4>Bordas trocáveis</h4><p>Pedidos chegam por API ou fila; sistemas de fora (cadastro, PDF)
-      ficam atrás de interfaces.</p></div>
+    <div class="card"><h4>Quatro camadas</h4><p>Apresentação, negócio, integração e persistência, cada uma numa pasta.
+      Todas usam o mesmo modelo.</p></div>
+    <div class="card"><h4>Um motor para todos</h4><p>Criar, processar e cancelar funcionam igual para qualquer
+      modalidade. A veicular entrou sem mudar o motor.</p></div>
+    <div class="card"><h4>Modalidades como peças</h4><p>Cada modalidade traz só o que é dela: a tabela, as regras e a
+      decisão de aprovar ou recusar.</p></div>
+    <div class="card"><h4>Gravar e ler por caminhos diferentes</h4><p>Gravar passa pelo negócio e pelas regras; as
+      telas leem direto do banco, no formato delas.</p></div>
     <div class="card"><h4>CRUD sem cerimônia</h4><p>O que é só cadastro (agências) segue um caminho bem mais curto,
       sem motor.</p></div>
     <div class="card"><h4>Regras viram teste</h4><p>Quem pode usar quem está escrito em testes: quebrou a regra,
@@ -237,91 +237,82 @@
   </table></div>
   <p>Para conhecer o código, leia nesta ordem (uns 30 minutos):</p>
   <ol class="steps">
-    <li><strong><code>MotorDeProcessamento</code></strong>: o fluxo inteiro de criar, processar e cancelar.</li>
-    <li><strong><code>Situacao</code></strong>: os estados do processo e as mudanças permitidas.</li>
-    <li><strong><code>SegmentoVeicular</code></strong> e <strong><code>RegrasVeiculares</code></strong>: um tipo de
-      processo completo, em poucas linhas.</li>
+    <li><strong><code>ProcessoService</code></strong>: o motor, com o fluxo inteiro de criar, processar e cancelar.</li>
+    <li><strong><code>Processo</code></strong> e <strong><code>Situacao</code></strong>: o processo e os estados, com as
+      mudanças permitidas.</li>
+    <li><strong><code>ModalidadeVeicular</code></strong> e <strong><code>RegrasVeiculares</code></strong>: uma
+      modalidade completa, em poucas linhas.</li>
     <li><strong><code>Cpf</code></strong> e <strong><code>Valor</code></strong>: dados que já nascem validados.</li>
     <li><strong><code>ProcessoVeicularResource</code></strong>: a API só traduz o pedido e chama o motor.</li>
     <li><strong><code>NovosProcessosImobiliarios</code></strong>: a mesma criação, chegando por fila.</li>
-    <li><strong><code>Agencias</code></strong>: um CRUD simples, para comparar.</li>
-    <li><strong><code>ArquiteturaModulosTest</code></strong> e <strong><code>CicloDeVidaPorTipoIT</code></strong>: as
-      regras escritas como teste.</li>
+    <li><strong><code>AgenciaService</code></strong>: um CRUD simples, para comparar.</li>
+    <li><strong><code>ArquiteturaTest</code></strong> e <strong><code>CicloDeVidaPorTipoIT</code></strong>: as regras
+      escritas como teste.</li>
   </ol>
-  <p>Cada pasta principal também tem um <code>package-info.java</code> que diz para que ela serve.</p>
+  <p>Cada camada também tem um <code>package-info.java</code> que diz para que ela serve.</p>
 </section>
 
 <!-- 3 -->
-<section id="modulos">
-  <h2>Os módulos</h2>
-  <p>O projeto é dividido em módulos Maven (partes que compilam separadas) e gera um único programa. A seta mostra quem
-    usa quem.</p>
-  <p><strong>Por que um programa só, e não vários serviços?</strong> Com até 1.000 usuários por dia em horário comercial,
-    um programa dá conta com folga, e o pagamento e a situação do processo mudam juntos numa única transação. E o modelo
-    ainda muda a cada modalidade nova: dentro de um programa só, mudar uma fronteira é refatorar, não renegociar
-    contratos entre serviços. A
-    justificativa completa, com os prós e contras, está na <a href="adr/0013-monolito-modular-para-o-consorcio.md">ADR
-    0013</a>.</p>
+<section id="camadas">
+  <h2>As camadas</h2>
+  <p>O projeto é um módulo só, dividido em pastas por responsabilidade. Cada camada só pode usar as que estão abaixo
+    dela. A seta mostra quem usa quem.</p>
   <figure>
-    <svg viewBox="0 0 760 360" role="img" aria-labelledby="diag-title">
-      <title id="diag-title">Dependências entre os módulos Maven</title>
+    <svg viewBox="0 0 720 420" role="img" aria-labelledby="diag-title">
+      <title id="diag-title">As camadas e quem usa quem</title>
       <defs>
         <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" class="svg-head"/>
         </marker>
       </defs>
 
-      <!-- setas do app -->
-      <path class="svg-arrow" d="M380,84 L120,148" marker-end="url(#seta)"/>
-      <path class="svg-arrow" d="M380,84 L380,148" marker-end="url(#seta)"/>
-      <path class="svg-arrow" d="M380,84 L640,148" marker-end="url(#seta)"/>
-      <!-- integracoes depende do core (implementa os ports) -->
-      <path class="svg-arrow" d="M200,182 L298,182" marker-end="url(#seta)"/>
-      <!-- core e query dependem do jpa-core -->
-      <path class="svg-arrow" d="M420,214 L470,278" marker-end="url(#seta)"/>
-      <path class="svg-arrow" d="M600,214 L550,278" marker-end="url(#seta)"/>
-      <!-- separação CQRS -->
-      <line class="svg-sep" x1="510" y1="158" x2="510" y2="222"/>
-      <text class="svg-sep-text" x="510" y="238" text-anchor="middle">não se</text>
-      <text class="svg-sep-text" x="510" y="252" text-anchor="middle">enxergam</text>
+      <!-- apresentação → negócio (grava) e → persistência (lê) -->
+      <path class="svg-arrow" d="M300,84 L240,146" marker-end="url(#seta)"/>
+      <text class="svg-text" x="236" y="118" text-anchor="end">grava</text>
+      <path class="svg-arrow" d="M420,84 L520,266" marker-end="url(#seta)"/>
+      <text class="svg-text" x="486" y="160">lê</text>
+      <!-- negócio → integração e → persistência -->
+      <path class="svg-arrow" d="M180,210 L160,266" marker-end="url(#seta)"/>
+      <path class="svg-arrow" d="M290,210 L440,266" marker-end="url(#seta)"/>
 
-      <rect class="svg-box-strong" x="300" y="20" width="160" height="64" rx="8"/>
-      <text class="svg-title" x="380" y="47" text-anchor="middle">processo-app</text>
-      <text class="svg-text" x="380" y="66" text-anchor="middle">REST · montagem · ITs</text>
+      <rect class="svg-box-strong" x="210" y="20" width="300" height="64" rx="8"/>
+      <text class="svg-title" x="360" y="47" text-anchor="middle">apresentacao</text>
+      <text class="svg-text" x="360" y="66" text-anchor="middle">API (rest) · fila (mensageria)</text>
 
-      <rect class="svg-box" x="40" y="150" width="160" height="64" rx="8"/>
-      <text class="svg-title" x="120" y="177" text-anchor="middle">integracoes</text>
-      <text class="svg-text" x="120" y="196" text-anchor="middle">cadastro · pdf</text>
+      <rect class="svg-box-strong" x="90" y="146" width="260" height="64" rx="8"/>
+      <text class="svg-title" x="220" y="173" text-anchor="middle">negocio</text>
+      <text class="svg-text" x="220" y="192" text-anchor="middle">motor · modalidades · agência</text>
 
-      <rect class="svg-box-strong" x="300" y="150" width="160" height="64" rx="8"/>
-      <text class="svg-title" x="380" y="177" text-anchor="middle">processo-core</text>
-      <text class="svg-text" x="380" y="196" text-anchor="middle">motor + segmentos</text>
+      <rect class="svg-box" x="40" y="268" width="250" height="64" rx="8"/>
+      <text class="svg-title" x="165" y="295" text-anchor="middle">integracao</text>
+      <text class="svg-text" x="165" y="314" text-anchor="middle">cadastro · pdf</text>
 
-      <rect class="svg-box" x="560" y="150" width="160" height="64" rx="8"/>
-      <text class="svg-title" x="640" y="177" text-anchor="middle">processo-query</text>
-      <text class="svg-text" x="640" y="196" text-anchor="middle">projeções de leitura</text>
+      <rect class="svg-box" x="390" y="268" width="290" height="64" rx="8"/>
+      <text class="svg-title" x="535" y="295" text-anchor="middle">persistencia</text>
+      <text class="svg-text" x="535" y="314" text-anchor="middle">repositorio (grava) · consulta (lê)</text>
 
-      <rect class="svg-box" x="430" y="280" width="160" height="64" rx="8"/>
-      <text class="svg-title" x="510" y="307" text-anchor="middle">jpa-core</text>
-      <text class="svg-text" x="510" y="326" text-anchor="middle">@Entity + Flyway</text>
+      <rect class="svg-box" x="40" y="356" width="640" height="48" rx="8"/>
+      <text class="svg-title" x="360" y="378" text-anchor="middle">modelo</text>
+      <text class="svg-text" x="360" y="396" text-anchor="middle">entidades · Situacao · Cpf · Valor: usado por todas as camadas</text>
     </svg>
-    <figcaption>A seta sai de quem depende. O app também depende do <code>jpa-core</code> direto, só para a cobertura
-      agregada.</figcaption>
+    <figcaption>Gravar passa sempre pelo negócio (regras e transação). Ler para uma tela vai direto às consultas, sem
+      um serviço que só repassaria.</figcaption>
   </figure>
   <div class="table-wrap"><table>
-    <thead><tr><th>Módulo</th><th>O que tem</th><th>O que não pode</th></tr></thead>
+    <thead><tr><th>Camada</th><th>O que tem</th><th>O que não pode</th></tr></thead>
     <tbody>
-      <tr><td><code>jpa-core</code></td><td>As tabelas do banco (entidades e scripts de criação).</td><td>Ter regra de negócio.</td></tr>
-      <tr><td><code>processo-core</code></td><td>Todas as regras: o motor, os segmentos e os cadastros.</td><td>Saber que existe HTTP ou fila.</td></tr>
-      <tr><td><code>processo-query</code></td><td>As consultas (só leitura).</td><td>Usar as regras do core.</td></tr>
-      <tr><td><code>integracoes</code></td><td>A conversa com sistemas de fora: cadastro e PDF.</td><td>Ser chamado direto; só por interface.</td></tr>
-      <tr><td><code>processo-app</code></td><td>Por onde os pedidos chegam (API e fila) e a montagem do programa.</td><td>Ter regra de negócio.</td></tr>
+      <tr><td><code>apresentacao</code></td><td>Por onde os pedidos chegam: a API e a fila. Traduz o pedido e a resposta.</td><td>Ter regra de negócio ou gravar direto no banco.</td></tr>
+      <tr><td><code>negocio</code></td><td>A lógica do sistema: o motor, uma pasta por modalidade e o cadastro de agências.</td><td>Saber que existe HTTP ou fila.</td></tr>
+      <tr><td><code>integracao</code></td><td>A conversa com sistemas de fora: cadastro e PDF.</td><td>Deixar o formato do sistema de fora vazar.</td></tr>
+      <tr><td><code>persistencia</code></td><td>A conversa com o banco: gravar e ler entidades, e as consultas das telas.</td><td>Ter regra de negócio.</td></tr>
+      <tr><td><code>modelo</code></td><td>O vocabulário comum: as entidades (tabelas), os estados e os dados validados.</td><td>Usar qualquer camada.</td></tr>
     </tbody>
   </table></div>
-  <p>Dentro do motor e de cada segmento, as pastas seguem sempre o mesmo padrão:</p>
-<pre><code>domain/        as regras, em Java puro (sem framework)
-application/   o motor, os segmentos e as interfaces do que vem de fora
-adapter/       a parte técnica: banco, transação</code></pre>
+  <p><strong>Por que um programa só, e não vários serviços?</strong> Com até 1.000 usuários por dia em horário comercial,
+    um programa dá conta com folga, e o pagamento e a situação do processo mudam juntos numa única transação. E o modelo
+    ainda muda a cada modalidade nova: dentro de um programa só, mudar uma fronteira é refatorar. Os prós e contras
+    estão na <a href="adr/0013-monolito-modular-para-o-consorcio.md">ADR 0013</a>; o porquê das camadas, na
+    <a href="adr/0014-camadas-num-modulo-so.md">ADR 0014</a>.</p>
 </section>
 
 <!-- 4 -->
@@ -336,9 +327,10 @@ CANCELADO                       RECUSADO (com o motivo)</code></pre>
 
   <h3>Criar</h3>
   <ol class="steps">
-    <li><strong>O pedido chega</strong> pela API (<code>POST /processos/imobiliarios</code>) ou pela fila.</li>
-    <li><strong>As regras conferem</strong>: primeiro as que valem para todos (nome, CPF, valor), depois as do tipo
-      (ex.: a avaliação do imóvel) e, por último, o sistema de cadastro, para não chamá-lo à toa.</li>
+    <li><strong>O pedido chega</strong> pela API (<code>POST /processos/imobiliarios</code>) ou pela fila e vira um
+      processo ainda sem número.</li>
+    <li><strong>As regras conferem</strong>: primeiro as que valem para todos (nome, CPF, valor), depois as da
+      modalidade (ex.: a avaliação do imóvel) e, por último, o sistema de cadastro, para não chamá-lo à toa.</li>
     <li><strong>O processo é gravado</strong> com um número (<code>IMO-2026-000042</code>) e fica
       <code>ABERTO</code>.</li>
     <li><strong>O PDF de abertura é pedido</strong>. Se o sistema de PDF falhar, o processo continua criado.</li>
@@ -348,8 +340,8 @@ CANCELADO                       RECUSADO (com o motivo)</code></pre>
   <ol class="steps">
     <li><strong>O processo vai para <code>EM_PROCESSAMENTO</code></strong>. Se duas pessoas pedirem ao mesmo tempo, só
       uma consegue; a outra recebe um aviso de conflito.</li>
-    <li><strong>O segmento decide</strong>: o imobiliário recusa acima de R$ 1.000.000; o veicular recusa veículo com
-      mais de 10 anos.</li>
+    <li><strong>A modalidade decide</strong>: a imobiliária recusa acima de R$ 1.000.000; a veicular recusa veículo
+      com mais de 10 anos.</li>
     <li><strong>O processo termina</strong> <code>CONCLUIDO</code> ou <code>RECUSADO</code>, com o motivo.</li>
   </ol>
   <p>Cancelar só vale enquanto o processo está <code>ABERTO</code>.</p>
@@ -377,23 +369,27 @@ CANCELADO                       RECUSADO (com o motivo)</code></pre>
 
 <!-- 5 -->
 <section id="motor">
-  <h2>Motor, segmentos e estados</h2>
-  <p>O motor faz tudo o que é igual para todos os tipos. O segmento só preenche o que é dele:</p>
+  <h2>Motor, modalidades e estados</h2>
+  <p>O motor (<code>ProcessoService</code>) faz tudo o que é igual para todas as modalidades. A modalidade só preenche
+    o que é dela:</p>
   <div class="table-wrap"><table>
-    <thead><tr><th>O motor faz (igual para todos)</th><th>O segmento faz (cada um o seu)</th></tr></thead>
+    <thead><tr><th>O motor faz (igual para todas)</th><th>A modalidade faz (cada uma a sua)</th></tr></thead>
     <tbody>
-      <tr><td>A ordem dos passos de criar, processar e cancelar</td><td>Os dados próprios (imóvel, veículo)</td></tr>
+      <tr><td>A ordem dos passos de criar, processar e cancelar</td><td>Os dados próprios (imóvel, veículo), na entidade dela</td></tr>
       <tr><td>As regras comuns e a consulta ao cadastro</td><td>As regras próprias</td></tr>
-      <tr><td>O número do processo e a gravação</td><td>A decisão de aprovar ou recusar</td></tr>
+      <tr><td>O número do processo e a gravação</td><td>O prefixo do número e a decisão de aprovar ou recusar</td></tr>
       <tr><td>Os estados e as mudanças permitidas</td><td>A tabela própria no banco</td></tr>
     </tbody>
   </table></div>
-  <p>Um segmento novo estende <code>SegmentoBase</code> e escreve só duas coisas, as regras e a decisão:</p>
+  <p>Uma modalidade nova é uma entidade filha de <code>Processo</code> e uma classe que implementa
+    <code>Modalidade</code>, com as regras e a decisão:</p>
 <pre><code>// resumido
-@Singleton
-public class SegmentoVeicular extends SegmentoBase&lt;DadosVeiculares&gt; {
-    public Especificacao&lt;Solicitacao&lt;DadosVeiculares&gt;&gt; regras() { return RegrasVeiculares.TODAS; }
-    public Avaliacao avaliar(Processo&lt;DadosVeiculares&gt; processo) { /* aprova ou recusa */ }
+@ApplicationScoped
+public class ModalidadeVeicular implements Modalidade&lt;ProcessoVeicular&gt; {
+    public Class&lt;ProcessoVeicular&gt; tipo() { return ProcessoVeicular.class; }
+    public String prefixo() { return "VEI"; }
+    public Especificacao&lt;ProcessoVeicular&gt; regras() { return RegrasVeiculares.TODAS; }
+    public Avaliacao avaliar(ProcessoVeicular processo) { /* aprova ou recusa */ }
 }</code></pre>
   <p>Os estados ficam num enum. Cada estado diz para onde pode ir; qualquer outra mudança é recusada com
     <code>422</code>:</p>
@@ -403,15 +399,17 @@ public enum Situacao {
     EM_PROCESSAMENTO { concluir() → CONCLUIDO; recusar() → RECUSADO },
     CONCLUIDO, RECUSADO, CANCELADO;   // finais: não vão para lugar nenhum
 }</code></pre>
-  <div class="warn"><strong>Quando um tipo não cabe no motor</strong>Se um tipo precisar de estados ou passos que os
-    outros não têm, ele ganha um fluxo próprio. Encher o motor de exceções para um tipo só é o sinal de alerta.</div>
+  <div class="warn"><strong>Quando uma modalidade não cabe no motor</strong>Se uma modalidade precisar de estados ou
+    passos que as outras não têm, ela ganha um fluxo próprio. Encher o motor de exceções para uma modalidade só é o
+    sinal de alerta.</div>
 </section>
 
 <!-- 6 -->
 <section id="externos">
   <h2>Sistemas externos</h2>
-  <p>O core nunca chama um sistema de fora direto. Ele declara uma interface do que precisa, e o módulo
-    <code>integracoes</code> implementa. Assim dá para trocar o sistema, ou simular nos testes, sem mexer na regra.</p>
+  <p>Toda conversa com um sistema de fora fica na camada <code>integracao</code>, numa pasta por sistema. O negócio
+    chama uma classe (<code>CadastroIntegracao</code>, <code>PdfIntegracao</code>) que esconde o HTTP, o formato do
+    sistema de fora e os erros dele.</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Sistema</th><th>Para quê</th><th>Se cair</th></tr></thead>
     <tbody>
@@ -427,10 +425,10 @@ public enum Situacao {
 <section id="crud">
   <h2>Quando é só cadastro</h2>
   <p>Nem tudo precisa de motor. Um cadastro de agências só inclui, altera, exclui e consulta: não tem estados, nem
-    tipos, nem fluxo. Por isso segue o caminho curto:</p>
+    modalidades, nem fluxo. Por isso segue o caminho curto, com as mesmas camadas:</p>
   <ul>
-    <li>um record que já nasce validado (<code>Agencia</code>);</li>
-    <li>um serviço que grava e lê (<code>Agencias</code>);</li>
+    <li>a entidade, que já nasce validada (<code>Agencia</code>);</li>
+    <li>um serviço que grava e lê (<code>AgenciaService</code>);</li>
     <li>a API em <code>/agencias</code> (<code>AgenciasResource</code>).</li>
   </ul>
   <p>A regra prática: <strong>é só CRUD, caminho curto</strong>. Se aparecer fluxo, estados ou variação por tipo, aí sim
@@ -441,16 +439,18 @@ public enum Situacao {
 <section id="qualidade">
   <h2>Como sabemos que está certo</h2>
   <ul>
-    <li><strong>As regras de arquitetura são testes.</strong> "O motor não conhece os segmentos" e "a API não usa o
-      banco direto" estão escritos no <code>ArquiteturaTest</code> e no <code>ArquiteturaModulosTest</code>. Quem
-      quebrar uma regra quebra o build.</li>
-    <li><strong>O motor é testado sem banco.</strong> Nos testes de unidade, versões em memória (fakes) fazem o papel do
-      banco. Um teste de contrato roda as mesmas verificações no fake e no Oracle, para garantir que o fake não mente.</li>
-    <li><strong>O sistema é testado de ponta a ponta.</strong> Os testes de integração sobem o programa pronto com um
-      Oracle de verdade e repetem o mesmo cenário para cada tipo, inclusive 8 pedidos simultâneos.</li>
+    <li><strong>As regras de arquitetura são testes.</strong> "A apresentação não grava direto no banco" e "uma
+      modalidade não usa a outra" estão escritos no <code>ArquiteturaTest</code>. Quem quebrar uma regra quebra o
+      build.</li>
+    <li><strong>As regras de negócio são testadas sem banco.</strong> Estados, CPF, valor e as regras de cada
+      modalidade rodam em Java puro, em segundos.</li>
+    <li><strong>O motor e o banco são testados juntos.</strong> Com um Oracle de verdade, que o Quarkus sobe sozinho
+      no Docker.</li>
+    <li><strong>O sistema é testado de ponta a ponta.</strong> Os testes de integração sobem o programa pronto e
+      repetem o mesmo cenário para cada modalidade, inclusive 8 pedidos simultâneos.</li>
   </ul>
-<pre><code>mvn -pl processo-core,integracoes -am test   # rápidos, sem Docker
-mvn verify                                    # tudo (precisa de Docker)</code></pre>
+<pre><code>mvn test -DexcludedGroups=banco   # rápidos, sem Docker
+mvn verify                        # tudo (precisa de Docker)</code></pre>
 </section>
 
 <!-- 9 -->
@@ -460,19 +460,18 @@ mvn verify                                    # tudo (precisa de Docker)</code><
     <thead><tr><th>Termo</th><th>O que é</th></tr></thead>
     <tbody>
       <tr><td>Processo</td><td>Um pedido que nasce <code>ABERTO</code> e termina concluído, recusado ou cancelado.</td></tr>
-      <tr><td>Segmento</td><td>Um tipo de processo (imobiliário, veicular), com seus dados, regras e decisão.</td></tr>
-      <tr><td>Motor</td><td>A parte que faz o que é igual para todos os tipos (<code>MotorDeProcessamento</code>).</td></tr>
-      <tr><td>Solicitação</td><td>O pedido de criação, antes de passar pelas regras.</td></tr>
-      <tr><td>Avaliação</td><td>A decisão do segmento ao processar: aprovado ou recusado com motivo.</td></tr>
+      <tr><td>Modalidade</td><td>Um tipo de processo de consórcio (imobiliária, veicular), com seus dados, regras e decisão. No banco e na API aparece como <code>segmento</code>.</td></tr>
+      <tr><td>Motor</td><td>A parte que faz o que é igual para todas as modalidades (<code>ProcessoService</code>).</td></tr>
+      <tr><td>Camada</td><td>Uma pasta com uma responsabilidade (apresentação, negócio, integração, persistência) e regras de quem pode usar quem.</td></tr>
+      <tr><td>Entidade</td><td>Uma classe ligada a uma tabela do banco. Aqui, as entidades são o próprio modelo do sistema.</td></tr>
+      <tr><td>Projeção</td><td>Um formato de leitura montado direto da consulta ao banco, para uma tela.</td></tr>
+      <tr><td>Avaliação</td><td>A decisão da modalidade ao processar: aprovado ou recusado com motivo.</td></tr>
       <tr><td>Cadastro simples</td><td>Algo que é só CRUD (agências). Vai pelo caminho curto, sem motor.</td></tr>
-      <tr><td>Port</td><td>Interface do que o core precisa de fora: banco, transação, sistema externo.</td></tr>
-      <tr><td>Adapter</td><td>Quem implementa um port com tecnologia de verdade (banco, HTTP) ou recebe pedidos (API, fila).</td></tr>
       <tr><td>Value object</td><td>Um dado que só existe se for válido, como <code>Cpf</code> e <code>Valor</code>.</td></tr>
       <tr><td>Especificação</td><td>Uma regra que, se não for cumprida, diz o motivo.</td></tr>
       <tr><td>Compare-and-set</td><td>Mudar o estado só se ele ainda for o esperado. É o que impede dois processamentos ao mesmo tempo.</td></tr>
       <tr><td>Chave de idempotência</td><td>O identificador que impede que o mesmo pedido, repetido, crie dois processos.</td></tr>
       <tr><td>Problem Details</td><td>O formato padrão das respostas de erro (<code>type</code>, <code>title</code>, <code>status</code>, <code>detail</code>).</td></tr>
-      <tr><td>Fake</td><td>Uma versão em memória de algo externo (como o banco), para testar sem ele.</td></tr>
       <tr><td>Dev Services</td><td>Containers (Oracle, fila) que o Quarkus sobe sozinho no desenvolvimento e nos testes.</td></tr>
     </tbody>
   </table></div>
@@ -489,7 +488,7 @@ mvn verify                                    # tudo (precisa de Docker)</code><
       <tr><td>Corrida na regra da matrícula</td><td>Duas criações simultâneas passam juntas.</td><td>Lock, tabela de controle com chave única ou situação copiada para a filha.</td></tr>
       <tr><td>Sem histórico de transições</td><td>Não se sabe quem mudou o quê e quando.</td><td>Tabela de transições gravada junto do compare-and-set.</td></tr>
       <tr><td>PDF sem retentativa</td><td>Chamada síncrona depois do commit (timeout de 2 s); falha só vai para o log.</td><td>Outbox: tabela de pendências gravada na transação e reenviada por um job.</td></tr>
-      <tr><td>REST e query com 0% no Sonar</td><td>Só os ITs os exercitam.</td><td><code>@QuarkusTest</code> nessas camadas, se o gate exigir.</td></tr>
+      <tr><td>REST com 0% no Sonar</td><td>Só os ITs exercitam os resources, e eles rodam o jar em outro processo, sem cobertura.</td><td><code>@QuarkusTest</code> com RestAssured nos resources, se o gate exigir.</td></tr>
       <tr><td>Lacunas de numeração</td><td>Falha na gravação deixa número sem uso.</td><td>Aceitar, ou trocar a sequence por um contador travado na transação, se precisar ser contínua.</td></tr>
     </tbody>
   </table></div>
@@ -501,8 +500,8 @@ mvn verify                                    # tudo (precisa de Docker)</code><
   <p>Tudo o que você precisa para alterar o projeto está no <a href="../AGENTS.md">AGENTS.md</a>:</p>
   <ul>
     <li><strong>Onde coloco…?</strong> Para cada tipo de mudança, a pasta e o arquivo de exemplo.</li>
-    <li><strong>Receitas:</strong> passo a passo para um tipo de processo novo, um cadastro, uma integração, uma fila ou
-      uma consulta.</li>
+    <li><strong>Receitas:</strong> passo a passo para uma modalidade nova, um cadastro, uma integração, uma fila ou uma
+      consulta.</li>
     <li><strong>Regras e o que não fazer</strong>, com o teste que garante cada regra.</li>
     <li><strong>Definição de pronto</strong> e as <strong>armadilhas</strong> conhecidas.</li>
   </ul>

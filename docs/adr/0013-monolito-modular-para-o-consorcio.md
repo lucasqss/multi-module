@@ -1,6 +1,6 @@
 # 0013. Monolito modular para o pagamento do crédito de consórcio
 
-- **Status:** Aceita
+- **Status:** Aceita (a organização interna em módulos Maven foi substituída pela [0014](0014-camadas-num-modulo-so.md))
 - **Data:** 2026-10-28
 
 Complementa a [0001](0001-multi-module-com-deploy-unico.md): ela decide o formato (multi-module com deploy único);

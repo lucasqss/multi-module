@@ -1,6 +1,6 @@
 # 0008. Sistemas externos atrás de ports em `integracoes`
 
-- **Status:** Aceita (substitui o módulo `impressao` baseado em evento)
+- **Status:** Substituída por [0014](0014-camadas-num-modulo-so.md)
 - **Data:** 2026-10-23
 
 ## Contexto

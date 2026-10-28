@@ -1,6 +1,6 @@
 # 0005. Interface só onde há costura real
 
-- **Status:** Aceita
+- **Status:** Substituída por [0014](0014-camadas-num-modulo-so.md)
 - **Data:** 2026-10-22
 
 ## Contexto

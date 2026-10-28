@@ -4,19 +4,11 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- POM pai: só agrega os módulos e centraliza versões/plugins -->
+    <!-- Um módulo só, organizado em camadas por pacote (apresentacao, negocio, integracao, persistencia, modelo).
+         As regras entre as camadas ficam no ArquiteturaTest (ADR 0014). -->
     <groupId>com.example</groupId>
-    <artifactId>multi-module-parent</artifactId>
+    <artifactId>processo</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <packaging>pom</packaging>
-
-    <modules>
-        <module>jpa-core</module>
-        <module>processo-core</module>
-        <module>processo-query</module>
-        <module>integracoes</module>
-        <module>processo-app</module>
-    </modules>
 
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
@@ -26,28 +18,20 @@
         <quarkus.platform.version>3.33.4</quarkus.platform.version>
         <compiler-plugin.version>3.14.0</compiler-plugin.version>
         <surefire-plugin.version>3.5.3</surefire-plugin.version>
-        <jandex-plugin.version>3.3.1</jandex-plugin.version>
-        <resources-plugin.version>3.3.1</resources-plugin.version>
-        <jar-plugin.version>3.4.1</jar-plugin.version>
         <archunit.version>1.5.1</archunit.version>
         <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
         <!-- Preenchido pelo jacoco:prepare-agent; o valor vazio evita erro se o JaCoCo for pulado -->
         <argLine/>
 
-        <!-- Sonar (scanner do Maven, rodado pelo CI em um passo separado, com -DskipTests, depois do build que
-             executa os testes). Cada módulo usa o target/ padrão; o scanner lê fontes, classes e
-             target/surefire-reports de cada um sozinho. Fora do padrão: -->
-        <!-- 1. Versão do Java para o analisador: o sonar-maven-plugin 3.6 não lê maven.compiler.release e,
-                sem isso, não reconhece records ("Parse error at line 1 column 1"). -->
+        <!-- Sonar (rodado pelo CI num passo separado, com -DskipTests, depois do build que executa os testes) -->
+        <!-- Sem isso o sonar-maven-plugin 3.6 não reconhece records ("Parse error at line 1 column 1") -->
         <sonar.java.source>${maven.compiler.release}</sonar.java.source>
-        <!-- 2. Cobertura agregada: um único relatório (report-aggregate no processo-app), lido por todos os
-                módulos; cada um importa só as linhas dos próprios arquivos. -->
-        <sonar.coverage.jacoco.xmlReportPaths>${maven.multiModuleProjectDirectory}/processo-app/target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <!-- O Sonar lê só target/surefire-reports por padrão; os @QuarkusIntegrationTest ficam em failsafe-reports -->
+        <sonar.junit.reportPaths>${project.build.directory}/surefire-reports,${project.build.directory}/failsafe-reports</sonar.junit.reportPaths>
     </properties>
 
     <dependencyManagement>
         <dependencies>
-            <!-- BOM do Quarkus: os módulos declaram dependências quarkus sem versão -->
             <dependency>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>${quarkus.platform.artifact-id}</artifactId>
@@ -55,112 +39,103 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <dependency>
-                <groupId>com.tngtech.archunit</groupId>
-                <artifactId>archunit</artifactId>
-                <version>${archunit.version}</version>
-            </dependency>
-            <!-- Módulos internos: versão única gerenciada aqui -->
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>jpa-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>processo-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <!-- Testes do core reaproveitados por outros módulos (o contrato dos ports roda também contra o Oracle) -->
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>processo-core</artifactId>
-                <version>${project.version}</version>
-                <type>test-jar</type>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>processo-query</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>integracoes</artifactId>
-                <version>${project.version}</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 
+    <dependencies>
+        <!-- persistencia + modelo: entidades, repositories Jakarta Data e migrations -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-hibernate-orm</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.data</groupId>
+            <artifactId>jakarta.data-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-oracle</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-flyway-oracle</artifactId>
+        </dependency>
+        <!-- apresentacao: REST e fila (AMQP 1.0; Artemis pelo Dev Services no dev e nos testes) -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-messaging-amqp</artifactId>
+        </dependency>
+        <!-- integracao: clientes HTTP dos sistemas externos -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-client-jackson</artifactId>
+        </dependency>
+        <!-- Contrato da API em /q/openapi (Swagger UI em /q/swagger-ui no dev) e /q/health para o deploy -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-smallrye-openapi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-smallrye-health</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Troca os canais da fila por memória no teste do consumidor, sem broker -->
+        <dependency>
+            <groupId>io.smallrye.reactive</groupId>
+            <artifactId>smallrye-reactive-messaging-in-memory</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <version>${archunit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
     <build>
-        <pluginManagement>
-            <plugins>
-                <plugin>
-                    <groupId>${quarkus.platform.group-id}</groupId>
-                    <artifactId>quarkus-maven-plugin</artifactId>
-                    <version>${quarkus.platform.version}</version>
-                    <extensions>true</extensions>
-                    <executions>
-                        <execution>
-                            <goals>
-                                <goal>build</goal>
-                                <goal>generate-code</goal>
-                                <goal>generate-code-tests</goal>
-                            </goals>
-                        </execution>
-                    </executions>
-                </plugin>
-                <!-- Gera META-INF/jandex.idx para que o Quarkus descubra beans/entidades nos módulos que não são o app -->
-                <plugin>
-                    <groupId>io.smallrye</groupId>
-                    <artifactId>jandex-maven-plugin</artifactId>
-                    <version>${jandex-plugin.version}</version>
-                    <executions>
-                        <execution>
-                            <id>make-index</id>
-                            <goals>
-                                <goal>jandex</goal>
-                            </goals>
-                        </execution>
-                    </executions>
-                </plugin>
-                <plugin>
-                    <artifactId>maven-resources-plugin</artifactId>
-                    <version>${resources-plugin.version}</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.jacoco</groupId>
-                    <artifactId>jacoco-maven-plugin</artifactId>
-                    <version>${jacoco-plugin.version}</version>
-                </plugin>
-                <!-- @QuarkusIntegrationTest (*IT) roda contra o artefato empacotado, na fase verify -->
-                <plugin>
-                    <artifactId>maven-failsafe-plugin</artifactId>
-                    <version>${surefire-plugin.version}</version>
-                    <executions>
-                        <execution>
-                            <goals>
-                                <goal>integration-test</goal>
-                                <goal>verify</goal>
-                            </goals>
-                        </execution>
-                    </executions>
-                    <configuration>
-                        <systemPropertyVariables>
-                            <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
-                        </systemPropertyVariables>
-                    </configuration>
-                </plugin>
-            </plugins>
-        </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>${quarkus.platform.group-id}</groupId>
+                <artifactId>quarkus-maven-plugin</artifactId>
+                <version>${quarkus.platform.version}</version>
+                <extensions>true</extensions>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>build</goal>
+                            <goal>generate-code</goal>
+                            <goal>generate-code-tests</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${compiler-plugin.version}</version>
                 <configuration>
                     <parameters>true</parameters>
-                    <!-- Hibernate Processor: gera o metamodel (ProcessoEntity_) e as implementações dos
-                         repositórios Jakarta Data, validando o HQL de @Query em tempo de compilação -->
+                    <!-- Hibernate Processor: gera o metamodel (Processo_) e as implementações dos repositories
+                         Jakarta Data, validando o HQL de @Query na compilação -->
                     <annotationProcessorPathsUseDepMgmt>true</annotationProcessorPathsUseDepMgmt>
                     <annotationProcessorPaths>
                         <path>
@@ -169,19 +144,6 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
-            </plugin>
-            <!-- Agente de cobertura nos testes unitários de todos os módulos: grava <módulo>/target/jacoco.exec -->
-            <plugin>
-                <groupId>org.jacoco</groupId>
-                <artifactId>jacoco-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>prepare-agent</id>
-                        <goals>
-                            <goal>prepare-agent</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -193,6 +155,52 @@
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>
                 </configuration>
+            </plugin>
+            <!-- @QuarkusIntegrationTest (*IT) roda contra o jar empacotado, na fase verify -->
+            <plugin>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>${surefire-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <systemPropertyVariables>
+                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <!-- Cobertura dos testes unitários e @QuarkusTest em target/site/jacoco (jacoco.xml para o Sonar, index.html
+                 para pessoas). Os *IT ficam de fora: rodam contra o jar em outro processo, sem agente. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Metamodel e repositories gerados pelo Hibernate Processor (Processo_, ProcessoRepository_) -->
+                            <excludes>
+                                <exclude>**/*_.class</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -1,6 +1,6 @@
 # 0011. Entradas por canal em `adapter/inbound`
 
-- **Status:** Aceita
+- **Status:** Substituída por [0014](0014-camadas-num-modulo-so.md) (os canais continuam separados, em `apresentacao/<canal>`)
 - **Data:** 2026-10-27
 
 ## Contexto

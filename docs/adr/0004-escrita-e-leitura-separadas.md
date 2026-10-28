@@ -1,6 +1,6 @@
 # 0004. Escrita e leitura separadas
 
-- **Status:** Aceita
+- **Status:** Substituída por [0014](0014-camadas-num-modulo-so.md) (a leitura continua separada, em `persistencia.consulta`)
 - **Data:** 2026-10-19
 
 ## Contexto

@@ -1,6 +1,6 @@
 # 0012. Cadastro simples pelo caminho curto, sem motor
 
-- **Status:** Aceita
+- **Status:** Aceita (o cadastro está em `negocio/agencia` desde a [0014](0014-camadas-num-modulo-so.md))
 - **Data:** 2026-10-27
 
 ## Contexto

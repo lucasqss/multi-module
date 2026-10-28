@@ -18,3 +18,4 @@ Uma ADR aceita não se edita; se a decisão mudar, escreve-se outra que a substi
 | [0010](0010-erros-em-problem-details.md) | Erros em Problem Details (RFC 9457) | Aceita |
 | [0011](0011-entradas-por-canal-em-adapter-inbound.md) | Entradas por canal em `adapter/inbound` (REST, fila, agendamento) | Aceita |
 | [0012](0012-cadastro-simples-sem-motor.md) | Cadastro simples pelo caminho curto, sem motor | Aceita |
+| [0013](0013-monolito-modular-para-o-consorcio.md) | Monolito modular para o pagamento do crédito de consórcio | Aceita |

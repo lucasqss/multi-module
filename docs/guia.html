@@ -256,6 +256,10 @@
   <h2>Os módulos</h2>
   <p>O projeto é dividido em módulos Maven (partes que compilam separadas) e gera um único programa. A seta mostra quem
     usa quem.</p>
+  <p><strong>Por que um programa só, e não vários serviços?</strong> Com até 1.000 usuários por dia em horário comercial,
+    um programa dá conta com folga, e o pagamento e a situação do processo mudam juntos numa única transação. A
+    justificativa completa, com os prós e contras, está na <a href="adr/0013-monolito-modular-para-o-consorcio.md">ADR
+    0013</a>.</p>
   <figure>
     <svg viewBox="0 0 760 360" role="img" aria-labelledby="diag-title">
       <title id="diag-title">Dependências entre os módulos Maven</title>

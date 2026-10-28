@@ -83,7 +83,7 @@ java -jar processo-app/target/quarkus-app/quarkus-run.jar
 
 | Você é… | Comece por |
 |---|---|
-| Pessoa nova na equipe | [`docs/guia.html`](docs/guia.html) (abra no navegador): seções "Comece por aqui" (ordem de leitura do código), "Glossário" e "Onde coloco…?". Depois, **como** está organizado: módulos, fluxos, modelo de dados, integrações, testes, receitas e armadilhas. |
+| Pessoa nova na equipe | [`docs/guia.html`](docs/guia.html) (abra no navegador): o que o sistema faz, como as peças se encaixam e por onde começar a ler o código, em linguagem simples (uns 10 minutos). |
 | Modelo de IA, ou quem vai mudar código | [`AGENTS.md`](AGENTS.md): regras invioláveis (e o teste que garante cada uma), onde colocar cada coisa, receitas em checklist, o que não fazer e a definição de pronto. O `CLAUDE.md` importa o mesmo arquivo. |
 | Quem quer entender uma decisão | [`docs/adr/`](docs/adr/README.md): **por que** cada decisão, uma por arquivo. Decisão nova = ADR nova, a partir do [modelo](docs/adr/0000-modelo.md). |
 

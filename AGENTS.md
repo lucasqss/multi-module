@@ -2,7 +2,8 @@
 
 Instruções para quem gera ou altera código aqui, seja pessoa ou modelo de IA. São regras, não sugestões: a maioria é
 verificada por teste e quebra o build. O **porquê** de cada decisão está em [`docs/adr/`](docs/adr/README.md). A
-**explicação** da estrutura, com diagramas e fluxos, está em [`docs/guia.html`](docs/guia.html).
+**explicação** para quem está chegando (visão, fluxos e conceitos, em linguagem simples) está em
+[`docs/guia.html`](docs/guia.html).
 
 ## O projeto em 5 linhas
 
@@ -151,15 +152,29 @@ mvn install -DskipTests && mvn -pl processo-app quarkus:dev   # dev; Swagger UI 
 - [ ] `mvn verify` verde, sem teste pulado ou afrouxado.
 - [ ] Comportamento novo tem teste: unitário no core (motor e segmento rodam sem Quarkus, com `Fakes`) e IT se passa por HTTP ou banco.
 - [ ] Decisão nova ou mudada → ADR.
-- [ ] Estrutura, regra ou receita mudou → `AGENTS.md` e `docs/guia.html` atualizados (e `README.md`, se mudou API ou comando).
+- [ ] Regra, receita ou armadilha mudou → `AGENTS.md`. Estrutura ou conceito mudou (módulo, fluxo, ideia nova) → também `docs/guia.html`. API ou comando mudou → `README.md`.
 
 ## Armadilhas conhecidas
 
-As que mais pegam (lista completa na seção "Armadilhas" do guia):
+- **`NUMBER` do Oracle perde zeros à direita** (`400000.00` → `400000`). `Valor` e os mappers normalizam para escala 2; nos testes, compare números, não texto.
+- **`select new` não instancia records aninhados**: use projeções planas.
+- **Enum inválido em `@QueryParam`** responde 404, não 400 (JAX-RS).
+- **URL do banco em `%prod`** desliga o Dev Services nos ITs. O mesmo vale para `amqp-host`: em prod, o broker vem só por variável de ambiente (`AMQP_HOST`, `AMQP_PORT`, `AMQP_USERNAME`, `AMQP_PASSWORD`).
+- **Colunas precisam de nome explícito**: o Quarkus não converte `dataAbertura` em `DATA_ABERTURA`.
+- **Sessão stateless**: sem cascade nem cache de 1º nível; toda gravação é explícita.
+- **Índice de entidades no jar**: sem o `copy-resources` do `entity/index` no `jpa-core`, o HQL dos outros módulos para de ser validado, sem aviso.
+- **Consumidor sem request context**: fora do HTTP, ler pela `StatelessSession` fora de transação dá `ContextNotActiveException`. Use `@ActivateRequestContext`.
+- **Fila virou tópico**: sem `capabilities=queue`, o Artemis cria o endereço como multicast, e as mensagens enviadas para a fila não chegam.
+- **JSON chega como texto**: sem content-type JSON, o connector AMQP entrega `String`, não `JsonObject`. O consumidor aceita os dois.
+- **Broker parado por disco**: o Artemis bloqueia produtores com o disco acima de 90%. No Dev Services isso está desligado; em produção, quem decide é a operação do broker.
+- **`@QuarkusTest` com conjuntos diferentes de `@WithTestResource`** reinicia o app e o Oracle: reaproveite o conjunto existente.
+- **Servidor falso nos ITs** roda na JVM do teste; o mapa devolvido por `start()` vira configuração do jar, que roda em outro processo.
+- **ArchUnit** roda com a API core (`check`) dentro de `@Test` comum: o engine `archunit-junit5` não roda sob o JUnit 6 do BOM.
+- **Subclasse de `SegmentoBase`** precisa ser `@Singleton`: `@ApplicationScoped` exige proxy, que exige construtor sem argumentos também na base.
+- **`Unsatisfied dependency` de um bean que existe**: POM pai desatualizado no `~/.m2`. Rode `mvn install -N` na raiz.
 
-- `NUMBER` do Oracle perde zeros à direita (`400000.00` → `400000`). `Valor` e os mappers normalizam para escala 2; nos testes, compare números, não texto.
-- `select new` não instancia records aninhados: projeções planas.
-- Enum inválido em `@QueryParam` responde 404, não 400 (JAX-RS).
-- `@QuarkusTest` com conjuntos diferentes de `@WithTestResource` reinicia o app e o Oracle: reaproveite o conjunto existente.
-- Fila no Artemis sem `capabilities=queue` vira tópico, e as mensagens não chegam.
-- ArchUnit roda com a API core dentro de `@Test` comum: o engine `archunit-junit5` não roda sob o JUnit 6 do BOM.
+## Por baixo dos panos
+
+- **Repositories Jakarta Data** não têm implementação escrita à mão. Na compilação, o `hibernate-processor` gera a classe (ex.: `ProcessoQueries_`, em `target/generated-sources`) e valida o HQL contra as entidades, então campo errado é erro de compilação. O `jandex-maven-plugin` indexa o jar para o Quarkus achar o bean. No core, o repository estende o port, e os métodos `default` convertem pelo mapper.
+- **Modelo de dados**: `PROCESSO` (pai, discriminador `SEGMENTO`) com uma tabela filha por tipo (herança JOINED, PK = FK). Numeração pela sequence única `SEQ_NUMERO_PROCESSO` (`<prefixo>-<ano>-<6 dígitos>`). Chaves de idempotência em `PROCESSO_IDEMPOTENCIA`. Cadastros têm tabela própria (`AGENCIA`). Tudo nas migrations de `jpa-core/src/main/resources/db/migration`.
+- **Sonar e cobertura**: o CI roda `mvn clean verify` e depois o `sonar-maven-plugin` com `-DskipTests`. Todos os módulos leem o relatório JaCoCo agregado do `processo-app` (`sonar.coverage.jacoco.xmlReportPaths` no POM pai), e o `report-aggregate` só enxerga dependências diretas: módulo novo entra como dependência do app. `sonar.java.source` no POM pai é obrigatório (sem ele, o scanner 3.6 não entende records). Os ITs contam como testes, mas não como cobertura, porque rodam o jar em outro processo.

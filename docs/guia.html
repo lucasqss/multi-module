@@ -176,147 +176,86 @@
   <ol>
     <li><a href="#visao">Em um minuto</a></li>
     <li><a href="#comece">Comece por aqui</a></li>
+    <li><a href="#modulos">Os módulos</a></li>
+    <li><a href="#vida">A vida de um processo</a></li>
+    <li><a href="#motor">Motor, segmentos e estados</a></li>
+    <li><a href="#externos">Sistemas externos</a></li>
+    <li><a href="#crud">Quando é só cadastro</a></li>
+    <li><a href="#qualidade">Como sabemos que está certo</a></li>
     <li><a href="#glossario">Glossário</a></li>
-    <li><a href="#onde">Onde coloco…?</a></li>
-    <li><a href="#modulos">Módulos</a></li>
-    <li><a href="#pacotes">Pastas e pacotes</a></li>
-    <li><a href="#fluxos">Fluxos</a></li>
-    <li><a href="#dados">Modelo de dados</a></li>
-    <li><a href="#motor">Motor e segmentos</a></li>
-    <li><a href="#estados">Máquina de estados</a></li>
-    <li><a href="#integracoes">Integrações</a></li>
-    <li><a href="#repositorios">Repositórios Jakarta Data</a></li>
-    <li><a href="#qualidade">Arquitetura e testes</a></li>
-    <li><a href="#build">Build e Sonar</a></li>
-    <li><a href="#receitas">Receitas</a></li>
-    <li><a href="#armadilhas">Armadilhas</a></li>
     <li><a href="#aberto">Pontos em aberto</a></li>
+    <li><a href="#mudar">Para mudar o código</a></li>
   </ol>
 </nav>
 
 <main>
 <header>
   <h1>Guia do projeto Processo</h1>
-  <p class="sub">Processos de vários tipos com um motor único, em Maven multi-module: onde fica cada coisa, por quê,
-    e como estender. O porquê de cada decisão, em detalhe, está nas <a href="adr/README.md">ADRs</a>.</p>
+  <p class="sub">O que o sistema faz, como as peças se encaixam e por onde começar. Leitura de uns 10 minutos.</p>
   <div class="chips">
     <span class="chip">Java 25</span>
     <span class="chip">Quarkus 3.33</span>
-    <span class="chip">Oracle + Flyway</span>
-    <span class="chip">Jakarta Data</span>
-    <span class="chip">Padrão State</span>
-    <span class="chip">ArchUnit</span>
-    <span class="chip">JaCoCo + Sonar</span>
+    <span class="chip">Oracle</span>
+    <span class="chip">Maven multi-module</span>
   </div>
 </header>
 
 <!-- 1 -->
 <section id="visao">
   <h2>Em um minuto</h2>
-  <p>Há dois tipos de processo, <strong>imobiliário</strong> e <strong>veicular</strong>. Os dois são criados,
-    processados e cancelados pelo <strong>mesmo motor</strong>; o que muda de um tipo para outro fica num
+  <p>O sistema cuida de <strong>processos</strong>: pedidos que nascem abertos e terminam concluídos, recusados ou
+    cancelados. Há dois tipos de processo, <strong>imobiliário</strong> e <strong>veicular</strong>, e os dois andam
+    pelo <strong>mesmo motor</strong>. O que muda de um tipo para outro fica num pedaço separado, o
     <strong>segmento</strong>.</p>
   <div class="grid2">
-    <div class="card"><h4>Motor único</h4><p>Mesmo fluxo e mesma máquina de estados para todos os tipos. O veicular
-      entrou sem mudar o motor.</p></div>
-    <div class="card"><h4>Pai e filho</h4><p>Dados comuns em <code>PROCESSO</code>, dados do tipo na tabela filha
-      (herança JPA <code>JOINED</code>).</p></div>
-    <div class="card"><h4>Escrita e leitura separadas</h4><p><code>processo-core</code> escreve,
-      <code>processo-query</code> lê. Um não enxerga o outro.</p></div>
-    <div class="card"><h4>Bordas trocáveis</h4><p>Entradas (REST, fila) no app; cadastro e PDF atrás de interfaces,
-      em <code>integracoes</code>.</p></div>
-    <div class="card"><h4>CRUD sem cerimônia</h4><p>O que é só cadastro (agências) vai pelo caminho curto: serviço e
-      repository, sem motor.</p></div>
-    <div class="card"><h4>Regras viram teste</h4><p>As fronteiras entre módulos e camadas são testes do ArchUnit: quebrou a
-      regra, quebrou o build.</p></div>
+    <div class="card"><h4>Um motor para todos</h4><p>Criar, processar e cancelar funcionam igual para qualquer tipo. O
+      veicular entrou sem mudar o motor.</p></div>
+    <div class="card"><h4>Tipos como peças</h4><p>Cada tipo traz só o que é dele: seus dados, suas regras e a decisão
+      de aprovar ou recusar.</p></div>
+    <div class="card"><h4>Escrever e ler separados</h4><p>Um módulo grava (<code>processo-core</code>), outro só
+      consulta (<code>processo-query</code>).</p></div>
+    <div class="card"><h4>Bordas trocáveis</h4><p>Pedidos chegam por API ou fila; sistemas de fora (cadastro, PDF)
+      ficam atrás de interfaces.</p></div>
+    <div class="card"><h4>CRUD sem cerimônia</h4><p>O que é só cadastro (agências) segue um caminho bem mais curto,
+      sem motor.</p></div>
+    <div class="card"><h4>Regras viram teste</h4><p>Quem pode usar quem está escrito em testes: quebrou a regra,
+      quebrou o build.</p></div>
   </div>
 </section>
 
-<!-- comece -->
+<!-- 2 -->
 <section id="comece">
   <h2>Comece por aqui</h2>
-  <p>Três documentos, cada um com um papel: este guia explica <strong>como</strong> está organizado, as
-    <a href="adr/README.md">ADRs</a> dizem <strong>por quê</strong>, e o <a href="../AGENTS.md">AGENTS.md</a> lista as
-    <strong>regras</strong> e receitas em checklist, para pessoas e para modelos de IA. Cada pacote principal também
-    tem um <code>package-info.java</code> com o papel dele e o que pode ou não depender.</p>
-  <p>Para entender o código, leia nesta ordem (uns 30 minutos):</p>
+  <p>A documentação tem três partes, cada uma com um papel:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Documento</th><th>Para quê</th></tr></thead>
+    <tbody>
+      <tr><td>Este guia</td><td>Entender o sistema: o que faz e como as peças se encaixam.</td></tr>
+      <tr><td><a href="../AGENTS.md">AGENTS.md</a></td><td>Mudar o código: onde colocar cada coisa, receitas passo a passo, regras e armadilhas. Também é o arquivo que os assistentes de IA leem.</td></tr>
+      <tr><td><a href="adr/README.md">docs/adr</a></td><td>Entender uma decisão: por que foi assim e não de outro jeito.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Para conhecer o código, leia nesta ordem (uns 30 minutos):</p>
   <ol class="steps">
-    <li><strong><code>MotorDeProcessamento</code></strong> (core/motor/application/service): o fluxo inteiro de criar,
-      processar e cancelar. Observe o que roda dentro e fora das transações curtas.</li>
-    <li><strong><code>Situacao</code></strong> (core/motor/domain/state): a máquina de estados num enum. Cada constante
-      aceita só as próprias transições.</li>
-    <li><strong><code>Segmento</code> e <code>SegmentoBase</code></strong> (core/motor/application/port/spi): o
-      contrato de um tipo de processo e o que já vem pronto.</li>
-    <li><strong><code>SegmentoVeicular</code></strong> e <strong><code>RegrasVeiculares</code></strong>: um tipo
-      completo, em poucas linhas. Compare com o imobiliário, que tem uma regra que consulta o banco.</li>
-    <li><strong><code>Cpf</code> e <code>Valor</code></strong> (core/motor/domain/model): value objects válidos por
-      construção.</li>
-    <li><strong><code>ProcessoVeicularResource</code></strong> e <strong><code>NovoProcessoVeicularRequest</code></strong>
-      (app/adapter/inbound/rest): a entrada HTTP só traduz e chama o motor.</li>
-    <li><strong><code>NovosProcessosImobiliarios</code></strong> (app/adapter/inbound/messaging): a mesma criação por fila,
-      com idempotência e ack/nack pelo tipo do erro.</li>
-    <li><strong><code>Agencias</code></strong> (core/cadastro/agencia): o caminho curto de um CRUD, para comparar.</li>
-    <li><strong><code>ArquiteturaModulosTest</code></strong> (app, testes): as fronteiras escritas como teste.</li>
-    <li><strong><code>CicloDeVidaPorTipoIT</code></strong> (app, testes): o mesmo cenário de ponta a ponta para cada tipo,
-      inclusive 8 processamentos simultâneos.</li>
+    <li><strong><code>MotorDeProcessamento</code></strong>: o fluxo inteiro de criar, processar e cancelar.</li>
+    <li><strong><code>Situacao</code></strong>: os estados do processo e as mudanças permitidas.</li>
+    <li><strong><code>SegmentoVeicular</code></strong> e <strong><code>RegrasVeiculares</code></strong>: um tipo de
+      processo completo, em poucas linhas.</li>
+    <li><strong><code>Cpf</code></strong> e <strong><code>Valor</code></strong>: dados que já nascem validados.</li>
+    <li><strong><code>ProcessoVeicularResource</code></strong>: a API só traduz o pedido e chama o motor.</li>
+    <li><strong><code>NovosProcessosImobiliarios</code></strong>: a mesma criação, chegando por fila.</li>
+    <li><strong><code>Agencias</code></strong>: um CRUD simples, para comparar.</li>
+    <li><strong><code>ArquiteturaModulosTest</code></strong> e <strong><code>CicloDeVidaPorTipoIT</code></strong>: as
+      regras escritas como teste.</li>
   </ol>
+  <p>Cada pasta principal também tem um <code>package-info.java</code> que diz para que ela serve.</p>
 </section>
 
-<!-- glossario -->
-<section id="glossario">
-  <h2>Glossário</h2>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Termo</th><th>No projeto</th></tr></thead>
-    <tbody>
-      <tr><td>Processo</td><td>O pedido que nasce <code>ABERTO</code> e termina concluído, recusado ou cancelado. <code>Processo&lt;D&gt;</code> no domínio; <code>PROCESSO</code> + tabela filha no banco.</td></tr>
-      <tr><td>Segmento</td><td>Um tipo de processo (imobiliário, veicular): dados, regras, decisão do processamento e a tabela filha. Implementa <code>Segmento&lt;D&gt;</code>.</td></tr>
-      <tr><td>Motor</td><td>O <code>MotorDeProcessamento</code>: o fluxo e o ciclo de vida iguais para todos os segmentos.</td></tr>
-      <tr><td>Solicitação</td><td>O pedido de abertura antes das regras (<code>Solicitacao&lt;D&gt;</code>), sem id, número nem data.</td></tr>
-      <tr><td>Avaliação</td><td>A decisão do segmento no processamento: aprovado ou recusado com motivo (<code>Avaliacao</code>).</td></tr>
-      <tr><td>Cadastro simples</td><td>Entidade só de CRUD, sem fluxo (agências). Vai pelo caminho curto, sem motor.</td></tr>
-      <tr><td>Port</td><td>Interface do que o core precisa de fora (<code>application/port/out</code>): banco, transação, sistema externo.</td></tr>
-      <tr><td>SPI</td><td>Interface que o core oferece para ser estendido (<code>application/port/spi</code>): o <code>Segmento</code>.</td></tr>
-      <tr><td>Adapter</td><td>Quem implementa um port com tecnologia (repository Jakarta Data, REST Client) ou recebe uma entrada (resource, consumer).</td></tr>
-      <tr><td>Value object</td><td>Record que só existe válido (<code>Cpf</code>, <code>Valor</code>, <code>Agencia</code>): valida no construtor.</td></tr>
-      <tr><td>Especificação</td><td>Uma regra (<code>Especificacao&lt;T&gt;</code>) que devolve o motivo da violação; compõe com <code>e(...)</code>.</td></tr>
-      <tr><td>Compare-and-set</td><td>Trocar a situação só se ela ainda for a anterior (<code>update ... where SITUACAO = :de</code>). Zero linhas = conflito (409).</td></tr>
-      <tr><td>Chave de idempotência</td><td>Identificador do pedido (o id da mensagem) que garante que a mesma criação, repetida, não gera outro processo.</td></tr>
-      <tr><td>Problem Details</td><td>Formato padrão de erro (RFC 9457): <code>application/problem+json</code> com <code>type</code>, <code>title</code>, <code>status</code>, <code>detail</code>.</td></tr>
-      <tr><td>Dev Services</td><td>Containers que o Quarkus sobe sozinho no dev e nos testes (Oracle, Artemis). Desligam se a URL for configurada.</td></tr>
-      <tr><td>Teste de contrato</td><td>O mesmo teste rodando contra o fake e contra a implementação real de um port (<code>PersistenciaDoProcessoContrato</code>).</td></tr>
-      <tr><td>Fake</td><td>Implementação em memória de um port, para testar o motor sem Quarkus nem banco (<code>Fakes</code>).</td></tr>
-    </tbody>
-  </table></div>
-</section>
-
-<!-- onde -->
-<section id="onde">
-  <h2>Onde coloco…?</h2>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Preciso de…</th><th>Vai em</th><th>Exemplo</th></tr></thead>
-    <tbody>
-      <tr><td>Regra para todo tipo de processo</td><td><code>core/motor/domain/rule/RegrasComuns</code></td><td>nome obrigatório</td></tr>
-      <tr><td>Regra de um tipo</td><td><code>core/segmento/&lt;tipo&gt;/domain/rule</code></td><td><code>RegrasVeiculares</code></td></tr>
-      <tr><td>Decisão do processamento de um tipo</td><td><code>avaliar()</code> do segmento</td><td><code>SegmentoVeicular</code></td></tr>
-      <tr><td>Valor de domínio com validação</td><td>record em <code>core/motor/domain/model</code></td><td><code>Cpf</code>, <code>Valor</code></td></tr>
-      <tr><td>Estado ou transição</td><td><code>Situacao</code> + enum espelhado no jpa-core + CHECK numa migration</td><td><code>Situacao</code></td></tr>
-      <tr><td>Erro de negócio novo</td><td>exceção em <code>domain/exception</code> + método no <code>TratadorDeErros</code></td><td><code>ConflitoDeSituacaoException</code></td></tr>
-      <tr><td>Chamada a sistema externo</td><td>port em <code>application/port/out</code> + <code>integracoes/&lt;sistema&gt;</code></td><td><code>GeradorDeDocumentos</code> → <code>integracoes/pdf</code></td></tr>
-      <tr><td>Endpoint HTTP</td><td><code>app/adapter/inbound/rest/resource</code> + <code>rest/dto</code></td><td><code>ProcessoVeicularResource</code></td></tr>
-      <tr><td>Consumo de fila</td><td><code>app/adapter/inbound/messaging/consumer</code> + <code>messaging/dto</code></td><td><code>NovosProcessosImobiliarios</code></td></tr>
-      <tr><td>Consulta de processos</td><td><code>ProcessoQueries</code> + record em <code>query/dto</code></td><td><code>ResumoProcesso</code></td></tr>
-      <tr><td>Cadastro simples (CRUD)</td><td><code>core/cadastro/&lt;nome&gt;</code> + resource</td><td><code>Agencias</code>, <code>AgenciasResource</code></td></tr>
-      <tr><td>Tabela ou coluna</td><td>entidade no <code>jpa-core</code> + migration nova</td><td><code>V5__agencia.sql</code></td></tr>
-      <tr><td>Decisão de arquitetura</td><td>ADR nova em <code>docs/adr</code></td><td><code>0000-modelo.md</code></td></tr>
-    </tbody>
-  </table></div>
-  <p>As receitas completas, em checklist, estão na seção <a href="#receitas">Receitas</a> e no
-    <a href="../AGENTS.md">AGENTS.md</a>.</p>
-</section>
-
-<!-- 2 -->
+<!-- 3 -->
 <section id="modulos">
-  <h2>Módulos</h2>
+  <h2>Os módulos</h2>
+  <p>O projeto é dividido em módulos Maven (partes que compilam separadas) e gera um único programa. A seta mostra quem
+    usa quem.</p>
   <figure>
     <svg viewBox="0 0 760 360" role="img" aria-labelledby="diag-title">
       <title id="diag-title">Dependências entre os módulos Maven</title>
@@ -363,426 +302,177 @@
     <figcaption>A seta sai de quem depende. O app também depende do <code>jpa-core</code> direto, só para a cobertura
       agregada.</figcaption>
   </figure>
-
   <div class="table-wrap"><table>
-    <thead><tr><th>Módulo</th><th>O que tem</th><th>Não pode depender de</th></tr></thead>
+    <thead><tr><th>Módulo</th><th>O que tem</th><th>O que não pode</th></tr></thead>
     <tbody>
-      <tr><td><code>jpa-core</code></td><td>O schema: entidades, enums de coluna e migrations. Nenhuma regra.</td><td>nenhum outro módulo</td></tr>
-      <tr><td><code>processo-core</code></td><td>Toda a regra de escrita: o motor, os segmentos e os cadastros simples (<code>cadastro.*</code>).</td><td>query, integrações, app, HTTP</td></tr>
-      <tr><td><code>processo-query</code></td><td>Consultas somente leitura que devolvem records.</td><td><code>processo-core</code></td></tr>
-      <tr><td><code>integracoes</code></td><td>Um pacote por sistema externo (<code>cadastro</code>, <code>pdf</code>), implementando interfaces do core.</td><td>app, query, outro pacote de integração</td></tr>
-      <tr><td><code>processo-app</code></td><td>REST, tratamento de erros, montagem do jar e testes de integração.</td><td>(ninguém depende dele)</td></tr>
+      <tr><td><code>jpa-core</code></td><td>As tabelas do banco (entidades e scripts de criação).</td><td>Ter regra de negócio.</td></tr>
+      <tr><td><code>processo-core</code></td><td>Todas as regras: o motor, os segmentos e os cadastros.</td><td>Saber que existe HTTP ou fila.</td></tr>
+      <tr><td><code>processo-query</code></td><td>As consultas (só leitura).</td><td>Usar as regras do core.</td></tr>
+      <tr><td><code>integracoes</code></td><td>A conversa com sistemas de fora: cadastro e PDF.</td><td>Ser chamado direto; só por interface.</td></tr>
+      <tr><td><code>processo-app</code></td><td>Por onde os pedidos chegam (API e fila) e a montagem do programa.</td><td>Ter regra de negócio.</td></tr>
     </tbody>
   </table></div>
-</section>
-
-<!-- 3 -->
-<section id="pacotes">
-  <h2>Pastas e pacotes</h2>
-  <p>O motor e cada segmento seguem as mesmas pastas. A dependência só vai para dentro:
-    <code>adapter → application → domain</code>.</p>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Pasta</th><th>O que vai lá</th></tr></thead>
-    <tbody>
-      <tr><td><code>domain/</code></td><td>Java puro: <code>model</code> (records), <code>state</code> (máquina de estados), <code>rule</code> (regras), <code>exception</code>.</td></tr>
-      <tr><td><code>application/port/out</code></td><td>Interfaces do que o core precisa de fora: banco, sistemas externos, transação.</td></tr>
-      <tr><td><code>application/port/spi</code></td><td>O contrato que cada segmento implementa (<code>Segmento</code>).</td></tr>
-      <tr><td><code>application/service</code></td><td>O motor e os segmentos.</td></tr>
-      <tr><td><code>adapter/outbound/persistence</code></td><td><code>repository/</code> (Jakarta Data) e <code>mapper/</code> (domínio ↔ entidade).</td></tr>
-      <tr><td><code>adapter/inbound/&lt;canal&gt;</code></td><td>No app, toda forma de iniciar algo, uma pasta por canal: <code>rest/</code> (<code>resource/</code>, <code>dto/</code>, <code>exception/</code>), <code>messaging/</code> (<code>consumer/</code>, <code>dto/</code>), <code>scheduler/</code>. Só traduzem e chamam o motor.</td></tr>
-      <tr><td><code>config</code></td><td>Producers CDI, como o <code>Clock</code>.</td></tr>
-    </tbody>
-  </table></div>
-  <div class="note"><strong>Duas regras para não criar código à toa</strong>
-    <ul>
-      <li><strong>Interface só onde há costura real:</strong> entre módulos (<code>Segmento</code>,
-        <code>SituacaoCadastral</code>, <code>GeradorDeDocumentos</code>). Dentro do módulo, injete a classe:
-        o REST injeta o <code>MotorDeProcessamento</code> direto.</li>
-      <li><strong>Mapper só quando a conversão tem lógica:</strong> conversão de uma linha é método do DTO
-        (<code>request.paraSolicitacao()</code>, <code>ProcessoCriadoResponse.de(p)</code>). Classe em
-        <code>mapper/</code> só para domínio ↔ entidade.</li>
-      <li><strong>Valor de domínio nasce válido:</strong> <code>Cpf</code> e <code>Valor</code> validam no construtor.
-        São criados onde o texto entra (DTO do REST, mapper de persistência); dali para dentro, ninguém valida de
-        novo.</li>
-    </ul>
-    Cada regra tem a sua ADR (<a href="adr/0005-interface-so-onde-ha-costura-real.md">0005</a>,
-    <a href="adr/0009-value-objects-validos-por-construcao.md">0009</a>).</div>
-<pre><code>multi-module/
-├─ jpa-core/         ProcessoEntity (pai) e uma entidade filha por tipo · db/migration/ V1..V3
-├─ processo-core/
-│  ├─ motor/
-│  │  ├─ domain/       model/ Processo&lt;D&gt;, Solicitacao&lt;D&gt;, Cpf, Valor, Avaliacao · state/ Situacao
-│  │  │                rule/ Especificacao, RegrasComuns · exception/
-│  │  ├─ application/  port/out/ Processos, Numeracao, Transacoes, SituacaoCadastral, GeradorDeDocumentos
-│  │  │                port/spi/ Segmento, SegmentoBase · service/ MotorDeProcessamento
-│  │  ├─ adapter/      outbound/persistence/repository/ · outbound/transaction/
-│  │  └─ config/       Relogio
-│  ├─ segmento/
-│  │  ├─ imobiliario/  domain/ · application/ · adapter/  (as mesmas pastas do motor)
-│  │  └─ veicular/     mesma estrutura
-│  └─ cadastro/
-│     └─ agencia/      Agencia, Agencias (serviço), AgenciaRepository  (CRUD: pacote plano)
-├─ processo-query/   repository/ ProcessoQueries · dto/ ResumoProcesso, Detalhe&lt;Tipo&gt;
-├─ integracoes/      cadastro/ client/ · dto/ · adapter/ SituacaoCadastralAdapter
-│                    pdf/      client/ · dto/ Documento · adapter/ GeradorDeDocumentosAdapter
-└─ processo-app/     adapter/inbound/rest/      resource/ · dto/ · exception/ TratadorDeErros
-                     adapter/inbound/messaging/ consumer/ NovosProcessosImobiliarios · dto/</code></pre>
+  <p>Dentro do motor e de cada segmento, as pastas seguem sempre o mesmo padrão:</p>
+<pre><code>domain/        as regras, em Java puro (sem framework)
+application/   o motor, os segmentos e as interfaces do que vem de fora
+adapter/       a parte técnica: banco, transação</code></pre>
 </section>
 
 <!-- 4 -->
-<section id="fluxos">
-  <h2>Fluxos</h2>
-  <h3>Criar: <code>POST /processos/imobiliarios</code></h3>
-<pre><code>{
-  "proponente": {"nome": "Ana Souza", "cpf": "52998224725"},
-  "valor": 400000.00,
-  "imovel": {"matricula": "12345", "tipo": "RESIDENCIAL", "valorAvaliacao": 500000.00, "uf": "SP"}
-}</code></pre>
+<section id="vida">
+  <h2>A vida de um processo</h2>
+<pre><code>            processar                     aprovado
+ABERTO ──────────────────► EM_PROCESSAMENTO ─────────► CONCLUIDO
+   │                                │
+   │ cancelar                       │ recusado
+   ▼                                ▼
+CANCELADO                       RECUSADO (com o motivo)</code></pre>
+
+  <h3>Criar</h3>
   <ol class="steps">
-    <li><strong>REST:</strong> o resource converte o JSON (<code>request.paraSolicitacao()</code>) e chama
-      <code>motor.criar</code>. CPF e valor inválidos já param aqui, ao virar <code>Cpf</code> e
-      <code>Valor</code>.</li>
-    <li><strong>Segmento:</strong> o motor escolhe pelo tipo dos dados (<code>DadosImobiliarios</code> →
-      <code>SegmentoImobiliario</code>).</li>
-    <li><strong>Regras, fora de transação:</strong> primeiro as comuns (nome), depois as do segmento
-      (limite da avaliação, matrícula sem processo em andamento) e por último o sistema de cadastro, para não
-      chamá-lo à toa.</li>
-    <li><strong>Transação curta:</strong> gera o número (<code>IMO-2026-000042</code>) e grava pai e filha.</li>
-    <li><strong>Depois do commit:</strong> o motor pede o PDF de abertura (<code>GeradorDeDocumentos</code>). Se o
-      sistema falhar, só loga: o processo já está gravado.</li>
+    <li><strong>O pedido chega</strong> pela API (<code>POST /processos/imobiliarios</code>) ou pela fila.</li>
+    <li><strong>As regras conferem</strong>: primeiro as que valem para todos (nome, CPF, valor), depois as do tipo
+      (ex.: a avaliação do imóvel) e, por último, o sistema de cadastro, para não chamá-lo à toa.</li>
+    <li><strong>O processo é gravado</strong> com um número (<code>IMO-2026-000042</code>) e fica
+      <code>ABERTO</code>.</li>
+    <li><strong>O PDF de abertura é pedido</strong>. Se o sistema de PDF falhar, o processo continua criado.</li>
   </ol>
-  <p>Respostas: <code>201 {"id", "numero"}</code>; regra violada <code>422</code>; cadastro fora do ar
-    <code>503</code>. O veicular é igual, com <code>veiculo</code> (placa, ano, FIPE) no corpo.</p>
-  <p>Todo erro sai em Problem Details (RFC 9457), como <code>application/problem+json</code>; o cliente decide pelo
-    <code>type</code>, e o <code>detail</code> é a mensagem para o usuário:</p>
+
+  <h3>Processar e cancelar</h3>
+  <ol class="steps">
+    <li><strong>O processo vai para <code>EM_PROCESSAMENTO</code></strong>. Se duas pessoas pedirem ao mesmo tempo, só
+      uma consegue; a outra recebe um aviso de conflito.</li>
+    <li><strong>O segmento decide</strong>: o imobiliário recusa acima de R$ 1.000.000; o veicular recusa veículo com
+      mais de 10 anos.</li>
+    <li><strong>O processo termina</strong> <code>CONCLUIDO</code> ou <code>RECUSADO</code>, com o motivo.</li>
+  </ol>
+  <p>Cancelar só vale enquanto o processo está <code>ABERTO</code>.</p>
+
+  <h3>As respostas da API</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Código</th><th>Quando</th></tr></thead>
+    <tbody>
+      <tr><td><code>201</code> / <code>200</code> / <code>204</code></td><td>Deu certo (criado / processado / cancelado).</td></tr>
+      <tr><td><code>422</code></td><td>Uma regra recusou o pedido. O motivo vem no campo <code>detail</code>.</td></tr>
+      <tr><td><code>404</code></td><td>O processo não existe.</td></tr>
+      <tr><td><code>409</code></td><td>Outra pessoa mudou o processo ao mesmo tempo. Tente de novo.</td></tr>
+      <tr><td><code>503</code></td><td>O sistema de cadastro está fora do ar.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Todo erro vem no mesmo formato (<em>Problem Details</em>):</p>
 <pre><code>{"type": "/problemas/regra-violada", "title": "Regra de negócio violada", "status": 422,
  "detail": "CPF inválido: 12345678900"}</code></pre>
 
-  <h3>Processar e cancelar (iguais para todos os tipos)</h3>
-  <ol class="steps">
-    <li><strong><code>POST /processos/{id}/processamento</code>:</strong> o motor lê o tipo na coluna
-      <code>SEGMENTO</code> e o segmento carrega o processo.</li>
-    <li><strong>ABERTO → EM_PROCESSAMENTO</strong> numa transação curta, com compare-and-set:
-      <code>update ... where ID = ? and SITUACAO = 'ABERTO'</code>. Se nenhuma linha mudou, outra requisição chegou
-      antes: <code>409</code>.</li>
-    <li><strong><code>segmento.avaliar</code>, fora de transação:</strong> o imobiliário recusa acima de
-      R$ 1.000.000, o veicular recusa veículo com mais de 10 anos.</li>
-    <li><strong>EM_PROCESSAMENTO → CONCLUIDO ou RECUSADO</strong> noutra transação curta. Responde
-      <code>200 {"situacao", "motivo"}</code>.</li>
-  </ol>
-  <p><code>POST /processos/{id}/cancelamento</code> só vale para <code>ABERTO</code> (<code>204</code>). Transição
-    inválida dá <code>422</code> e processo inexistente <code>404</code>.</p>
-  <div class="note"><strong>Por que não lock pessimista?</strong>Ele prenderia a conexão durante a avaliação, que pode
-    chamar sistemas externos. O compare-and-set garante o mesmo sem travar.</div>
-
-  <h3>Criar por fila</h3>
-  <p>A mesma criação, por outro canal: o <code>NovosProcessosImobiliarios</code> consome
-    <code>processos.imobiliarios.novos</code> (AMQP 1.0), chama <code>motor.criar(solicitacao, idDaMensagem)</code> e
-    responde em <code>processos.imobiliarios.respostas</code>. A mensagem tem layout próprio do canal, plano como um
-    registro do mainframe:</p>
-<pre><code>{"id": "msg-123", "nome": "Ana Souza", "cpf": "52998224725", "valor": 400000.00, "matricula": "12345",
- "tipoImovel": "RESIDENCIAL", "valorAvaliacao": 500000.00, "uf": "SP"}</code></pre>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Resultado</th><th>Resposta</th><th>Mensagem</th></tr></thead>
-    <tbody>
-      <tr><td>criado, ou já criado antes com o mesmo <code>id</code></td><td><code>criado</code>, com id e número</td><td>ack</td></tr>
-      <tr><td>regra violada ou mensagem malformada</td><td><code>recusado</code>, com o motivo</td><td>ack: reentregar não muda o resultado</td></tr>
-      <tr><td>sistema externo fora do ar, banco, qualquer outra falha</td><td>nenhuma</td><td>nack: o broker reentrega</td></tr>
-    </tbody>
-  </table></div>
-  <div class="note"><strong>Fila reentrega: idempotência não é opcional</strong>O <code>id</code> da mensagem é a chave
-    de idempotência. O motor grava a chave junto com o processo (<code>PROCESSO_IDEMPOTENCIA</code>) e, numa
-    reentrega, devolve o processo já criado, sem reaplicar regras, gerar número nem pedir PDF. Por que e como, na
-    <a href="adr/0011-entradas-por-canal-em-adapter-inbound.md">ADR 0011</a>.</div>
-
-  <h3>Consultar</h3>
-  <p><code>GET /processos?situacao=ABERTO&amp;pagina=1&amp;tamanho=20</code> lista todos os tipos a partir da tabela
-    pai, paginado (<code>{"itens", "pagina", "tamanho", "total"}</code>; tamanho até 100, fora disso
-    <code>400</code>).
-    <code>GET /processos/imobiliarios/{id}</code> (ou <code>/veiculares/{id}</code>) consulta a filha. As duas vão
-    direto ao <code>processo-query</code>, sem passar pelo domínio, e as projeções dele já são a resposta.</p>
+  <div class="note"><strong>Pela fila, a mesma criação</strong>Uma mensagem na fila
+    <code>processos.imobiliarios.novos</code> cria o processo como a API. Se a mesma mensagem chegar duas vezes (o que
+    é normal em fila), o processo não é criado de novo: o id da mensagem serve de chave. A resposta, criado ou
+    recusado, volta em outra fila.</div>
 </section>
 
 <!-- 5 -->
-<section id="dados">
-  <h2>Modelo de dados</h2>
-<pre><code>PROCESSO                                   PROCESSO_IMOBILIARIO
-  ID              RAW(16)  PK   ◄─────────   PROCESSO_ID     RAW(16)  PK, FK
-  NUMERO          VARCHAR2 único             MATRICULA, TIPO_IMOVEL, VALOR_AVALIACAO, UF
-  SEGMENTO        VARCHAR2 (discriminador)
-  PROPONENTE_NOME, PROPONENTE_CPF            PROCESSO_VEICULAR
-  VALOR           NUMBER(15,2)  ◄─────────   PROCESSO_ID     RAW(16)  PK, FK
-  SITUACAO        VARCHAR2                   PLACA, ANO_FABRICACAO, VALOR_FIPE
-  MOTIVO_RECUSA, DATA_ABERTURA
-
-SEQ_NUMERO_PROCESSO   numeração única para todos os tipos</code></pre>
-  <ul>
-    <li><strong>No banco</strong>, o tipo é uma subclasse JPA da entidade pai. <strong>No domínio</strong>, é um
-      <code>Processo&lt;DadosImobiliarios&gt;</code>: records não herdam, e para o motor só o <code>D</code> muda.</li>
-    <li><strong>Por que o <code>jpa-core</code> é separado:</strong> escrita e leitura usam as mesmas entidades sem se
-      enxergar. O mapeamento e as migrations existem uma vez só.</li>
-    <li><strong>Tipo novo</strong> é sempre uma migration nova com a tabela filha.</li>
-  </ul>
+<section id="motor">
+  <h2>Motor, segmentos e estados</h2>
+  <p>O motor faz tudo o que é igual para todos os tipos. O segmento só preenche o que é dele:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>O motor faz (igual para todos)</th><th>O segmento faz (cada um o seu)</th></tr></thead>
+    <tbody>
+      <tr><td>A ordem dos passos de criar, processar e cancelar</td><td>Os dados próprios (imóvel, veículo)</td></tr>
+      <tr><td>As regras comuns e a consulta ao cadastro</td><td>As regras próprias</td></tr>
+      <tr><td>O número do processo e a gravação</td><td>A decisão de aprovar ou recusar</td></tr>
+      <tr><td>Os estados e as mudanças permitidas</td><td>A tabela própria no banco</td></tr>
+    </tbody>
+  </table></div>
+  <p>Um segmento novo estende <code>SegmentoBase</code> e escreve só duas coisas, as regras e a decisão:</p>
+<pre><code>// resumido
+@Singleton
+public class SegmentoVeicular extends SegmentoBase&lt;DadosVeiculares&gt; {
+    public Especificacao&lt;Solicitacao&lt;DadosVeiculares&gt;&gt; regras() { return RegrasVeiculares.TODAS; }
+    public Avaliacao avaliar(Processo&lt;DadosVeiculares&gt; processo) { /* aprova ou recusa */ }
+}</code></pre>
+  <p>Os estados ficam num enum. Cada estado diz para onde pode ir; qualquer outra mudança é recusada com
+    <code>422</code>:</p>
+<pre><code>// resumido: no código, cada transição é um método que devolve o próximo estado
+public enum Situacao {
+    ABERTO           { iniciarProcessamento() → EM_PROCESSAMENTO; cancelar() → CANCELADO },
+    EM_PROCESSAMENTO { concluir() → CONCLUIDO; recusar() → RECUSADO },
+    CONCLUIDO, RECUSADO, CANCELADO;   // finais: não vão para lugar nenhum
+}</code></pre>
+  <div class="warn"><strong>Quando um tipo não cabe no motor</strong>Se um tipo precisar de estados ou passos que os
+    outros não têm, ele ganha um fluxo próprio. Encher o motor de exceções para um tipo só é o sinal de alerta.</div>
 </section>
 
 <!-- 6 -->
-<section id="motor">
-  <h2>Motor e segmentos</h2>
-  <p>O motor só conhece a interface <code>Segmento</code>. Cada tipo é um bean que a implementa:</p>
-<pre><code>public interface Segmento&lt;D extends DadosDoSegmento&gt; {
-    String codigo();                                // "IMOBILIARIO", gravado como discriminador
-    String prefixo();                               // "IMO", compõe o número
-    Class&lt;D&gt; tipoDosDados();                        // como o motor escolhe o segmento
-    Especificacao&lt;Solicitacao&lt;D&gt;&gt; regras();        // aplicadas depois das comuns
-    void salvar(Processo&lt;D&gt; processo);              // grava pai + filha
-    Optional&lt;Processo&lt;D&gt;&gt; carregar(UUID id);        // lê pai + filha
-    Avaliacao avaliar(Processo&lt;D&gt; processo);       // decisão do processamento
-}</code></pre>
-  <p>O segmento estende <code>SegmentoBase</code>, que já implementa código, prefixo, tipo, gravar e ler; ele só
-    escreve <code>regras()</code> e <code>avaliar()</code>. O motor recebe todos os segmentos pelo CDI, sem registro
-    manual. Cada endpoint de criação é do segmento (o corpo é dele), e todos entregam ao mesmo
-    <code>motor.criar</code>. Cada regra
-    (<code>Especificacao</code>) devolve o motivo da violação; regras se compõem com <code>e(...)</code>, e a
-    primeira que falha vira a mensagem do 422.</p>
+<section id="externos">
+  <h2>Sistemas externos</h2>
+  <p>O core nunca chama um sistema de fora direto. Ele declara uma interface do que precisa, e o módulo
+    <code>integracoes</code> implementa. Assim dá para trocar o sistema, ou simular nos testes, sem mexer na regra.</p>
   <div class="table-wrap"><table>
-    <thead><tr><th>Do motor (igual para todos)</th><th>Do segmento (cada um o seu)</th></tr></thead>
+    <thead><tr><th>Sistema</th><th>Para quê</th><th>Se cair</th></tr></thead>
     <tbody>
-      <tr><td>Fluxo de criação, regras comuns, cadastro</td><td>Dados, regras próprias, endpoint de criação</td></tr>
-      <tr><td>Numeração, transações, eventos</td><td>Prefixo, tabela filha, consulta de detalhe</td></tr>
-      <tr><td>Máquina de estados, processar e cancelar</td><td>A decisão do processamento (<code>avaliar</code>)</td></tr>
+      <tr><td>Cadastro</td><td>Confere a situação do CPF antes de criar.</td><td>A criação para e responde <code>503</code>.</td></tr>
+      <tr><td>PDF</td><td>Gera o documento de abertura depois de criar.</td><td>O processo continua criado; a falha vai para o log.</td></tr>
     </tbody>
   </table></div>
-  <div class="warn"><strong>Quando um tipo deve sair do motor</strong>Se um tipo precisar de estados ou etapas que os
-    outros não têm, dê a ele um fluxo próprio. Encher o <code>Segmento</code> de flags e casos especiais é o sinal.</div>
+  <p>No modo de desenvolvimento (<code>quarkus:dev</code>) os dois são simulados: dá para rodar tudo sem os sistemas de
+    verdade. Nos testes, servidores falsos fazem o papel deles.</p>
 </section>
 
 <!-- 7 -->
-<section id="estados">
-  <h2>Máquina de estados</h2>
-<pre><code>ABERTO ──iniciarProcessamento──► EM_PROCESSAMENTO ──concluir──► CONCLUIDO
-   │                                    └───recusar───► RECUSADO
-   └──cancelar──► CANCELADO</code></pre>
-  <p>É o padrão State num enum: cada constante de <code>Situacao</code> sobrescreve só as transições que aceita, e o
-    resto lança <code>TransicaoInvalidaException</code> (422). O <code>Processo</code> só delega; não há
-    <code>if</code> sobre a situação.</p>
-<pre><code>public enum Situacao {
-    ABERTO {
-        public Situacao iniciarProcessamento() { return EM_PROCESSAMENTO; }
-        public Situacao cancelar() { return CANCELADO; }
-    },
-    EM_PROCESSAMENTO {
-        public Situacao concluir() { return CONCLUIDO; }
-        public Situacao recusar() { return RECUSADO; }
-    },
-    CONCLUIDO, RECUSADO, CANCELADO;
-
-    public Situacao concluir() { throw new TransicaoInvalidaException(this, "concluído"); }
-    // iniciarProcessamento(), recusar() e cancelar(): o mesmo
-}
-
-// No Processo:
-public Processo&lt;D&gt; cancelar() { return em(situacao.cancelar(), null); }</code></pre>
-  <p>Transição nova: um método numa constante e uma linha na tabela do <code>SituacaoTest</code>.</p>
+<section id="crud">
+  <h2>Quando é só cadastro</h2>
+  <p>Nem tudo precisa de motor. Um cadastro de agências só inclui, altera, exclui e consulta: não tem estados, nem
+    tipos, nem fluxo. Por isso segue o caminho curto:</p>
+  <ul>
+    <li>um record que já nasce validado (<code>Agencia</code>);</li>
+    <li>um serviço que grava e lê (<code>Agencias</code>);</li>
+    <li>a API em <code>/agencias</code> (<code>AgenciasResource</code>).</li>
+  </ul>
+  <p>A regra prática: <strong>é só CRUD, caminho curto</strong>. Se aparecer fluxo, estados ou variação por tipo, aí sim
+    vale o modelo do processo.</p>
 </section>
 
 <!-- 8 -->
-<section id="integracoes">
-  <h2>Integrações</h2>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Situação</th><th>Onde fica</th><th>Exemplo</th></tr></thead>
-    <tbody>
-      <tr><td>O fluxo precisa da resposta</td><td>interface em <code>port/out</code> do core, implementada em <code>integracoes.&lt;sistema&gt;</code></td><td>cadastro, PDF</td></tr>
-      <tr><td>O sistema externo nos chama (API, fila)</td><td><code>adapter/inbound/&lt;canal&gt;</code> no <code>processo-app</code>; módulo de entrada próprio se trouxer dependência pesada ou for descartável</td><td>resources, consumidor da fila</td></tr>
-    </tbody>
-  </table></div>
-
-  <h3>Cadastro</h3>
+<section id="qualidade">
+  <h2>Como sabemos que está certo</h2>
   <ul>
-    <li><code>CadastroClient</code>: o REST Client, com a URL em <code>CADASTRO_URL</code>.</li>
-    <li><code>SituacaoCadastralAdapter</code>: implementa a interface do core. Erro HTTP, de rede ou timeout (2 s)
-      vira <code>503</code>.</li>
-    <li><code>CadastroClientSimulado</code>: responde sempre <code>REGULAR</code>, só no <code>quarkus:dev</code>.</li>
+    <li><strong>As regras de arquitetura são testes.</strong> "O motor não conhece os segmentos" e "a API não usa o
+      banco direto" estão escritos no <code>ArquiteturaTest</code> e no <code>ArquiteturaModulosTest</code>. Quem
+      quebrar uma regra quebra o build.</li>
+    <li><strong>O motor é testado sem banco.</strong> Nos testes de unidade, versões em memória (fakes) fazem o papel do
+      banco. Um teste de contrato roda as mesmas verificações no fake e no Oracle, para garantir que o fake não mente.</li>
+    <li><strong>O sistema é testado de ponta a ponta.</strong> Os testes de integração sobem o programa pronto com um
+      Oracle de verdade e repetem o mesmo cenário para cada tipo, inclusive 8 pedidos simultâneos.</li>
   </ul>
-<pre><code>@IfBuildProfile("dev")             // só existe no build de dev
-@Alternative @Priority(1)          // ganha do REST Client gerado
-@RestClient @ApplicationScoped
-public class CadastroClientSimulado implements CadastroClient { ... }</code></pre>
-  <p>No dev responde a simulação; no jar, o REST Client real; nos ITs, o REST Client contra o servidor falso
-    <code>CadastroFalso</code>. Se o módulo <code>integracoes</code> sair do app, o build falha, não a produção.</p>
-
-  <h3>PDF</h3>
-  <p>Mesmo molde do cadastro, no pacote <code>integracoes.pdf</code>. O motor chama o port
-    <code>GeradorDeDocumentos</code> depois do commit; o <code>GeradorDeDocumentosAdapter</code> envia
-    <code>Documento.deAbertura(processo)</code> ao sistema de PDF (<code>SISTEMA_PDF_URL</code>, timeout de 2 s) e
-    traduz falhas para <code>SistemaExternoIndisponivelException</code>, que o motor só loga. No dev, o
-    <code>SistemaDePdfSimulado</code> só registra o pedido no log.</p>
+<pre><code>mvn -pl processo-core,integracoes -am test   # rápidos, sem Docker
+mvn verify                                    # tudo (precisa de Docker)</code></pre>
 </section>
 
 <!-- 9 -->
-<section id="repositorios">
-  <h2>Repositórios Jakarta Data</h2>
-  <p>As interfaces <code>@Repository</code> não têm implementação escrita à mão:</p>
-  <ol class="steps">
-    <li><strong>Compilação:</strong> o <code>hibernate-processor</code> gera <code>ProcessoQueries_</code> em
-      <code>target/generated-sources</code> (Java comum, dá para ler) e valida o HQL contra as entidades. Erro de
-      campo é erro de compilação.</li>
-    <li><strong>Empacotamento:</strong> o <code>jandex-maven-plugin</code> indexa o jar para o Quarkus achar o bean.</li>
-    <li><strong>No core:</strong> o repository estende a interface de <code>port/out</code>, e os métodos
-      <code>default</code> convertem pelo mapper. O motor não sabe que é Jakarta Data.</li>
-  </ol>
+<section id="glossario">
+  <h2>Glossário</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Termo</th><th>O que é</th></tr></thead>
+    <tbody>
+      <tr><td>Processo</td><td>Um pedido que nasce <code>ABERTO</code> e termina concluído, recusado ou cancelado.</td></tr>
+      <tr><td>Segmento</td><td>Um tipo de processo (imobiliário, veicular), com seus dados, regras e decisão.</td></tr>
+      <tr><td>Motor</td><td>A parte que faz o que é igual para todos os tipos (<code>MotorDeProcessamento</code>).</td></tr>
+      <tr><td>Solicitação</td><td>O pedido de criação, antes de passar pelas regras.</td></tr>
+      <tr><td>Avaliação</td><td>A decisão do segmento ao processar: aprovado ou recusado com motivo.</td></tr>
+      <tr><td>Cadastro simples</td><td>Algo que é só CRUD (agências). Vai pelo caminho curto, sem motor.</td></tr>
+      <tr><td>Port</td><td>Interface do que o core precisa de fora: banco, transação, sistema externo.</td></tr>
+      <tr><td>Adapter</td><td>Quem implementa um port com tecnologia de verdade (banco, HTTP) ou recebe pedidos (API, fila).</td></tr>
+      <tr><td>Value object</td><td>Um dado que só existe se for válido, como <code>Cpf</code> e <code>Valor</code>.</td></tr>
+      <tr><td>Especificação</td><td>Uma regra que, se não for cumprida, diz o motivo.</td></tr>
+      <tr><td>Compare-and-set</td><td>Mudar o estado só se ele ainda for o esperado. É o que impede dois processamentos ao mesmo tempo.</td></tr>
+      <tr><td>Chave de idempotência</td><td>O identificador que impede que o mesmo pedido, repetido, crie dois processos.</td></tr>
+      <tr><td>Problem Details</td><td>O formato padrão das respostas de erro (<code>type</code>, <code>title</code>, <code>status</code>, <code>detail</code>).</td></tr>
+      <tr><td>Fake</td><td>Uma versão em memória de algo externo (como o banco), para testar sem ele.</td></tr>
+      <tr><td>Dev Services</td><td>Containers (Oracle, fila) que o Quarkus sobe sozinho no desenvolvimento e nos testes.</td></tr>
+    </tbody>
+  </table></div>
 </section>
 
 <!-- 10 -->
-<section id="qualidade">
-  <h2>Arquitetura e testes</h2>
-  <p>O Maven só impede o que não está no classpath; o resto o ArchUnit garante:</p>
-  <ul>
-    <li><strong><code>ArquiteturaTest</code> (core):</strong> o motor não conhece segmentos, segmentos não se
-      enxergam, <code>domain</code> é Java puro, <code>application</code> não conhece adapters.</li>
-    <li><strong><code>ArquiteturaModulosTest</code> (app):</strong> core e query não se enxergam; ninguém depende de
-      integrações nem do app; HTTP só nas bordas; o app entra no core por serviços (o motor ou o de um cadastro); um canal de entrada não usa outro; sem ciclos.</li>
-  </ul>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Módulo</th><th>Testes</th><th>Docker</th></tr></thead>
-    <tbody>
-      <tr><td><code>processo-core</code></td><td>Tabela de estados × eventos, <code>Cpf</code> e <code>Valor</code>, regras, motor com segmentos falsos, cada segmento no motor real, contrato dos ports contra os fakes.</td><td>não</td></tr>
-      <tr><td><code>integracoes</code></td><td>Conversão da resposta do cadastro, documento enviado ao PDF, falha do cliente vira indisponibilidade.</td><td>não</td></tr>
-      <tr><td><code>processo-app</code></td><td>ITs contra o jar com Oracle: o mesmo ciclo de vida para cada tipo (inclusive 8 processamentos simultâneos, só um vence), os casos da criação, a paginação, os erros em Problem Details e health/OpenAPI. Contrato dos ports contra o Oracle (<code>PersistenciaOracleTest</code>).</td><td>sim</td></tr>
-    </tbody>
-  </table></div>
-  <div class="note"><strong>Teste de contrato: o fake não pode mentir</strong>Os testes do motor usam fakes dos ports de
-    persistência. O <code>PersistenciaDoProcessoContrato</code> descreve o que o motor espera deles (ida e volta,
-    compare-and-set, motivo da recusa, matrícula em andamento) e roda duas vezes: contra os fakes, no core, e contra
-    os repositories no Oracle, no app (o core publica os testes num test-jar). Ele já pegou uma divergência: o
-    Oracle devolvia <code>500000</code> para <code>500000.00</code>. Port novo com fake ganha contrato novo.</div>
-  <div class="note"><strong>Guardas contra duplicação que não dá para evitar</strong>O jpa-core não pode depender do core,
-    então os enums de coluna repetem os do domínio. O <code>EnumsEspelhadosTest</code> falha se
-    <code>Situacao</code>/<code>SituacaoProcesso</code> ou os <code>TipoImovel</code> divergirem, e o contrato no Oracle
-    grava todas as situações, então um CHECK desatualizado também quebra.</div>
-<pre><code>mvn -pl processo-core,integracoes -am test   # unitários, sem Docker
-mvn verify                                    # tudo: contrato no Oracle e ITs
-mvn install -DskipTests &amp;&amp; mvn -pl processo-app quarkus:dev   # dev: Oracle via Dev Services</code></pre>
-  <p>No dev: Swagger UI em <code>/q/swagger-ui</code>. Em qualquer ambiente: contrato em <code>/q/openapi</code> e
-    health em <code>/q/health</code> (o readiness confere o banco).</p>
-  <h3>Definição de pronto</h3>
-  <ul>
-    <li><code>mvn verify</code> verde, sem teste pulado ou afrouxado.</li>
-    <li>Comportamento novo tem teste: unitário no core (motor e segmentos rodam sem Quarkus, com os fakes) e IT se
-      passa por HTTP, fila ou banco.</li>
-    <li>Decisão nova ou mudada: ADR.</li>
-    <li>Estrutura, regra ou receita mudou: <code>AGENTS.md</code> e este guia atualizados (e o README, se mudou API ou
-      comando).</li>
-  </ul>
-</section>
-
-<!-- 11 -->
-<section id="build">
-  <h2>Build e Sonar</h2>
-<pre><code>mvn clean verify                                     # testes + JaCoCo agregado no app
-mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
-    -Dsonar.sources=pom.xml,src/main -DskipTests ...  # análise, sem clean</code></pre>
-  <ul>
-    <li>Todos os módulos leem o relatório agregado do app (<code>sonar.coverage.jacoco.xmlReportPaths</code> no POM pai).</li>
-    <li>O <code>report-aggregate</code> só enxerga dependências diretas: por isso o app declara todos os módulos.</li>
-    <li><code>sonar.java.source</code> no POM pai: sem ele, o scanner 3.6 não entende records.</li>
-    <li>Os ITs contam como testes, mas não como cobertura (rodam o jar em outro processo).</li>
-  </ul>
-</section>
-
-<!-- 12 -->
-<section id="receitas">
-  <h2>Receitas</h2>
-  <h3>Novo tipo de processo</h3>
-  <ol>
-    <li><code>jpa-core</code>: entidade filha (<code>@DiscriminatorValue</code>) e a migration.</li>
-    <li><code>processo-core/segmento/&lt;tipo&gt;</code>: o record de dados, as regras, o port de persistência
-      (estende <code>PersistenciaDoSegmento</code>), o segmento (estende <code>SegmentoBase</code>: só
-      <code>regras()</code> e <code>avaliar()</code>), o repository e o mapper.</li>
-    <li><code>processo-query</code>: a consulta de detalhe. A listagem já inclui o tipo novo.</li>
-    <li><code>processo-app</code>: resource com <code>POST</code> e <code>GET {id}</code>, e o request com
-      <code>paraSolicitacao()</code>.</li>
-    <li>Testes: os do segmento e um <code>Tipo</code> novo em <code>CicloDeVidaPorTipoIT.tipos()</code>.</li>
-  </ol>
-  <p>O motor, os estados e as integrações não mudam. O commit do veicular é o exemplo.</p>
-  <h3>Nova integração</h3>
-  <ol>
-    <li>Interface em <code>port/out</code> do core (do motor ou do segmento que a usa), chamada numa regra ou num passo do fluxo.</li>
-    <li>Pacote <code>integracoes.&lt;sistema&gt;</code> com <code>client/</code>, <code>dto/</code>,
-      <code>adapter/</code> e, se quiser, a simulação de dev.</li>
-    <li>URL em <code>application.properties</code> e um servidor falso no IT (<code>@WithTestResource</code>).</li>
-  </ol>
-  <h3>Nova forma de iniciar um processo</h3>
-  <ol>
-    <li>Pasta do canal em <code>processo-app/.../adapter/inbound/&lt;canal&gt;</code>, com o <code>dto/</code> do formato do
-      canal (<code>paraSolicitacao()</code>) e quem recebe (<code>resource/</code>, <code>consumer/</code>, job).</li>
-    <li>Chame o motor. Fora do HTTP, <code>@ActivateRequestContext</code>; em fila, passe o id da mensagem como chave
-      de idempotência e decida ack/nack pelo tipo do erro, como o <code>NovosProcessosImobiliarios</code>.</li>
-    <li>Teste com o canal em memória, como o <code>NovosProcessosPorFilaTest</code>.</li>
-    <li>Dependência pesada ou canal descartável: módulo de entrada próprio, registrado como qualquer módulo novo.</li>
-  </ol>
-  <h3>Novo cadastro (CRUD)</h3>
-  <p>Entidade que é só cadastro, sem fluxo, estados nem variação por tipo, vai pelo caminho curto
-    (<a href="adr/0012-cadastro-simples-sem-motor.md">ADR 0012</a>). Modelo: agências.</p>
-  <ol>
-    <li><code>jpa-core</code>: entidade e migration.</li>
-    <li><code>processo-core/cadastro/&lt;nome&gt;</code>, pacote plano: record válido por construção, repository Jakarta
-      Data e um serviço <code>@ApplicationScoped</code> com <code>@Transactional</code> nas escritas.</li>
-    <li><code>processo-app/.../inbound/rest</code>: resource com POST, GET, PUT e DELETE, e os requests em
-      <code>dto/</code>. A resposta pode ser o próprio record.</li>
-    <li>Um IT do ciclo completo, como o <code>AgenciasIT</code>.</li>
-  </ol>
-  <p>Quando aparecer fluxo, estados ou variação por tipo, promova para o modelo do processo.</p>
-  <h3>Nova consulta</h3>
-  <p>Método com <code>@Query</code> e <code>select new</code> em <code>ProcessoQueries</code>, record em
-    <code>dto/</code> e endpoint no app.</p>
-  <h3>Nova decisão de arquitetura</h3>
-  <p>Copie <a href="adr/0000-modelo.md">docs/adr/0000-modelo.md</a> com o próximo número, preencha contexto, decisão
-    e consequências, e acrescente no <a href="adr/README.md">índice</a>. ADR aceita não se edita: se a decisão
-    mudar, escreva outra que a substitui.</p>
-  <h3>Novo módulo Maven</h3>
-  <p>Registre em quatro lugares: <code>&lt;module&gt;</code> e <code>dependencyManagement</code> no POM pai,
-    dependência no app, <code>jandex-maven-plugin</code> (se tiver beans) e <code>MODULOS</code> no
-    <code>ArquiteturaModulosTest</code>.</p>
-</section>
-
-<!-- 13 -->
-<section id="armadilhas">
-  <h2>Armadilhas</h2>
-  <ul>
-    <li><strong>Índice de entidades:</strong> sem o <code>copy-resources</code> do <code>entity/index</code> no
-      <code>jpa-core</code>, o HQL dos outros módulos para de ser validado, sem aviso.</li>
-    <li><strong><code>select new</code></strong> não instancia records aninhados: use projeções planas.</li>
-    <li><strong><code>NUMBER</code> do Oracle</strong> perde zeros à direita (<code>400000.00</code> volta
-      <code>400000</code>). Compare números, não texto.</li>
-    <li><strong>Enum inválido em <code>@QueryParam</code></strong> responde 404, não 400.</li>
-    <li><strong>URL do banco em <code>%prod</code></strong> desliga o Dev Services nos ITs. O mesmo vale para
-      <code>amqp-host</code>: em prod, o broker vem só por variável de ambiente (<code>AMQP_HOST</code>,
-      <code>AMQP_PORT</code>, <code>AMQP_USERNAME</code>, <code>AMQP_PASSWORD</code>).</li>
-    <li><strong>Consumidor sem request context:</strong> fora do HTTP, ler pela <code>StatelessSession</code> fora de
-      transação falha (<code>ContextNotActiveException</code>). Use <code>@ActivateRequestContext</code>.</li>
-    <li><strong>Fila virou tópico:</strong> sem <code>capabilities=queue</code>, o Artemis cria o endereço como
-      multicast, e mensagens enviadas para a fila não chegam ao consumidor.</li>
-    <li><strong>JSON chega como texto:</strong> sem content-type JSON, o connector AMQP entrega <code>String</code>, não
-      <code>JsonObject</code>. O consumidor aceita os dois.</li>
-    <li><strong>Broker parado por disco:</strong> o Artemis bloqueia produtores com o disco acima de 90%. No Dev
-      Services isso está desligado; em produção é a operação do broker que decide.</li>
-    <li><strong>Servidor falso nos ITs</strong> roda na JVM do teste; o mapa de <code>start()</code> vira configuração do
-      jar, que roda em outro processo.</li>
-    <li><strong>Conjunto de test resources:</strong> <code>@QuarkusTest</code> com conjuntos diferentes de
-      <code>@WithTestResource</code> reinicia o app (e o Oracle). Teste novo reaproveita o conjunto dos existentes.</li>
-    <li><strong>Sessão stateless:</strong> sem cascade nem cache de 1º nível; toda gravação é explícita.</li>
-    <li><strong>ArchUnit com JUnit 6:</strong> o engine <code>archunit-junit5</code> não roda sob o JUnit 6 do BOM. Use a
-      API core (<code>check</code>) dentro de um <code>@Test</code> comum.</li>
-    <li><strong>Base de bean sem construtor vazio:</strong> bean <code>@ApplicationScoped</code> precisa de proxy, que
-      exige construtor sem argumentos também na superclasse. Por isso os segmentos são <code>@Singleton</code>.</li>
-    <li><strong>Colunas</strong> precisam de nome explícito: o Quarkus não converte <code>dataAbertura</code> em
-      <code>DATA_ABERTURA</code>.</li>
-    <li><strong><code>Unsatisfied dependency</code> de bean que existe:</strong> POM pai velho no
-      <code>~/.m2</code>. Rode <code>mvn install -N</code> na raiz.</li>
-  </ul>
-</section>
-
-<!-- 14 -->
 <section id="aberto">
   <h2>Pontos em aberto</h2>
   <p>Decidir antes de levar o padrão para produção:</p>
@@ -799,9 +489,22 @@ mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar \
   </table></div>
 </section>
 
+<!-- 11 -->
+<section id="mudar">
+  <h2>Para mudar o código</h2>
+  <p>Tudo o que você precisa para alterar o projeto está no <a href="../AGENTS.md">AGENTS.md</a>:</p>
+  <ul>
+    <li><strong>Onde coloco…?</strong> Para cada tipo de mudança, a pasta e o arquivo de exemplo.</li>
+    <li><strong>Receitas:</strong> passo a passo para um tipo de processo novo, um cadastro, uma integração, uma fila ou
+      uma consulta.</li>
+    <li><strong>Regras e o que não fazer</strong>, com o teste que garante cada regra.</li>
+    <li><strong>Definição de pronto</strong> e as <strong>armadilhas</strong> conhecidas.</li>
+  </ul>
+  <p>Para entender por que algo é como é, veja as <a href="adr/README.md">decisões de arquitetura (ADRs)</a>.</p>
+</section>
+
 <footer>
-  Guia da branch <code>processo-imobiliario</code>. O porquê das decisões em <a href="adr/README.md">docs/adr</a>; como
-  rodar no <a href="../README.md">README</a>.
+  Guia da branch <code>processo-imobiliario</code>. Como rodar no <a href="../README.md">README</a>.
 </footer>
 </main>
 </div>

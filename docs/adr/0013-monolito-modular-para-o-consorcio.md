@@ -4,7 +4,7 @@
 - **Data:** 2026-10-28
 
 Complementa a [0001](0001-multi-module-com-deploy-unico.md): ela decide o formato (multi-module com deploy único);
-esta justifica o estilo pela carga e pelo domínio, com Mark Richards e Kent Beck como referências.
+esta justifica o estilo pela carga, pelo domínio e pela fase do projeto (domínio em descoberta), com Mark Richards e Kent Beck como referências.
 
 ## Contexto
 
@@ -17,6 +17,14 @@ O sistema paga o crédito de consórcio (imóvel, veículo): cria o processo, co
 - Com um pico 10 vezes maior, ainda fica abaixo de 10 por segundo. Uma instância Quarkus atende milhares.
 - Fora do horário não há uso: existe uma janela natural para deploy e manutenção.
 
+**O momento do domínio:**
+
+- O processo começa do zero. As modalidades de consórcio (imóvel e veículo hoje; outras depois) entram uma de cada
+  vez.
+- A cada modalidade, o modelo de dados e as regras mudam, inclusive no que é comum a todas.
+- As fronteiras do domínio ainda estão sendo descobertas: o que hoje parece um módulo estável pode se dividir ou se
+  juntar daqui a alguns meses.
+
 **As características que decidem o estilo** (as *driving characteristics* de Richards e Ford, que são poucas de
 propósito):
 
@@ -24,6 +32,7 @@ propósito):
 |---|---|
 | Integridade dos dados e transação | É dinheiro: liberar o crédito e mudar a situação do processo acontecem juntos, ou nenhum dos dois. |
 | Auditabilidade | O consórcio é regulado pelo Bacen. |
+| Evolutividade (facilidade de mudar) | O domínio e o modelo de dados mudam a cada modalidade nova; é a característica que mais pesa agora. |
 | Manutenibilidade e testabilidade | Equipe pequena; as regras mudam por segmento. |
 | Disponibilidade no horário comercial | Não precisa ser 24x7. |
 
@@ -60,6 +69,14 @@ em módulos Maven, com as fronteiras verificadas por teste (ADR 0001).
    `ArquiteturaTest`.
 6. **Nas tabelas de avaliação de Richards, os estilos monolíticos pontuam alto em simplicidade e custo.** É
    exatamente o que este cenário pede.
+7. **Volatilidade espalhada não é motivo para separar** (*The Hard Parts*).
+   - A volatilidade do código só puxa para separar quando está concentrada numa parte: separar isola essa parte do
+     resto estável.
+   - Aqui a mudança está em todo o domínio, inclusive no modelo de dados. Separar agora congelaria fronteiras que
+     ainda estão sendo descobertas.
+   - Cada mudança de modelo viraria mudança de contrato entre serviços, mais uma migration coordenada em bancos
+     separados. *The Hard Parts* trata a decomposição dos dados como a parte mais difícil.
+   - No monolito, mover uma fronteira é uma refatoração na IDE mais uma migration.
 
 ### Por que, em Kent Beck
 
@@ -77,6 +94,18 @@ em módulos Maven, com as fronteiras verificadas por teste (ADR 0001).
    unitários levam cerca de 30 s. Os contratos garantem que o fake e o Oracle se comportam igual.
 5. **"Make the change easy, then make the easy change."** Interface só onde há costura real (ADR 0005): cada
    elemento de estrutura precisa se pagar.
+6. **"Embrace change"**, o subtítulo de *Extreme Programming Explained*. O XP parte do princípio de que o
+   requisito vai mudar e otimiza para que mudar seja barato. Esse é o cenário de um domínio que cresce modalidade
+   a modalidade.
+7. **Explore, Expand, Extract (3X).**
+   - Na fase de exploração, o que vale é aprender rápido com experimentos baratos.
+   - Investir em escala e em separação física é coisa da fase de extração, quando o domínio já estabilizou.
+   - Distribuir agora seria pagar o custo da fase 3 durante a fase 1.
+8. **Decisões reversíveis são baratas** (*Tidy First?*).
+   - Uma fronteira entre módulos dentro do mesmo jar se desfaz numa refatoração. Uma fronteira entre serviços, com
+     banco próprio, não se desfaz fácil.
+   - Separe as mudanças de estrutura das de comportamento, em passos pequenos. A cada modalidade nova: primeiro
+     arrumar o modelo para receber a mudança, depois fazer a mudança.
 
 ## Consequências
 
@@ -89,6 +118,10 @@ em módulos Maven, com as fronteiras verificadas por teste (ADR 0001).
   junto.
 - **Fronteiras garantidas por compilação e por teste**, não por disciplina: quem chega, pessoa ou IA, erra menos.
 - **Refatoração entre módulos numa IDE só**, sem versionar contratos de rede.
+- **Uma mudança de domínio é um commit, um deploy e uma migration**, com o compilador apontando tudo o que quebrou
+  (até o HQL das consultas é validado na compilação).
+- **Uma modalidade nova é aditiva**: um segmento novo e uma tabela filha, sem tocar no motor nem nas outras
+  modalidades (ADRs 0002 e 0003).
 
 **Contras e como estão mitigados**
 
@@ -101,6 +134,11 @@ em módulos Maven, com as fronteiras verificadas por teste (ADR 0001).
 | Banco compartilhado: os módulos se acoplam pelos dados, o que dificulta uma extração futura. | Só o core grava; o query só lê (ADR 0004). |
 | Erosão das fronteiras, o risco que Richards aponta no modular monolith. | As fitness functions quebram o build. |
 | Pilha única (Java, Quarkus, Oracle) para tudo. | Aceito: um time, uma pilha. |
+| Um campo novo atravessa várias camadas: migration, entidade, record do domínio, mapper, projeção da consulta, DTO de entrada. Com o domínio mudando muito, esse é o custo que mais aparece no dia a dia. | É o preço de separar domínio e schema. As receitas do `AGENTS.md` listam cada passo; o compilador, o HQL validado na compilação e os contratos apontam o que faltou. |
+| Os enums do domínio têm espelho no `jpa-core`: mudar um estado ou tipo é mudar dois enums e um CHECK. | O `EnumsEspelhadosTest` falha até os dois ficarem iguais. |
+| Com o modelo mudando, as migrations se acumulam. | Antes da primeira ida para produção, elas podem ser consolidadas numa só, porque ainda não foram aplicadas em produção. Depois disso, só migration nova. |
+| Mudar um campo comum a todas as modalidades mexe na tabela pai e em todos os segmentos. | É raro por desenho: o comum fica no motor, o específico na tabela filha. |
+| O motor único (ADR 0002) é uma aposta: uma modalidade com ciclo de vida diferente não cabe nele. | Num monolito, rever a aposta é refatoração; o gatilho está abaixo. |
 | A auditabilidade ainda não está atendida: não há histórico de transições. | Independe do estilo, mas é uma característica que decide: precisa entrar no backlog. |
 
 **Quando rever** (cada um destes gatilhos pede uma ADR nova):
@@ -111,6 +149,9 @@ em módulos Maven, com as fronteiras verificadas por teste (ADR 0001).
   isolamento exigido pelo Bacen.
 - **Vários times com cadências de release em conflito** no mesmo jar.
 - **A carga medida, não a suposta, chega perto do limite** de uma instância.
+- **Uma modalidade não cabe no ciclo de vida do motor.** Revê-se a ADR 0002 (o motor), não necessariamente o deploy.
+- **O domínio estabilizou**: as fronteiras dos módulos não mudam há meses. Só então extrair um serviço passa a
+  valer a pena, e só se outro gatilho desta lista também aparecer.
 
 ## Referências
 
@@ -122,4 +163,6 @@ em módulos Maven, com as fronteiras verificadas por teste (ADR 0001).
 - RICHARDS, M. *Software Architecture Patterns*. 2ª ed. O'Reilly, 2022.
 - BECK, K.; ANDRES, C. *Extreme Programming Explained*. 2ª ed. Addison-Wesley, 2004: design simples e YAGNI.
 - BECK, K. *Test-Driven Development: By Example*. Addison-Wesley, 2002.
-- BECK, K. *Tidy First?* O'Reilly, 2023: acoplamento, coesão e estrutura como opção.
+- BECK, K. *Tidy First?* O'Reilly, 2023: acoplamento, coesão, estrutura como opção, decisões reversíveis,
+  separar estrutura de comportamento.
+- BECK, K. Explore, Expand, Extract (3X): o modelo de fases que ele apresenta em palestras e textos a partir de 2016.

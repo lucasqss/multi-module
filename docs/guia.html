@@ -257,7 +257,9 @@
   <p>O projeto é dividido em módulos Maven (partes que compilam separadas) e gera um único programa. A seta mostra quem
     usa quem.</p>
   <p><strong>Por que um programa só, e não vários serviços?</strong> Com até 1.000 usuários por dia em horário comercial,
-    um programa dá conta com folga, e o pagamento e a situação do processo mudam juntos numa única transação. A
+    um programa dá conta com folga, e o pagamento e a situação do processo mudam juntos numa única transação. E o modelo
+    ainda muda a cada modalidade nova: dentro de um programa só, mudar uma fronteira é refatorar, não renegociar
+    contratos entre serviços. A
     justificativa completa, com os prós e contras, está na <a href="adr/0013-monolito-modular-para-o-consorcio.md">ADR
     0013</a>.</p>
   <figure>

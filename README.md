@@ -88,6 +88,7 @@ java -jar target/quarkus-app/quarkus-run.jar
 |---|---|
 | Pessoa nova na equipe | [`docs/guia.html`](docs/guia.html) (abra no navegador): o que o sistema faz, como as peças se encaixam e por onde começar a ler o código, em linguagem simples (uns 10 minutos). |
 | Modelo de IA, ou quem vai mudar código | [`AGENTS.md`](AGENTS.md): as camadas, as regras invioláveis (e o teste que garante cada uma), onde colocar cada coisa, receitas em checklist, o que não fazer e a definição de pronto. O `CLAUDE.md` importa o mesmo arquivo. |
+| Vai aplicar este modelo em outro projeto (com Copilot ou outro agente) | [`docs/kit-camadas/`](docs/kit-camadas/README.md): guia completo das decisões, modelos de código, ArchUnit com modo de migração, `AGENTS.md` modelo e os prompts fase a fase. |
 | Quem quer entender uma decisão | [`docs/adr/`](docs/adr/README.md): **por que** cada decisão, uma por arquivo. Decisão nova = ADR nova, a partir do [modelo](docs/adr/0000-modelo.md). |
 
 Cada camada também tem um `package-info.java` com o papel dela e o que pode ou não usar.

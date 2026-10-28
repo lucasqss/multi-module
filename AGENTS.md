@@ -4,6 +4,9 @@ Instruções para quem gera ou altera código aqui, seja pessoa ou modelo de IA.
 verificada por teste e quebra o build.
 
 - O **porquê** de cada decisão está em [`docs/adr/`](docs/adr/README.md).
+- Para **aplicar este modelo em outro projeto**, use o kit autocontido em
+  [`docs/kit-camadas/`](docs/kit-camadas/README.md). Mudou uma decisão ou um padrão aqui? Atualize o kit
+  (`python3 docs/kit-camadas/gerar-modelos.py` e o `GUIA.md`).
 - A **explicação** para quem está chegando (visão, fluxos e conceitos, em linguagem simples) está em
   [`docs/guia.html`](docs/guia.html).
 

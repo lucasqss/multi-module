@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roadmap imóvel urbano</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --papel:#F2F4F1; --papel-2:#E8ECE7; --tinta:#1C2B3A; --grafite:#5B6773; --linha:#C9D1CC;
+  --carimbo:#A4262C; --registro:#2F6B4F; --foco:#2F5D8A; --lote:#FFFFFF;
+  --r-C:#3D6E99; --r-V:#9A7B3C; --r-AT:#5E7F80; --r-CR:#7A5C99; --r-FJ:#3F7A5A; --r-TS:#A0553A; --r-EXT:#6B7078;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --sans:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --papel:#131A21; --papel-2:#1A232C; --tinta:#E3E8E4; --grafite:#9AA6AE; --linha:#2E3A44;
+    --carimbo:#E0646A; --registro:#6FB892; --foco:#8DB7E0; --lote:#18212A;
+    --r-C:#7FAAD3; --r-V:#CDAE6E; --r-AT:#8FB1B2; --r-CR:#B39AD1; --r-FJ:#7DBB97; --r-TS:#D9906F; --r-EXT:#A3A9AE;
+  }
+}
+:root[data-theme="dark"]{
+  --papel:#131A21; --papel-2:#1A232C; --tinta:#E3E8E4; --grafite:#9AA6AE; --linha:#2E3A44;
+  --carimbo:#E0646A; --registro:#6FB892; --foco:#8DB7E0; --lote:#18212A;
+  --r-C:#7FAAD3; --r-V:#CDAE6E; --r-AT:#8FB1B2; --r-CR:#B39AD1; --r-FJ:#7DBB97; --r-TS:#D9906F; --r-EXT:#A3A9AE;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--papel);color:var(--tinta);font:400 16px/1.55 var(--sans);font-variant-numeric:tabular-nums}
+a{color:var(--foco)}
+:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px}
+h1,h2,h3{font-family:var(--serif);font-weight:600;line-height:1.15;margin:0}
+h1{font-size:clamp(2rem,4.6vw,3.25rem);letter-spacing:-.01em;max-width:24ch}
+h2{font-size:1.6rem;margin-bottom:.35rem}
+h3{font-size:1.15rem}
+p{margin:.4rem 0}
+.muted{color:var(--grafite)}
+
+/* cabeçalho */
+header.top{padding:40px 0 8px}
+.matricula{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:18px;color:var(--grafite);font-size:.92rem}
+.matricula b{color:var(--tinta);font-weight:600}
+.lede{font-size:1.1rem;max-width:62ch;margin-top:14px}
+
+/* a rua */
+.rua-sec{margin-top:34px}
+.legenda{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 18px}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--linha);background:var(--lote);color:var(--tinta);
+  border-radius:999px;padding:5px 12px 5px 9px;font:500 .88rem var(--sans);cursor:pointer}
+.chip i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.chip[aria-pressed="true"]{border-color:var(--tinta);box-shadow:inset 0 0 0 1px var(--tinta)}
+.chip.limpar{border-style:dashed}
+.rua{overflow-x:auto;padding:6px 2px 18px;scrollbar-width:thin}
+.quadras{display:flex;gap:18px;min-width:max-content;align-items:stretch}
+.quadra{display:flex;flex-direction:column;gap:8px}
+.quadra h3{font-size:.98rem;color:var(--grafite);font-family:var(--sans);font-weight:600;padding-left:2px}
+.lotes{display:flex;gap:6px;position:relative;padding-bottom:16px;flex:1}
+.lotes::after{content:"";position:absolute;left:-9px;right:-9px;bottom:0;height:8px;background:repeating-linear-gradient(90deg,var(--linha) 0 14px,transparent 14px 22px);border-radius:2px}
+.lote{position:relative;width:118px;min-height:132px;background:var(--lote);border:1px solid var(--linha);border-top:5px solid var(--cor);
+  border-radius:3px 3px 0 0;padding:10px 10px 12px;text-align:left;cursor:pointer;color:var(--tinta);font:inherit;
+  display:flex;flex-direction:column;gap:6px;transition:transform .15s ease, opacity .2s ease}
+.lote:hover{transform:translateY(-2px)}
+.lote[aria-selected="true"]{box-shadow:0 0 0 2px var(--tinta)}
+.lote .n{font:700 1.35rem/1 var(--serif);color:var(--cor)}
+.lote .nome{font-size:.86rem;line-height:1.3;font-weight:500}
+.lote .resp{margin-top:auto;font-size:.76rem;color:var(--grafite)}
+.lote.apagado{opacity:.28}
+.lote.pre{border-style:dashed;border-top-style:solid}
+.carimbo{position:absolute;top:6px;right:6px;font:700 .64rem/1 var(--sans);color:var(--carimbo);border:1.5px solid var(--carimbo);
+  border-radius:3px;padding:3px 4px;transform:rotate(-8deg);letter-spacing:.02em;background:var(--lote)}
+.lote.marco{border-bottom:3px solid var(--registro)}
+.marco-txt{font-size:.72rem;color:var(--registro);font-weight:600}
+
+/* ficha */
+.ficha{margin-top:8px;background:var(--lote);border:1px solid var(--linha);border-left:6px solid var(--cor,var(--tinta));border-radius:4px;padding:22px 24px}
+.ficha-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
+.ficha-top .n{font:700 2.2rem/1 var(--serif);color:var(--cor)}
+.ficha-top h3{font-size:1.45rem}
+.ficha .origem{font-size:.9rem;color:var(--grafite);margin-top:6px}
+.ficha .porque{margin-top:10px;padding:10px 12px;background:var(--papel-2);border-radius:3px;font-size:.95rem}
+.ficha .porque b{color:var(--carimbo)}
+.campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px 28px;margin-top:16px}
+.campo h4{margin:0 0 4px;font:600 .86rem var(--sans);color:var(--grafite)}
+.campo ul{margin:0;padding-left:18px}
+.campo li{margin:2px 0}
+.nav-ficha{display:flex;gap:8px;margin-top:18px}
+.btn{border:1px solid var(--linha);background:var(--papel);color:var(--tinta);border-radius:4px;padding:7px 12px;font:500 .9rem var(--sans);cursor:pointer}
+.btn:hover{border-color:var(--tinta)}
+
+/* seções */
+section.bloco{margin-top:56px}
+.intro{max-width:66ch}
+.escopo{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:16px;border:1px solid var(--linha);border-radius:4px;overflow:hidden;background:var(--lote)}
+.escopo > div{padding:16px 20px}
+.escopo > div + div{border-left:1px solid var(--linha);background:var(--papel-2)}
+.escopo ul{margin:8px 0 0;padding-left:18px}
+.escopo li{margin:3px 0}
+.ordem{list-style:none;padding:0;margin:16px 0 0;display:grid;gap:8px}
+.ordem li{display:grid;grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);gap:10px;align-items:center;background:var(--lote);border:1px solid var(--linha);border-radius:4px;padding:10px 14px}
+.ordem .seta{text-align:center;color:var(--grafite);font-size:1.2rem}
+.ordem .porq{grid-column:1/-1;font-size:.9rem;color:var(--grafite);border-top:1px dashed var(--linha);padding-top:6px}
+.ordem b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;background:var(--lote);border:1px solid var(--linha);border-radius:4px;overflow:hidden;font-size:.94rem}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--linha)}
+th{font-weight:600;background:var(--papel-2)}
+tr:last-child td{border-bottom:0}
+td.id{white-space:nowrap;font-weight:600}
+.rec{color:var(--registro);font-weight:600}
+.tabela-wrap{overflow-x:auto}
+.checklist{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:6px}
+.checklist label{display:flex;gap:10px;align-items:flex-start;background:var(--lote);border:1px solid var(--linha);border-radius:4px;padding:10px 12px;cursor:pointer}
+.checklist input{margin-top:3px;accent-color:var(--registro);width:17px;height:17px;flex:none}
+.checklist input:checked + span{color:var(--grafite);text-decoration:line-through;text-decoration-color:var(--linha)}
+.progresso{margin-top:10px;font-size:.92rem;color:var(--grafite)}
+.barra{height:6px;background:var(--papel-2);border-radius:3px;overflow:hidden;margin-top:6px;max-width:420px}
+.barra i{display:block;height:100%;background:var(--registro);width:0;transition:width .3s ease}
+details{background:var(--lote);border:1px solid var(--linha);border-radius:4px;margin-top:8px}
+summary{cursor:pointer;padding:10px 14px;font-weight:600}
+details pre{margin:0;padding:0 14px 14px;white-space:pre-wrap;font:400 .88rem/1.55 var(--sans);color:var(--tinta)}
+.etapas{list-style:none;padding:0;margin:16px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.etapas li{border:1px solid var(--linha);border-radius:4px;padding:10px 12px;background:var(--lote)}
+.etapas li.atual{border-color:var(--tinta);box-shadow:inset 4px 0 0 var(--registro)}
+.etapas .en{font:700 1.1rem var(--serif);margin-right:6px}
+.etapas small{display:block;color:var(--grafite);margin-top:3px}
+.alerta{margin-top:16px;border:1.5px solid var(--carimbo);border-radius:4px;padding:12px 16px;background:var(--lote)}
+.alerta b{color:var(--carimbo)}
+footer{margin:64px 0 40px;color:var(--grafite);font-size:.88rem;border-top:1px solid var(--linha);padding-top:16px}
+.tema{float:right}
+
+@media (max-width:720px){
+  .quadras{flex-direction:column;min-width:0}
+  .lotes{flex-wrap:wrap}
+  .lote{width:calc(50% - 3px);min-height:112px}
+  .lotes::after{display:none}
+  .escopo{grid-template-columns:1fr}
+  .escopo > div + div{border-left:0;border-top:1px solid var(--linha)}
+  .ordem li{grid-template-columns:1fr;gap:2px}
+  .ordem .seta{transform:rotate(90deg);text-align:left;width:20px}
+  .ficha{padding:18px 16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <button class="btn tema" id="tema" type="button" aria-label="Alternar tema claro/escuro">Tema</button>
+    <h1>Etapa 1: aquisição de imóvel urbano pronto</h1>
+    <p class="lede">O consorciado contemplado de um grupo de imóveis compra um imóvel urbano pronto, paga o vendedor com a carta de crédito e, se faltar, com recursos próprios. Ao final, a alienação fiduciária a favor do grupo está registrada na matrícula.</p>
+    <div class="matricula">
+      <span>Roadmap: <b>etapa 1 de 9</b></span>
+      <span>Situação: <b>em definição</b></span>
+      <span>Fases: <b>16</b> + pré-requisito</span>
+      <span>Fases acrescentadas: <b>8</b></span>
+      <span>Decisões em aberto: <b>8</b></span>
+    </div>
+  </header>
+
+  <section class="rua-sec" aria-labelledby="t-rua">
+    <h2 id="t-rua">O caminho do imóvel, fase a fase</h2>
+    <p class="muted intro">Cada lote é uma fase, na ordem em que acontece. A cor indica quem faz. O carimbo marca as fases acrescentadas à lista original. Selecione um lote para ver a ficha da fase.</p>
+    <div class="legenda" id="legenda" role="group" aria-label="Destacar por responsável"></div>
+    <div class="rua" id="rua"></div>
+    <article class="ficha" id="ficha" aria-live="polite"></article>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-escopo">
+    <h2 id="t-escopo">O que entra nesta etapa</h2>
+    <div class="escopo">
+      <div>
+        <h3>Dentro</h3>
+        <ul>
+          <li>Imóvel urbano construído, com construção averbada na matrícula</li>
+          <li>Residencial ou comercial, se o regulamento permitir</li>
+          <li>Vendedor pessoa física ou jurídica, sem ônus impeditivos</li>
+          <li>Pagamento à vista ao vendedor</li>
+          <li>Carta de crédito e recursos próprios</li>
+          <li>Ressarcimento de sinal pago após a contemplação; destinação da sobra</li>
+          <li>Grupos dos regimes Res. 285 e Circ. 3.432</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Fica para depois</h3>
+        <ul>
+          <li>FGTS (etapa 2)</li>
+          <li>Planta, terreno, construção e reforma (etapa 6)</li>
+          <li>Imóvel rural</li>
+          <li>Imóvel com financiamento do vendedor a quitar no ato (decisão D-E1-03)</li>
+          <li>Pagamento por etapas (etapa 6)</li>
+          <li>Crédito em espécie (etapa 5)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-ordem">
+    <h2 id="t-ordem">Ordem que não pode ser trocada</h2>
+    <p class="muted intro">Estas dependências protegem o grupo e evitam retrabalho com o cartório.</p>
+    <ol class="ordem">
+      <li><span><b>F4–F6</b> capacidade, jurídico e avaliação</span><span class="seta" aria-hidden="true">›</span><span><b>F9</b> contrato</span><span class="porq">O contrato precisa do valor avaliado, da dívida garantida e da matrícula sem ônus.</span></li>
+      <li><span><b>F7</b> complemento comprovado</span><span class="seta" aria-hidden="true">›</span><span><b>F9</b> contrato</span><span class="porq">O preço do contrato precisa estar integralmente coberto.</span></li>
+      <li><span><b>F11</b> ITBI pago</span><span class="seta" aria-hidden="true">›</span><span><b>F12</b> registro</span><span class="porq">O cartório não registra sem o imposto pago.</span></li>
+      <li><span><b>F12</b> registro concluído</span><span class="seta" aria-hidden="true">›</span><span><b>F14</b> pagamento</span><span class="porq">Pagar antes deixa o grupo sem garantia (recomendação; ver D-E1-01).</span></li>
+      <li><span><b>F14</b> pagamento confirmado</span><span class="seta" aria-hidden="true">›</span><span><b>F16</b> sobra</span><span class="porq">A sobra só existe depois da aquisição efetiva (Res. 285 art. 18 §3º).</span></li>
+    </ol>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-dec">
+    <h2 id="t-dec">Decisões a tomar</h2>
+    <p class="muted intro">Cada decisão muda o comportamento do processo. A recomendação é o ponto de partida para a conversa com o Jurídico e as áreas.</p>
+    <div class="tabela-wrap"><table id="decisoes"><thead><tr><th>#</th><th>Decisão</th><th>Opções</th><th>Recomendação</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-prazos">
+    <h2 id="t-prazos">Prazos e indicadores</h2>
+    <div class="tabela-wrap"><table>
+      <thead><tr><th>Trecho</th><th>Meta sugerida</th></tr></thead>
+      <tbody>
+        <tr><td>Comunicação formal até a aprovação (F1 → F7)</td><td>Prazo de análise do regulamento (PAR-06)</td></tr>
+        <tr><td>Aprovação até a assinatura (F7 → F10)</td><td>Até 5 dias úteis</td></tr>
+        <tr><td>Protocolo até o registro (F12)</td><td>Acompanhar por cartório</td></tr>
+        <tr><td>Registro até o pagamento (F13 → F14)</td><td>Até 2 dias úteis</td></tr>
+        <tr><td>Ponta a ponta (F1 → F14)</td><td>Até 30 dias úteis (mediana)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-pronto">
+    <h2 id="t-pronto">Definição de pronto</h2>
+    <p class="muted intro">Marque o que já foi cumprido. As marcações ficam salvas só neste navegador.</p>
+    <ul class="checklist" id="pronto"></ul>
+    <div class="progresso" id="progresso"></div>
+    <div class="barra" aria-hidden="true"><i id="barra"></i></div>
+    <div class="alerta"><b>Execução de garantia:</b> assim que o primeiro imóvel for pago, um atraso de mais de uma prestação já obriga a executar a garantia (Res. 285 art. 27). Defina ao menos um procedimento manual antes de entrar em operação, ou antecipe essa capacidade para logo após a etapa 1.</div>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-riscos">
+    <h2 id="t-riscos">Riscos desta etapa</h2>
+    <div class="tabela-wrap"><table>
+      <thead><tr><th>Risco</th><th>Como mitigar</th></tr></thead>
+      <tbody>
+        <tr><td>Prenotação vence durante a exigência do cartório</td><td>Controlar o prazo em F12 e priorizar a formalização</td></tr>
+        <tr><td>Fraude documental: vendedor não é o proprietário</td><td>Cruzar a identidade (F3) com a matrícula (F5)</td></tr>
+        <tr><td>Vendedor exige pagamento antes do registro</td><td>Explicar a condição desde a F1; cláusula de pagamento pós-registro no contrato</td></tr>
+        <tr><td>Avaliação abaixo do valor negociado</td><td>Complemento (F7) ou renegociação, comunicados cedo</td></tr>
+        <tr><td>Atraso de cartório</td><td>Indicador por cartório; prazo esperado informado ao cliente</td></tr>
+        <tr><td>Ônus surge na matrícula entre a análise e o registro</td><td>Matrícula atualizada próxima à assinatura</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-ca">
+    <h2 id="t-ca">Critérios de aceite específicos</h2>
+    <p class="muted intro">Somam-se aos critérios gerais do BDUF (CA-01 a CA-19 e CA-35 a CA-40 aplicáveis).</p>
+    <div id="criterios"></div>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-roadmap">
+    <h2 id="t-roadmap">Onde esta etapa fica no roadmap</h2>
+    <ol class="etapas">
+      <li class="atual"><span class="en">1</span>Imóvel urbano pronto<small>Constrói o tronco comum</small></li>
+      <li><span class="en">2</span>FGTS no imóvel<small>Complemento e lance</small></li>
+      <li><span class="en">3</span>Veículos<small>Subcategorias I e II</small></li>
+      <li><span class="en">4</span>Quitação de financiamento<small>Janela sem garantia</small></li>
+      <li><span class="en">5</span>Espécie e fim de ciclo<small>180 dias, baixa, encerramento</small></li>
+      <li><span class="en">6</span>Planta, construção e reforma<small>Pagamento por etapas</small></li>
+      <li><span class="en">7</span>Serviços<small>Garantia sem vínculo</small></li>
+      <li><span class="en">8</span>Eventos da cota<small>Cessão, sinistro, exclusão, execução</small></li>
+      <li><span class="en">9</span>Demais bens móveis<small>Máquinas, embarcações, aeronaves</small></li>
+    </ol>
+  </section>
+
+  <footer>
+    Fonte: <a href="README.md">README da etapa 1</a> · processo em <a href="processo-aquisicao-imovel-urbano.bpmn">BPMN</a> · definição completa no <a href="../../bduf/README.md">BDUF negocial</a>. Não é aconselhamento jurídico.
+  </footer>
+</div>
+
+<script>
+const RESP = {
+  C:{nome:"Consorciado"}, V:{nome:"Vendedor"}, AT:{nome:"Atendimento"}, CR:{nome:"Crédito e PLD"},
+  FJ:{nome:"Formalização, Jurídico e Engenharia"}, TS:{nome:"Tesouraria"}, EXT:{nome:"Cartório, prefeitura, seguradora"}
+};
+const QUADRAS = [
+  {nome:"Abertura", fases:["F0","F1","F2"]},
+  {nome:"Análises", fases:["F3","F4","F5","F6","F7"]},
+  {nome:"Seguro e contrato", fases:["F8","F9","F10","F11"]},
+  {nome:"Registro", fases:["F12","F13"]},
+  {nome:"Pagamento e encerramento", fases:["F14","F15","F16"]}
+];
+const FASES = {
+  F0:{nome:"Crédito disponibilizado", curto:"Crédito disponível", resp:["TS"], pre:true, origem:"Pré-requisito", uc:"UC14",
+      conclusao:["Crédito disponibilizado até o 3º dia útil, com extrato aberto e consorciado avisado"]},
+  F1:{nome:"Abertura do processo e comunicação formal", curto:"Abertura do processo", resp:["C","AT"], origem:"Sua etapa: criação do processo", uc:"UC02, UC01",
+      entradas:["Endereço e matrícula do imóvel","Vendedor (nome, CPF/CNPJ)","Valor negociado","Sinal pago, se houver","Composição dos recursos"],
+      atividades:["Simular sobra ou complemento","Validar elegibilidade: grupo de imóveis, imóvel urbano (inscrição de IPTU) e pronto, finalidade prevista no regulamento, área de atuação nos grupos antigos","Confirmar a comunicação formal"],
+      conclusao:["Solicitação em análise","Checklist gerado","Prazo de análise iniciado"], recusas:["MOT-011 categoria diferente","MOT-013 fora da área de atuação","MOT-014 finalidade não prevista","MOT-015 já há solicitação em andamento"]},
+  F2:{nome:"Envio de documentos", curto:"Envio de documentos", resp:["C","V"], origem:"Sua etapa: envio de documentos", uc:"UC03",
+      atividades:["Consorciado: identificação, estado civil, residência, renda","Vendedor: identificação, estado civil e regime de bens, conta, matrícula atualizada, certidões, IPTU, condomínio"],
+      conclusao:["Checklist completo ou pendências abertas"], recusas:["MOT-030 documento pendente","MOT-031 documento vencido"]},
+  F3:{nome:"Qualificação do vendedor", curto:"Qualificação do vendedor", resp:["CR"], nova:true, origem:"Fase acrescentada", uc:"UC23",
+      porque:"O pagamento vai a um terceiro: é preciso confirmar quem recebe e de quem é a conta (RN-07, RN-19).",
+      atividades:["Situação cadastral","Titularidade da conta","Listas restritivas e pessoa politicamente exposta","Classificação de risco"],
+      conclusao:["Vendedor qualificado, ou solicitação reprovada / troca de conta"]},
+  F4:{nome:"Análise de capacidade de pagamento", curto:"Capacidade de pagamento", resp:["CR"], nova:true, origem:"Fase acrescentada", uc:"UC04",
+      porque:"Obrigatória na contemplação, com evidência guardada por 5 anos após o encerramento do grupo (Res. 285 art. 3º §§2º-3º).",
+      conclusao:["Aprovado, aprovado com garantia complementar, pendente ou reprovado","Evidência guardada"]},
+  F5:{nome:"Análise jurídica do imóvel e do vendedor", curto:"Análise jurídica", resp:["FJ"], nova:true, origem:"Fase acrescentada", uc:"UC05",
+      porque:"A garantia só vale se a matrícula estiver sem ônus e a construção averbada; restrições do vendedor podem anular a venda.",
+      atividades:["Vendedor é o proprietário na matrícula","Construção averbada","Sem penhora, indisponibilidade, hipoteca ou alienação não quitada, usufruto","Certidões do vendedor e do imóvel","Estado civil e outorga do cônjuge"],
+      conclusao:["Parecer favorável, com ou sem condições"], recusas:["Construção não averbada: pendência ou recusa (D-E1-04)","Financiamento do vendedor: D-E1-03"]},
+  F6:{nome:"Vistoria e avaliação", curto:"Vistoria e avaliação", resp:["FJ"], origem:"Sua etapa: vistoria", uc:"UC05",
+      atividades:["Vistoria por engenharia própria ou terceirizada","Laudo com valor avaliado e condição do imóvel"],
+      conclusao:["Valor da carta usado = menor entre negociado, avaliado e saldo","A garantia cobre o valor avaliado"]},
+  F7:{nome:"Decisão consolidada e complemento", curto:"Decisão e complemento", resp:["CR","FJ","C"], nova:true, origem:"Fase acrescentada", uc:"UC04, UC05, UC11",
+      porque:"Se o imóvel custa mais que a carta, o complemento precisa estar comprovado antes de redigir o contrato.",
+      atividades:["Aprovar só com F3, F4, F5 e F6 aprovadas","Comprovante do complemento pago ao vendedor"],
+      conclusao:["Solicitação aprovada e preço integralmente coberto"]},
+  F8:{nome:"Seguros", curto:"Seguros", resp:["C","EXT"], origem:"Sua etapa: seguro", uc:"—",
+      atividades:["Danos físicos ao imóvel (o imóvel é a garantia do grupo)","Prestamista: confirmar se já está vinculado à cota"],
+      conclusao:["Apólice ou certificado emitido, com o grupo/administradora como beneficiário","Prêmio pode ser reembolsado pela sobra"]},
+  F9:{nome:"Redação do instrumento de compra e venda com alienação fiduciária", curto:"Redigir contrato", resp:["FJ"], origem:"Sua etapa: redigir contrato", uc:"—",
+      atividades:["Compra e venda e alienação fiduciária no mesmo instrumento particular (Lei 11.795 art. 45; Lei 9.514 art. 38)","Qualificação das partes e descrição conforme a matrícula","Preço e forma de pagamento: carta, próprios, sinal","Dívida garantida, prazo, valor para leilão, carência","Obrigação de seguro e pagamento ao vendedor após o registro"],
+      conclusao:["Minuta aprovada"]},
+  F10:{nome:"Assinaturas", curto:"Assinar contrato", resp:["FJ","C","V"], origem:"Sua etapa: assinar contrato", uc:"—",
+      atividades:["Comprador e cônjuge, vendedor e cônjuge, administradora (e testemunhas, se exigidas)","Forma física ou eletrônica aceita pelo cartório"],
+      conclusao:["Instrumento assinado por todos"]},
+  F11:{nome:"ITBI", curto:"ITBI", resp:["C","EXT"], nova:true, origem:"Fase acrescentada", uc:"—",
+      porque:"O cartório não registra sem o ITBI pago; o valor pode ser reembolsado pela sobra, dentro do teto de 10%.",
+      conclusao:["Guia paga e comprovante anexado"]},
+  F12:{nome:"Registro no cartório", curto:"Registro em cartório", resp:["FJ","EXT"], marco:true, origem:"Sua etapa: constituir garantia junto ao cartório", uc:"UC06",
+      atividades:["Prenotação","Qualificação do título","Cumprir exigências dentro do prazo da prenotação","Registro da compra e venda e da alienação fiduciária (ato único)"],
+      conclusao:["Matrícula com o consorciado proprietário e a alienação fiduciária a favor do grupo"]},
+  F13:{nome:"Conferência do registro e pré-condições", curto:"Conferir registro", resp:["FJ"], nova:true, origem:"Fase acrescentada", uc:"UC13",
+      porque:"Confirma na matrícula que a garantia ficou a favor do grupo e aplica o checklist do art. 18 §2º antes de pagar.",
+      conclusao:["Solicitação apta a pagamento"]},
+  F14:{nome:"Liberação do pagamento", curto:"Liberar pagamento", resp:["TS"], origem:"Sua etapa: liberar pagamento", uc:"UC07, UC12",
+      atividades:["Ordem ao vendedor: valor da carta usado menos o sinal","Ordem ao consorciado do sinal, se houver","Aprovação por pessoa diferente de quem preparou, dentro da alçada","Confirmação bancária"],
+      conclusao:["Pagamento confirmado","Crédito utilizado"]},
+  F15:{nome:"Entrega da posse", curto:"Entrega da posse", resp:["V","C"], nova:true, origem:"Fase acrescentada", uc:"—",
+      porque:"Fecha a operação com o vendedor; pendências de posse viram ocorrência, não problema financeiro.",
+      conclusao:["Chaves entregues e termo de entrega assinado"]},
+  F16:{nome:"Sobra e encerramento", curto:"Sobra e encerramento", resp:["C","TS"], nova:true, origem:"Fase acrescentada", uc:"UC10, UC24",
+      porque:"A sobra é comum: pode reembolsar ITBI, registro e seguros até 10% da carta, abater prestações ou ser devolvida com a cota quitada.",
+      conclusao:["Solicitação concluída","Dossiê arquivado","Conciliação do dia sem divergência"]}
+};
+const DECISOES = [
+  ["D-E1-01","Quando pagar o vendedor","Após o registro · contra prenotação com retenção","Após o registro"],
+  ["D-E1-02","Seguros obrigatórios","Danos físicos · prestamista · ambos","Danos físicos obrigatório; confirmar prestamista na cota"],
+  ["D-E1-03","Imóvel com financiamento do vendedor","Recusar na etapa 1 · aceitar com quitação no ato","Recusar com orientação; tratar na etapa 4"],
+  ["D-E1-04","Construção não averbada","Recusar · pendência para o vendedor averbar","Pendência com prazo; recusa se não regularizar"],
+  ["D-E1-05","Imóvel comercial","Aceitar · só residencial","Seguir o regulamento do grupo"],
+  ["D-E1-06","Certidões exigidas do vendedor","Lista completa · lista reduzida (concentração na matrícula)","Definir com o Jurídico"],
+  ["D-E1-07","Complemento","Pago direto ao vendedor · depositado para pagamento único","Direto ao vendedor, com comprovante"],
+  ["D-E1-08","Assinatura","Física · eletrônica","Conforme aceitação dos cartórios atendidos"]
+];
+const PRONTO = [
+  "As 16 fases operam de ponta a ponta para os regimes Res. 285 e Circ. 3.432",
+  "Decisões D-E1-01 a D-E1-08 tomadas e refletidas nos parâmetros",
+  "Parâmetros PAR-01, 06, 07, 08, 10, 13, 20, 21, 22, 25, 29, 30 e 31 com valores definidos",
+  "Checklist de documentos validado pelo Jurídico",
+  "Modelo de instrumento com alienação fiduciária aprovado e testado em um cartório de cada praça",
+  "Critérios de aceite da etapa aprovados",
+  "Textos das comunicações ao cliente aprovados",
+  "Conciliação diária funcionando",
+  "Contingência para execução de garantia definida",
+  "Indicadores da etapa sendo medidos"
+];
+const CRITERIOS = [
+  ["CA-E1-01 — Construção não averbada","Dado um imóvel cuja matrícula não registra a construção\nQuando a análise jurídica é concluída\nEntão a solicitação fica pendente pedindo a averbação ao vendedor"],
+  ["CA-E1-02 — Imóvel com financiamento do vendedor","Dado uma matrícula com alienação fiduciária a favor de um banco, em nome do vendedor\nQuando a análise jurídica é concluída\nEntão a solicitação é recusada com orientação para quitação prévia pelo vendedor"],
+  ["CA-E1-03 — Pagamento só após o registro","Dado o instrumento assinado, o ITBI pago e o título apenas prenotado\nQuando o preparador tenta criar o pagamento ao vendedor\nEntão o pagamento é bloqueado com o motivo MOT-040"],
+  ["CA-E1-04 — Garantia a favor do grupo conferida","Dado o registro concluído\nQuando a matrícula não mostra a alienação fiduciária a favor da administradora\nEntão a solicitação não fica apta a pagamento e é aberta uma exigência de retificação"],
+  ["CA-E1-05 — Reembolso de ITBI pela sobra","Dado uma carta de R$ 300.000,00 sem lance embutido, um imóvel de R$ 280.000,00 pago e um ITBI de R$ 5.600,00 pago pelo consorciado\nQuando o consorciado escolhe reembolsar o ITBI com a sobra\nEntão R$ 5.600,00 é pago ao consorciado como despesa vinculada\nE o teto restante para despesas é R$ 24.400,00"],
+  ["CA-E1-06 — Complemento antes do contrato","Dado um imóvel de R$ 350.000,00 e um saldo utilizável de R$ 300.000,00\nQuando o comprovante do complemento de R$ 50.000,00 não foi anexado\nEntão a redação do instrumento não é iniciada"]
+];
+
+const $ = s => document.querySelector(s);
+const ordem = QUADRAS.flatMap(q => q.fases);
+let filtro = null;
+let atual = "F1";
+
+function store(get, key, val){
+  try { return get ? localStorage.getItem(key) : localStorage.setItem(key, val); } catch(e){ return null; }
+}
+const corDe = id => `var(--r-${FASES[id].resp[0]})`;
+
+function renderLegenda(){
+  const el = $("#legenda");
+  el.innerHTML = Object.entries(RESP).map(([k,v]) =>
+    `<button type="button" class="chip" data-r="${k}" aria-pressed="false"><i style="background:var(--r-${k})"></i>${v.nome}</button>`).join("")
+    + `<button type="button" class="chip limpar" data-r="" aria-pressed="false">Mostrar todos</button>`;
+  el.addEventListener("click", e => {
+    const b = e.target.closest(".chip"); if(!b) return;
+    filtro = b.dataset.r && filtro !== b.dataset.r ? b.dataset.r : null;
+    el.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(!!filtro && c.dataset.r === filtro)));
+    document.querySelectorAll(".lote").forEach(l => l.classList.toggle("apagado", !!filtro && !FASES[l.dataset.id].resp.includes(filtro)));
+  });
+}
+
+function renderRua(){
+  $("#rua").innerHTML = `<div class="quadras" role="tablist" aria-label="Fases do processo">` + QUADRAS.map(q => `
+    <div class="quadra"><h3>${q.nome}</h3><div class="lotes">` + q.fases.map(id => {
+      const f = FASES[id];
+      return `<button type="button" role="tab" class="lote${f.pre?" pre":""}${f.marco?" marco":""}" data-id="${id}" id="tab-${id}"
+        aria-selected="false" aria-controls="ficha" style="--cor:${corDe(id)}">
+        ${f.nova?'<span class="carimbo">nova</span>':""}
+        <span class="n">${id}</span><span class="nome">${f.curto}</span>
+        ${f.marco?'<span class="marco-txt">garantia passa a valer</span>':""}
+        <span class="resp">${f.resp.map(r=>RESP[r].nome.split(",")[0]).join(" · ")}</span></button>`;
+    }).join("") + `</div></div>`).join("") + `</div>`;
+  $("#rua").addEventListener("click", e => {
+    const b = e.target.closest(".lote"); if(!b) return;
+    selecionar(b.dataset.id, true);
+    if(matchMedia("(max-width:720px)").matches) $("#ficha").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth"});
+  });
+  $("#rua").addEventListener("keydown", e => {
+    if(!["ArrowRight","ArrowLeft"].includes(e.key)) return;
+    const i = ordem.indexOf(atual) + (e.key === "ArrowRight" ? 1 : -1);
+    if(i >= 0 && i < ordem.length){ e.preventDefault(); selecionar(ordem[i], true); $("#tab-"+ordem[i]).focus(); }
+  });
+}
+
+function lista(titulo, itens){
+  return itens && itens.length ? `<div class="campo"><h4>${titulo}</h4><ul>${itens.map(i=>`<li>${i}</li>`).join("")}</ul></div>` : "";
+}
+
+function selecionar(id, salvar){
+  atual = id;
+  const f = FASES[id];
+  document.querySelectorAll(".lote").forEach(l => {
+    const s = l.dataset.id === id; l.setAttribute("aria-selected", String(s)); l.tabIndex = s ? 0 : -1;
+  });
+  const i = ordem.indexOf(id);
+  const ficha = $("#ficha");
+  ficha.style.setProperty("--cor", corDe(id));
+  ficha.innerHTML = `
+    <div class="ficha-top"><span class="n">${id}</span><h3>${f.nome}</h3></div>
+    <p class="origem">${f.origem} · responsável: ${f.resp.map(r=>RESP[r].nome).join(", ")} · caso de uso: ${f.uc}</p>
+    ${f.porque?`<p class="porque"><b>Por que entra:</b> ${f.porque}</p>`:""}
+    <div class="campos">${lista("Entradas",f.entradas)}${lista("O que acontece",f.atividades)}${lista("Pronto quando",f.conclusao)}${lista("Recusas e pendências",f.recusas)}</div>
+    <div class="nav-ficha">
+      <button type="button" class="btn" ${i===0?"disabled":""} data-go="${ordem[i-1]||""}">Fase anterior</button>
+      <button type="button" class="btn" ${i===ordem.length-1?"disabled":""} data-go="${ordem[i+1]||""}">Próxima fase</button>
+    </div>`;
+  ficha.setAttribute("aria-labelledby", "tab-"+id);
+  if(salvar) store(false, "roadmap-e1-fase", id);
+}
+
+function renderDecisoes(){
+  $("#decisoes tbody").innerHTML = DECISOES.map(d =>
+    `<tr><td class="id">${d[0]}</td><td>${d[1]}</td><td>${d[2]}</td><td class="rec">${d[3]}</td></tr>`).join("");
+}
+
+function renderPronto(){
+  let marcados = [];
+  try { marcados = JSON.parse(store(true, "roadmap-e1-pronto") || "[]"); } catch(e){ marcados = []; }
+  $("#pronto").innerHTML = PRONTO.map((t,i) =>
+    `<li><label><input type="checkbox" data-i="${i}" ${marcados.includes(i)?"checked":""}><span>${t}</span></label></li>`).join("");
+  const atualizar = () => {
+    const sel = [...document.querySelectorAll("#pronto input:checked")].map(x => +x.dataset.i);
+    $("#progresso").textContent = `${sel.length} de ${PRONTO.length} itens cumpridos`;
+    $("#barra").style.width = (sel.length / PRONTO.length * 100) + "%";
+    store(false, "roadmap-e1-pronto", JSON.stringify(sel));
+  };
+  $("#pronto").addEventListener("change", atualizar);
+  atualizar();
+}
+
+function renderCriterios(){
+  $("#criterios").innerHTML = CRITERIOS.map(c => `<details><summary>${c[0]}</summary><pre>${c[1]}</pre></details>`).join("");
+}
+
+function tema(){
+  const root = document.documentElement;
+  const salvo = store(true, "roadmap-tema");
+  if(salvo) root.dataset.theme = salvo;
+  $("#tema").addEventListener("click", () => {
+    const escuro = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = escuro ? "light" : "dark";
+    store(false, "roadmap-tema", root.dataset.theme);
+  });
+}
+
+tema();
+renderLegenda();
+renderRua();
+$("#ficha").addEventListener("click", e => { const b = e.target.closest("[data-go]"); if(b && b.dataset.go){ selecionar(b.dataset.go, true); }});
+const salva = store(true, "roadmap-e1-fase");
+selecionar(FASES[salva] ? salva : "F1", false);
+renderDecisoes();
+renderPronto();
+renderCriterios();
+</script>
+</body>
+</html>

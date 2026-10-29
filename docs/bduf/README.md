@@ -28,6 +28,8 @@ Base normativa, modalidades e processos de referência: [`../utilizacao-credito/
 ### Diagramas (`diagramas/`)
 `01-partes-envolvidas.puml` · `02-ciclo-solicitacao.puml` · `03-ciclo-garantia.puml` · `04-ciclo-pagamento.puml` · BPMN complementar em [`../utilizacao-credito/diagramas/bpmn/05-cessao-sinistro-credito-parcial.bpmn`](../utilizacao-credito/diagramas/bpmn/05-cessao-sinistro-credito-parcial.bpmn)
 
+> **Roadmap de entrega:** [`../roadmap/`](../roadmap/README.md) (etapa 1: aquisição de imóvel urbano pronto).
+
 ## Convenções
 
 | Convenção | Significado |

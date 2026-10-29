@@ -1,0 +1,25 @@
+@startuml ciclo-garantia
+title Garantia — ciclo de vida
+
+[*] --> PROPOSTA
+PROPOSTA --> EM_ASSINATURA : envelope enviado
+EM_ASSINATURA --> ASSINADA : assinaturas concluídas
+ASSINADA --> EM_REGISTRO : protocolo SNG / RI / RTD
+ASSINADA --> REGISTRADA : fiança / aval\n(sem registro externo)
+EM_REGISTRO --> EM_EXIGENCIA : nota de exigência
+EM_EXIGENCIA --> EM_REGISTRO : exigência cumprida
+EM_REGISTRO --> REGISTRADA : registro concluído\n[cobertura >= saldo]
+REGISTRADA --> SUBSTITUIDA : nova garantia registrada (UC16)
+REGISTRADA --> EM_EXECUCAO : atraso > 1 prestação (RN-15)
+EM_EXECUCAO --> REGISTRADA : purgação da mora
+EM_EXECUCAO --> EXECUTADA : bem alienado
+REGISTRADA --> BAIXA_SOLICITADA : cota quitada (RN-12)
+BAIXA_SOLICITADA --> BAIXADA : baixa confirmada
+PROPOSTA --> CANCELADA
+EM_ASSINATURA --> CANCELADA
+EM_REGISTRO --> CANCELADA
+SUBSTITUIDA --> [*]
+EXECUTADA --> [*]
+BAIXADA --> [*]
+CANCELADA --> [*]
+@enduml

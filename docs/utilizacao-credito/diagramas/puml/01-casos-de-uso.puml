@@ -38,7 +38,13 @@ rectangle "Plataforma de utilização do crédito (unificada)" {
   usecase "UC18 Executar garantia\n(atraso > 1 prestação)" as UC18 <<pos-utilizacao>>
   usecase "UC19 Baixar garantia\n(após quitação da cota)" as UC19 <<pos-utilizacao>>
   usecase "UC20 Comunicar crédito não utilizado\nno encerramento do grupo" as UC20
+  usecase "UC21 Tratar óbito / sinistro\ndo titular" as UC21
+  usecase "UC22 Pagar crédito parcial\nao excluído contemplado" as UC22
+  usecase "UC23 Qualificar beneficiário\n(KYC do recebedor)" as UC23 <<transversal>>
+  usecase "UC24 Conciliar pagamentos\ne saldo do crédito" as UC24 <<transversal>>
 }
+
+actor "Seguradora" as SEG
 
 C --> UC01
 C --> UC02
@@ -64,6 +70,13 @@ JUR --> UC18
 T --> UC14
 T --> UC15
 T --> UC20
+C --> UC21
+SEG --> UC21
+TES --> UC22
+AN --> UC23
+F --> UC23
+TES --> UC24
+UC13 ..> UC23 : <<include>>
 
 UC07 --> F
 UC08 --> F

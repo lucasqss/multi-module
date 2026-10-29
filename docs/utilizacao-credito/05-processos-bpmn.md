@@ -8,6 +8,7 @@ Os arquivos ficam em [`diagramas/bpmn/`](diagramas/bpmn/). Todos trazem layout (
 | `02-pagamento-por-etapas.bpmn` | Pagamento por etapas | Planta, construção, reforma, serviço por cronograma |
 | `03-quitacao-financiamento.bpmn` | Quitação de financiamento | Com controle da janela sem garantia |
 | `04-eventos-pos-contemplacao.bpmn` | 4 pools independentes | Espécie (180 dias), inadimplência, baixa de garantia, encerramento do grupo |
+| `05-cessao-sinistro-credito-parcial.bpmn` | 3 pools independentes | Cessão de cota contemplada, óbito/sinistro, crédito parcial do excluído |
 
 ## 1. Processo principal
 

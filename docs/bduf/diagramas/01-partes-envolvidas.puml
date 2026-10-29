@@ -1,0 +1,40 @@
+@startuml partes-envolvidas
+title Utilização da carta de crédito — Partes envolvidas e o que trocam
+
+actor "Consorciado\n(contemplado)" as C
+actor "Vendedor / Fornecedor /\nPrestador / Construtora" as F
+actor "Credor do financiamento\na quitar" as CR
+actor "Garantidor\n(fiador, avalista)" as G
+
+rectangle "Administradora\n(processo de utilização do crédito)" as ADM #1F4E79;text:white
+
+rectangle "Gestão do grupo\n(assembleias, cotas, prestações)" as GRP
+rectangle "Banco da conta do grupo" as BCO
+rectangle "Registros\n(gravame de veículos, Registro de Imóveis, RTD)" as REG
+rectangle "CAIXA (FGTS)" as FGTS
+rectangle "Seguradora (prestamista)" as SEG
+rectangle "Avaliadores / tabelas de referência" as AVAL
+rectangle "Cobrança / Jurídico" as JUR
+rectangle "Contabilidade do grupo" as CTB
+
+C --> ADM : escolha do objeto, documentos,\nautorizações, destinação da sobra
+ADM --> C : saldo, pendências, prazos,\ncomprovantes, termo de liberação
+F --> ADM : proposta, NF, medições, dados bancários
+ADM --> F : pagamento
+CR --> ADM : saldo de quitação, termo de quitação
+ADM --> CR : pagamento da quitação
+G --> ADM : garantia pessoal
+GRP --> ADM : contemplação homologada,\nsaldo devedor, cota quitada, exclusão
+ADM --> GRP : amortização de vincendas,\nsituação da utilização
+ADM --> BCO : ordens de pagamento
+BCO --> ADM : confirmação, devolução, extrato
+ADM --> REG : constituição e baixa de garantia
+REG --> ADM : registro, exigência, baixa
+ADM --> FGTS : pedido de uso do FGTS
+FGTS --> ADM : autorização / liberação
+SEG --> ADM : indenização de sinistro
+AVAL --> ADM : valor de referência / laudo
+ADM --> JUR : dossiê para execução de garantia
+JUR --> ADM : resultado da execução
+ADM --> CTB : movimentos do crédito por grupo
+@enduml

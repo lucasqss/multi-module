@@ -94,3 +94,17 @@ Diagrama: [`diagramas/puml/01-casos-de-uso.puml`](diagramas/puml/01-casos-de-uso
 
 ### UC20 — Comunicar crédito não utilizado no encerramento
 - Até 60 dias após a última AGO de contemplação, com controle de recebimento; o que não for procurado vira recurso não procurado.
+
+### UC21 — Tratar óbito / sinistro do titular
+- Suspende os pagamentos, aciona a seguradora e, conforme o crédito tenha sido usado ou não, amortiza/quita o saldo e mantém o crédito para os sucessores ou baixa a garantia (Res. 285 arts. 14 e 29). BPMN: `bpmn/05-cessao-sinistro-credito-parcial.bpmn`.
+
+### UC22 — Pagar crédito parcial ao excluído contemplado
+- Apenas `RES_285` e crédito não utilizado na aquisição (art. 32 p.u.); cálculo do art. 33; comunicação com controle de recebimento.
+
+### UC23 — Qualificar beneficiário
+- KYC do recebedor (situação cadastral, titularidade da conta, listas restritivas, PEP) antes de qualquer pagamento.
+
+### UC24 — Conciliar pagamentos e saldo do crédito
+- Diária: pagamentos confirmados pelo banco × extratos dos créditos × saldo aplicado do grupo × situação das cotas.
+
+> Especificação completa de todos os UCs: [BDUF negocial](../bduf/03-casos-de-uso.md).

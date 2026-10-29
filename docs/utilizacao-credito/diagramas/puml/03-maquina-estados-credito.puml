@@ -41,14 +41,6 @@ state "Em utilização" as EmUtilizacao {
 Disponibilizado --> EmUtilizacao : consorciado inicia
 Disponibilizado : rende até a utilização [art. 17]
 
-EmUtilizacao --> Utilizado : pagamento à vista\nou última etapa
-EmUtilizacao --> ExcluidoComCreditoParcial : inadimplência (3 venc.)\n[RES_285 arts. 32-33]
-EmUtilizacao --> ContemplacaoCancelada : AGO cancela\n[CIRC_3432 art. 10]
-Disponibilizado --> ElegivelEspecie : 180 dias [art. 15 §2º]
-EmUtilizacao --> ElegivelEspecie : 180 dias sem pagamento
-ElegivelEspecie --> EmUtilizacao : opta por aquisição
-ElegivelEspecie --> PagoEmEspecie : cota quitada + conta própria
-
 state Utilizado {
   state "Sobra em destinação" as Sobra
   state "Garantia ativa" as GarantiaAtiva
@@ -56,6 +48,15 @@ state Utilizado {
   [*] --> GarantiaAtiva : sem sobra
   Sobra --> GarantiaAtiva : destinada\n[art. 18 §3º]
 }
+
+EmUtilizacao --> Utilizado : pagamento à vista\nou última etapa
+EmUtilizacao --> ExcluidoComCreditoParcial : inadimplência (3 venc.)\n[RES_285 arts. 32-33]
+EmUtilizacao --> ContemplacaoCancelada : AGO cancela\n[CIRC_3432 art. 10]
+Disponibilizado --> ElegivelEspecie : 180 dias [art. 15 §2º]
+EmUtilizacao --> ElegivelEspecie : 180 dias sem pagamento
+ElegivelEspecie --> EmUtilizacao : opta por aquisição
+ElegivelEspecie --> PagoEmEspecie : cota quitada + conta própria
+Disponibilizado --> ExcluidoComCreditoParcial : inadimplência (3 venc.)\n[RES_285 arts. 32-33]
 
 Utilizado --> EmExecucaoGarantia : atraso > 1 prestação\n[art. 27]
 Utilizado --> GarantiaBaixada : cota quitada\n[Lei 11.795 art. 14 §5º II]

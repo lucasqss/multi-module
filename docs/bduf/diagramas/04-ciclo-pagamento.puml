@@ -1,0 +1,24 @@
+@startuml ciclo-pagamento
+title Pagamento — ciclo de vida e efeito no saldo do crédito
+
+[*] --> PENDENTE_APROVACAO : criada (UC13 ok)\n/ compromete valor
+PENDENTE_APROVACAO --> APROVADA : 2º aprovador (alçada)
+PENDENTE_APROVACAO --> CANCELADA : recusada\n/ desfaz comprometimento
+APROVADA --> ENVIADA : entregue ao banco
+APROVADA --> CANCELADA : cancelada antes do envio\n/ desfaz comprometimento
+ENVIADA --> LIQUIDADA : liquidação confirmada\n/ pagamento no extrato
+ENVIADA --> REJEITADA : rejeição\n/ desfaz comprometimento
+ENVIADA --> EM_VERIFICACAO : sem confirmação no prazo
+EM_VERIFICACAO --> LIQUIDADA : consulta: liquidada
+EM_VERIFICACAO --> REJEITADA : consulta: rejeitada
+LIQUIDADA --> DEVOLVIDA : devolução pelo recebedor\n/ estorno ao saldo
+CANCELADA --> [*]
+REJEITADA --> [*]
+LIQUIDADA --> [*]
+DEVOLVIDA --> [*]
+
+note right of EM_VERIFICACAO
+  Nunca pagar de novo sem confirmar a falha;
+  consultar o banco antes de qualquer reenvio.
+end note
+@enduml

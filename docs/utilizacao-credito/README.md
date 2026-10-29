@@ -12,12 +12,14 @@ O objetivo é servir de **modelo de referência genérico**. A solução real ap
 | 02 | [Modalidades e suas divergências](02-modalidades.md) | — |
 | 03 | [Casos de uso](03-casos-de-uso.md) | `puml/01-casos-de-uso.puml` |
 | 04 | [Modelo de domínio](04-modelo-dominio.md) | `puml/02-modelo-dominio.puml`, `puml/03-maquina-estados-credito.puml` |
-| 05 | [Processos (BPMN)](05-processos-bpmn.md) | `bpmn/01..04-*.bpmn` |
+| 05 | [Processos (BPMN)](05-processos-bpmn.md) | `bpmn/01..05-*.bpmn` |
 | 06 | [Jornada do cliente](06-jornada-cliente.md) | `puml/04-jornada-cliente.puml`, `puml/05..07-sequencia-*.puml` |
 | 07 | [Catálogo de regras de negócio](07-regras-de-negocio.md) | — |
 | 08 | [Arquitetura da solução unificada](08-arquitetura-solucao-unificada.md) | `puml/08-componentes-solucao-unificada.puml` |
 | 09 | [Parametrização do meu sistema](09-parametrizacao-do-meu-sistema.md) | — (template a preencher) |
 | 10 | [Referências e pontos em aberto](10-referencias-e-pendencias.md) | — |
+
+> **BDUF negocial** (especificação completa e agnóstica de tecnologia, construída sobre esta referência): [`../bduf/`](../bduf/README.md)
 
 ## Convenção de rótulos
 

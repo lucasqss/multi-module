@@ -1,0 +1,36 @@
+@startuml ciclo-solicitacao
+title Solicitação de utilização — ciclo de vida
+
+[*] --> RASCUNHO : finalidade e objeto elegíveis
+RASCUNHO --> EM_ANALISE : comunicação formal confirmada
+RASCUNHO --> CANCELADA : desistência / expiração
+EM_ANALISE --> PENDENTE_DOCUMENTOS : pendência
+PENDENTE_DOCUMENTOS --> EM_ANALISE : pendências sanadas
+EM_ANALISE --> REPROVADA : análise reprovada
+EM_ANALISE --> APROVADA : todas aprovadas
+APROVADA --> EM_FORMALIZACAO : constituir garantia
+APROVADA --> APTA_PAGAMENTO : sem garantia nova (espécie)
+APROVADA --> EM_PAGAMENTO : quitação de financiamento
+EM_FORMALIZACAO --> APTA_PAGAMENTO : garantia registrada + UC13
+APTA_PAGAMENTO --> EM_PAGAMENTO : ordem criada
+EM_PAGAMENTO --> APTA_PAGAMENTO : ordem rejeitada
+EM_PAGAMENTO --> EM_FORMALIZACAO : quitação liquidada\n(nova AF)
+EM_FORMALIZACAO --> PAGA : quitação: nova AF registrada
+EM_PAGAMENTO --> PAGA : ordens/etapas liquidadas
+PAGA --> EM_DESTINACAO_SOBRA : saldo > 0
+PAGA --> CONCLUIDA : sem saldo
+EM_DESTINACAO_SOBRA --> CONCLUIDA : sobra destinada
+EM_ANALISE --> CANCELADA : desistência / cessão / exclusão
+APTA_PAGAMENTO --> CANCELADA : sem ordem enviada
+REPROVADA --> [*]
+CANCELADA --> [*]
+CONCLUIDA --> [*]
+
+state SUSPENSA
+note right of SUSPENSA
+  Alcançável de qualquer estado não final
+  quando o crédito fica SUSPENSO
+  (óbito, ordem judicial); retorna
+  ao estado anterior.
+end note
+@enduml

@@ -1,0 +1,53 @@
+@startuml sequencia-quitacao-financiamento
+title Sequência — Quitação de financiamento próprio com a carta
+autonumber
+
+actor Consorciado as C
+participant "Orquestrador de\nUtilização" as ORQ
+participant "PoliticaModalidade" as POL
+participant "Garantias" as GAR
+participant "Tesouraria" as TES
+participant "Credor original" as CR
+participant "Registro externo" as EXT
+participant "Agendador" as SCH
+
+C -> ORQ : solicitar quitação(contrato, credor)
+ORQ -> POL : validarQuitacao(financiamento)
+note right of POL
+  [NORMA] art. 15 II e §1º:
+  - titularidade do consorciado
+  - mesma categoria do grupo
+  - quitação TOTAL
+  - inclui leasing financeiro e
+    consórcio já utilizado
+  [NORMA] Lei 11.795 art. 22 §3º: anuência prévia
+end note
+POL --> ORQ : elegível
+C -> ORQ : anexar saldo de quitação (com validade)
+alt saldoQuitacao > saldoUtilizavel
+  C -> ORQ : comprovar aporte de recursos próprios
+end
+ORQ -> TES : pagar(credor, saldoQuitacao)
+TES -> CR : pagamento (boleto/TED)
+ORQ -> SCH : agendar alerta "janela sem garantia" (prazo parametrizado)
+ORQ -> ORQ : estado = QUITACAO_EM_ANDAMENTO
+
+alt termo de quitação recebido no prazo
+  CR --> ORQ : termo de quitação + baixa do gravame anterior
+  ORQ -> SCH : cancelar alerta
+else prazo excedido
+  SCH -> ORQ : alerta disparado
+  ORQ -> GAR : acionar garantia provisória / escalar
+  ORQ -> CR : cobrar termo e baixa
+end
+
+ORQ -> GAR : constituir AF em favor do grupo
+GAR -> EXT : registrar
+EXT --> GAR : protocolo
+GAR --> ORQ : REGISTRADA
+ORQ -> ORQ : estado = UTILIZADO
+note over ORQ
+  Lei 11.795 art. 14 §5º I: garantia insuficiente
+  é indenizada ao grupo pela administradora.
+end note
+@enduml

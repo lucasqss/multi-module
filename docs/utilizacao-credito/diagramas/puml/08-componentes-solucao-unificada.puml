@@ -1,0 +1,84 @@
+@startuml componentes-solucao-unificada
+title Solução unificada de pagamentos do consórcio — visão de componentes
+skinparam componentStyle rectangle
+
+package "Canais" {
+  [Portal / App do consorciado] as Portal
+  [Backoffice (analistas)] as Backoffice
+  [Portal do fornecedor] as PortalForn
+}
+
+package "Núcleo de utilização do crédito" {
+  [Orquestrador de Utilização\n(workflow BPMN)] as ORQ
+  [Resolvedor de Regras\n(regime × segmento × subcategoria)] as REG
+  [Calendário de dias úteis\n(localidade do grupo)] as CAL
+  interface "PoliticaModalidade" as IPOL
+  [PoliticaBemMovel] as PM
+  [PoliticaImovel] as PI
+  [PoliticaServico] as PS
+  [PoliticaQuitacaoFinanciamento] as PQ
+  [Gestão de Garantias] as GAR
+  [Gestão Documental] as DOC
+  [Conta do Crédito\n(saldo, rendimentos, movimentos)] as CONTA
+  [Motor de Pagamentos\n(à vista, etapas, sobra, espécie)] as PAG
+  [Trilha de Auditoria /\nEvidências] as AUD
+}
+
+package "Sistemas da administradora" {
+  [Gestão de Grupos e Cotas\n(assembleias, contemplação)] as GRP
+  [Cobrança / Jurídico] as COB
+  [Contabilidade do grupo\n(Doc. 2080)] as CTB
+  [Crédito / PLD] as CRD
+}
+
+cloud "Externos" {
+  [SPB / Pix] as SPB
+  [Detran / SNG] as SNG
+  [Registro de Imóveis (ONR)] as RI
+  [RTD] as RTD
+  [CAIXA (FGTS)] as FGTS
+  [Tabela FIPE / Avaliadores] as AVAL
+}
+
+Portal --> ORQ
+Backoffice --> ORQ
+PortalForn --> ORQ
+GRP --> ORQ : evento ContemplacaoHomologada
+ORQ --> REG
+REG --> CAL
+ORQ --> IPOL
+PM ..> IPOL : implementa
+PI ..> IPOL : implementa
+PS ..> IPOL : implementa
+PQ ..> IPOL : implementa
+ORQ --> GAR
+ORQ --> DOC
+ORQ --> CRD
+ORQ --> PAG
+PAG --> CONTA
+PAG --> SPB
+GAR --> SNG
+GAR --> RI
+GAR --> RTD
+PI --> FGTS
+PM --> AVAL
+CONTA --> CTB
+ORQ --> AUD
+COB --> GAR : execução / baixa
+GRP --> CONTA : rendimentos da aplicação
+
+note right of IPOL
+  Ponto de variação por modalidade:
+  - validarElegibilidade(objeto)
+  - documentosExigidos(finalidade)
+  - garantiaPadrao(objeto)
+  - planoPagamentoPadrao(objeto)
+  - despesasVinculadasAdmitidas()
+end note
+
+note bottom of REG
+  Regras rotuladas [NORMA] / [CONTRATO] / [PRÁTICA],
+  versionadas e resolvidas pelo regime do grupo
+  (CIRC_3432 para 1ª AGO < 01/07/2024).
+end note
+@enduml

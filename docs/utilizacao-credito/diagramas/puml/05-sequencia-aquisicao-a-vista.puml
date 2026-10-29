@@ -1,0 +1,70 @@
+@startuml sequencia-aquisicao-a-vista
+title Sequência — Aquisição com pagamento à vista ao fornecedor
+autonumber
+
+actor Consorciado as C
+participant "Canal\n(portal/app)" as UI
+participant "Orquestrador de\nUtilização" as ORQ
+participant "Resolvedor de\nRegras (regime)" as REG
+participant "PoliticaModalidade\n(móvel|imóvel|serviço)" as POL
+participant "Crédito/PLD" as CRD
+participant "Garantias" as GAR
+participant "Registro externo\n(SNG, RI, RTD)" as EXT
+participant "Tesouraria\n(conta do grupo)" as TES
+actor "Fornecedor" as F
+
+C -> UI : indicar finalidade, objeto e fornecedor
+UI -> ORQ : criarSolicitacao(cota, finalidade, objeto, beneficiario)
+ORQ -> REG : regrasPara(grupo.regime, segmento, subcategoria)
+REG --> ORQ : conjunto de regras + parâmetros do regulamento
+ORQ -> POL : validarElegibilidade(objeto)
+alt objeto fora da categoria/subcategoria
+  POL --> ORQ : inelegível [art. 15 I; art. 5º §2º]
+  ORQ --> UI : recusa com motivo
+else elegível
+  POL --> ORQ : documentosExigidos, garantiaPadrao, planoPadrao
+  ORQ --> UI : checklist de documentos
+end
+
+C -> UI : enviar documentos
+UI -> ORQ : anexar(documentos)
+par análises
+  ORQ -> CRD : analisarCapacidade(consorciado, saldoDevedor)
+  CRD --> ORQ : resultado + evidência (retida 5 anos)
+else
+  ORQ -> CRD : checarPLD(beneficiario, composicaoRecursos)
+  CRD --> ORQ : ok / alerta
+else
+  ORQ -> POL : analisarObjeto(documentos, avaliacao)
+  POL --> ORQ : aprovado / pendências
+end
+
+ORQ -> GAR : constituir(garantiaPadrao, objeto)
+GAR -> EXT : registrar(gravame/AF)
+EXT --> GAR : protocolo de registro
+GAR --> ORQ : garantia REGISTRADA
+
+ORQ -> REG : validarPreCondicoesPagamento(solicitacao)
+note right of REG
+  art. 18 §2º: identificação completa,
+  objeto/condições, garantias,
+  documentos do contrato
+end note
+REG --> ORQ : ok
+
+ORQ -> TES : pagar(beneficiario, valor − sinalRessarcivel)
+TES -> F : TED/Pix para conta do fornecedor
+opt sinal pago após contemplação [art. 18 §1º]
+  TES -> C : ressarcir sinal (deduzido do crédito)
+end
+TES --> ORQ : pagamento efetivado
+F --> C : entrega do bem / NF
+
+alt saldoUtilizavel > 0
+  ORQ -> UI : oferecer destinação da sobra [art. 18 §3º]
+  C -> UI : escolher destinação
+  UI -> ORQ : destinarSobra(tipo, valor)
+  ORQ -> TES : executar destinação (teto 10% para despesas)
+end
+ORQ -> ORQ : estado = UTILIZADO
+@enduml

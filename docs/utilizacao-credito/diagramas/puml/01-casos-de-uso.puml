@@ -1,0 +1,98 @@
+@startuml casos-de-uso
+title Utilização da carta de crédito — Diagrama de casos de uso
+left to right direction
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor<<transversal>> #FFF4E5
+  BackgroundColor<<pos-utilizacao>> #EAF3FF
+}
+
+actor "Consorciado\n(contemplado)" as C
+actor "Vendedor / Fornecedor /\nPrestador / Construtora" as F
+actor "Credor do financiamento\na quitar" as CR
+actor "Registros\n(Detran-SNG, RI, RTD)" as REG
+actor "CAIXA\n(agente FGTS)" as FGTS
+actor "Analista\n(crédito, PLD, formalização)" as AN
+actor "Tesouraria" as TES
+actor "Cobrança / Jurídico" as JUR
+actor "Agendador\n(tempo)" as T
+
+rectangle "Plataforma de utilização do crédito (unificada)" {
+  usecase "UC01 Consultar crédito disponível,\nrendimentos e pendências" as UC01
+  usecase "UC02 Indicar finalidade, objeto\ne fornecedor" as UC02
+  usecase "UC03 Enviar e gerir documentação" as UC03
+  usecase "UC04 Analisar capacidade de pagamento\ne cadastro (KYC/PLD)" as UC04
+  usecase "UC05 Analisar objeto conforme\npolítica da modalidade" as UC05
+  usecase "UC06 Constituir e registrar garantia" as UC06
+  usecase "UC07 Pagar fornecedor à vista" as UC07
+  usecase "UC08 Pagar por etapas / cronograma" as UC08
+  usecase "UC09 Quitar financiamento próprio" as UC09
+  usecase "UC10 Destinar sobra de crédito" as UC10
+  usecase "UC11 Complementar com recursos\npróprios ou FGTS" as UC11
+  usecase "UC12 Ressarcir sinal pago\napós a contemplação" as UC12
+  usecase "UC13 Validar pré-condições de\npagamento (art. 18 §2º)" as UC13 <<transversal>>
+  usecase "UC14 Disponibilizar e aplicar crédito\n(≤ D+3 úteis)" as UC14 <<transversal>>
+  usecase "UC15 Receber crédito em espécie\n(≥ 180 dias + quitação)" as UC15
+  usecase "UC16 Substituir garantia" as UC16 <<pos-utilizacao>>
+  usecase "UC17 Ceder cota contemplada" as UC17
+  usecase "UC18 Executar garantia\n(atraso > 1 prestação)" as UC18 <<pos-utilizacao>>
+  usecase "UC19 Baixar garantia\n(após quitação da cota)" as UC19 <<pos-utilizacao>>
+  usecase "UC20 Comunicar crédito não utilizado\nno encerramento do grupo" as UC20
+}
+
+C --> UC01
+C --> UC02
+C --> UC03
+C --> UC10
+C --> UC11
+C --> UC15
+C --> UC17
+
+AN --> UC04
+AN --> UC05
+AN --> UC06
+AN --> UC16
+AN --> UC17
+
+TES --> UC07
+TES --> UC08
+TES --> UC09
+TES --> UC14
+
+JUR --> UC18
+
+T --> UC14
+T --> UC15
+T --> UC20
+
+UC07 --> F
+UC08 --> F
+UC09 --> CR
+UC06 --> REG
+UC19 --> REG
+UC11 --> FGTS
+
+UC07 ..> UC13 : <<include>>
+UC08 ..> UC13 : <<include>>
+UC09 ..> UC13 : <<include>>
+UC02 ..> UC05 : <<include>>
+UC02 ..> UC04 : <<include>>
+UC13 ..> UC06 : <<include>>
+UC11 ..> UC02 : <<extend>>
+UC12 ..> UC07 : <<extend>>
+UC10 ..> UC07 : <<extend>>
+UC10 ..> UC09 : <<extend>>
+UC16 ..> UC08 : <<extend>>\nobra concluída
+UC19 ..> UC06 : <<extend>>
+
+note bottom of UC13
+  Pré-condições [NORMA] Res. BCB 285 art. 18 §2º:
+  - comunicação formal com nome e CPF/CNPJ
+    do consorciado e do fornecedor;
+  - características do objeto e condições;
+  - garantias satisfeitas;
+  - documentos obrigatórios do contrato;
+  - adiantamento só com contrato
+    fornecedor × administradora (§2º II).
+end note
+@enduml

@@ -1,0 +1,114 @@
+@startuml jornada-cliente
+title Jornada do consorciado — da contemplação ao crédito utilizado
+
+|Consorciado|
+start
+:Recebe aviso de contemplação\n(valor da carta, prazo, documentos);
+if (Contemplado por lance?) then (sim)
+  :Paga o lance no prazo do contrato;
+  note right: Lance embutido é deduzido da carta.\nFGTS segue regras CAIXA.
+else (não)
+endif
+
+|Administradora|
+:Homologa e disponibiliza o crédito (≤ D+3 úteis);
+:Crédito aplicado e rendendo até o uso;
+
+|Consorciado|
+:Consulta saldo atualizado e simula o uso;
+:Escolhe a finalidade;
+
+switch (Finalidade?)
+case (Bem móvel)
+  :Escolhe veículo/máquina/equipamento\n(usado só se subcategoria I);
+  :Negocia com o vendedor e obtém\npedido/proposta ou NF;
+case (Imóvel pronto)
+  :Escolhe imóvel e negocia;
+  :Reúne matrícula, certidões\ndo imóvel e do vendedor;
+case (Planta / construção / reforma)
+  :Apresenta projeto, alvará\ne cronograma físico-financeiro;
+  :Indica construtora/incorporadora;
+case (Serviço)
+  :Contrata prestador\n(orçamento/contrato, CPF/CNPJ);
+case (Quitação de financiamento)
+  :Solicita ao credor o saldo de quitação\n(contrato próprio, mesma categoria);
+case (Aguardar)
+  :Mantém crédito aplicado;
+  if (180 dias passaram?) then (sim)
+    :Pode optar por espécie\n(com quitação da cota);
+    stop
+  else (não)
+    stop
+  endif
+endswitch
+
+:Comunica formalmente a escolha\n(objeto, fornecedor, condições);
+:Envia documentos pessoais,\nde renda e do objeto;
+
+|Administradora|
+fork
+  :Analisa capacidade de pagamento;
+fork again
+  :Analisa objeto e documentos\n(política da modalidade);
+fork again
+  :Checagem KYC/PLD;
+end fork
+
+while (Pendências?) is (sim)
+  |Consorciado|
+  :Complementa documentos\nou garantia;
+  |Administradora|
+  :Reanalisa;
+endwhile (não)
+
+:Emite contrato de garantia\n(AF do bem, outro imóvel ou garantia pessoal);
+
+|Consorciado|
+:Assina contrato/escritura e\nregistra a garantia;
+note right
+  Veículo: gravame SNG/CRV.
+  Imóvel: registro na matrícula (ato único).
+end note
+
+|Administradora|
+if (Valor > carta?) then (sim)
+  |Consorciado|
+  :Paga a diferença ao vendedor\n(recursos próprios/FGTS);
+  |Administradora|
+else (não)
+endif
+
+if (Forma de pagamento?) then (à vista)
+  :Paga diretamente ao fornecedor/credor;
+else (etapas)
+  repeat
+    :Vistoria/mede a etapa;
+    |Consorciado|
+    :Autoriza liberação da parcela;
+    |Administradora|
+    :Libera parcela ao fornecedor;
+  repeat while (Última etapa?) is (não) not (sim)
+  :Substitui garantia provisória\n(quando aplicável);
+endif
+
+|Fornecedor|
+:Entrega o bem / conclui o serviço;
+
+|Administradora|
+if (Sobrou crédito?) then (sim)
+  |Consorciado|
+  :Escolhe destinação da sobra:\n- despesas (≤ 10% da carta)\n- abater prestações\n- devolução (se quitar a cota);
+  |Administradora|
+  :Executa a destinação;
+else (não)
+endif
+
+|Consorciado|
+:Continua pagando as prestações;
+note right
+  Atraso > 1 prestação após o uso
+  → execução da garantia.
+end note
+:Quita a cota e recebe a baixa da garantia;
+stop
+@enduml

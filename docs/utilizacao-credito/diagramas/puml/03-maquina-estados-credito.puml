@@ -1,0 +1,76 @@
+@startuml maquina-estados-credito
+title CreditoContemplado — Máquina de estados
+
+[*] --> PendenteHomologacao : contemplação por lance
+[*] --> Homologada : contemplação por sorteio
+
+PendenteHomologacao --> Homologada : lance recebido no prazo\n[Res. 285 art. 12 II]
+PendenteHomologacao --> [*] : lance não pago
+
+Homologada --> Disponibilizado : ≤ D+3 úteis\n[art. 16; art. 52]
+
+state "Em utilização" as EmUtilizacao {
+  state "Aguardando escolha" as AguardandoEscolha
+  state "Em análise" as EmAnalise {
+    state "Cadastral/capacidade" as Cad
+    state "Objeto/documentos" as Obj
+    state "PLD" as PLD
+    Cad : art. 3º §2º
+    Obj : art. 2º XIV-b
+    PLD : Circ. 3.978
+  }
+  state "Pendente de documentação" as Pendente
+  state "Constituição de garantia" as EmGarantia
+  state "Apto a pagamento" as Apto
+  state "Pagamento em etapas" as Etapas
+  state "Quitação em andamento\n(janela sem garantia)" as JanelaRisco
+
+  [*] --> AguardandoEscolha
+  AguardandoEscolha --> EmAnalise : finalidade indicada\n(comunicação formal)
+  EmAnalise --> Pendente : pendência
+  Pendente --> EmAnalise : documentos enviados
+  EmAnalise --> AguardandoEscolha : reprovado\n(crédito segue aplicado)
+  EmAnalise --> EmGarantia : aprovado / aquisição
+  EmAnalise --> JanelaRisco : aprovado / quitação\n[art. 15 II]
+  JanelaRisco --> EmGarantia : baixa do gravame anterior
+  EmGarantia --> Apto : garantia registrada\n[art. 18 §2º]
+  Apto --> Etapas : forma = ETAPAS
+  Etapas --> Etapas : parcela liberada
+}
+
+Disponibilizado --> EmUtilizacao : consorciado inicia
+Disponibilizado : rende até a utilização [art. 17]
+
+EmUtilizacao --> Utilizado : pagamento à vista\nou última etapa
+EmUtilizacao --> ExcluidoComCreditoParcial : inadimplência (3 venc.)\n[RES_285 arts. 32-33]
+EmUtilizacao --> ContemplacaoCancelada : AGO cancela\n[CIRC_3432 art. 10]
+Disponibilizado --> ElegivelEspecie : 180 dias [art. 15 §2º]
+EmUtilizacao --> ElegivelEspecie : 180 dias sem pagamento
+ElegivelEspecie --> EmUtilizacao : opta por aquisição
+ElegivelEspecie --> PagoEmEspecie : cota quitada + conta própria
+
+state Utilizado {
+  state "Sobra em destinação" as Sobra
+  state "Garantia ativa" as GarantiaAtiva
+  [*] --> Sobra : valor pago < crédito
+  [*] --> GarantiaAtiva : sem sobra
+  Sobra --> GarantiaAtiva : destinada\n[art. 18 §3º]
+}
+
+Utilizado --> EmExecucaoGarantia : atraso > 1 prestação\n[art. 27]
+Utilizado --> GarantiaBaixada : cota quitada\n[Lei 11.795 art. 14 §5º II]
+EmExecucaoGarantia --> [*] : bem alienado, saldo apurado [art. 28]
+GarantiaBaixada --> [*]
+
+Disponibilizado --> NaoProcurado : grupo encerrado sem utilização\n[Lei 11.795 arts. 31-36]
+ElegivelEspecie --> NaoProcurado : encerramento sem manifestação
+PagoEmEspecie --> [*]
+ExcluidoComCreditoParcial --> [*]
+ContemplacaoCancelada --> [*]
+NaoProcurado --> [*]
+
+note right of Utilizado
+  A partir daqui é vedada a exclusão do contemplado
+  (RES_285 art. 32 p.u.; CIRC_3432 veda para qualquer contemplado).
+end note
+@enduml

@@ -1,0 +1,45 @@
+@startuml sequencia-pagamento-etapas
+title Sequência — Pagamento por etapas (construção, reforma, planta, serviço)
+autonumber
+
+actor Consorciado as C
+participant "Orquestrador de\nUtilização" as ORQ
+participant "Engenharia /\nMedição" as ENG
+participant "Garantias" as GAR
+participant "Tesouraria" as TES
+actor "Construtora /\nPrestador" as F
+
+ORQ -> GAR : constituir garantia provisória\n(sem vínculo ao bem — Lei 11.795 art. 14 §3º)
+GAR --> ORQ : REGISTRADA (provisória)
+ORQ -> ORQ : criar PlanoPagamento(ETAPAS, cronograma, retenção final)
+
+opt adiantamento antes da execução
+  ORQ -> ORQ : exigir ContratoAdiantamento\n(art. 18 §2º II — responsabilidade total da administradora)
+  ORQ -> TES : pagar adiantamento
+  TES -> F : adiantamento
+end
+
+loop para cada etapa
+  F -> ORQ : solicitar medição da etapa N
+  ORQ -> ENG : agendar vistoria
+  ENG --> ORQ : laudo de medição (% executado)
+  alt etapa não conforme
+    ORQ --> F : devolver para correção
+  else conforme
+    ORQ -> C : solicitar autorização da parcela
+    C --> ORQ : autoriza
+    ORQ -> TES : liberar parcela N (valor da etapa)
+    TES -> F : pagamento
+    note right of TES : saldo não liberado segue\naplicado e rendendo (art. 17)
+  end
+end
+
+F -> ORQ : entrega final (habite-se, averbação / termo de conclusão)
+alt objeto é imóvel
+  ORQ -> GAR : substituir provisória por AF do imóvel\n(procedimento do contrato — art. 2º XV)
+  GAR --> ORQ : AF REGISTRADA; provisória BAIXADA
+end
+ORQ -> TES : liberar retenção final
+TES -> F : pagamento final
+ORQ -> ORQ : estado = UTILIZADO
+@enduml

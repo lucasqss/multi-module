@@ -1,0 +1,305 @@
+@startuml modelo-dominio
+title Utilização da carta de crédito — Modelo de domínio
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+hide empty methods
+
+package "Grupo e cota" {
+  enum RegimeNormativo {
+    CIRC_3432
+    RES_285
+  }
+  enum Segmento {
+    BEM_MOVEL
+    BEM_IMOVEL
+    SERVICO
+  }
+  enum SubcategoriaMovel {
+    I_VEICULOS_MAQUINAS
+    II_DEMAIS_NOVOS
+  }
+  class Grupo {
+    codigo
+    dataPrimeiraAGO : Date
+    regimeNormativo : RegimeNormativo
+    segmento : Segmento
+    subcategoria : SubcategoriaMovel [0..1]
+    localidadeConstituicao : Municipio
+  }
+  class RegulamentoGrupo <<parâmetros do contrato>> {
+    prazoPagamentoLance : Duration
+    prazoAnaliseDocumentacao : Duration
+    indiceAtualizacaoCredito
+    documentosExigidos : Map<Finalidade, TipoDocumento[]>
+    garantiasExigidas
+    procedimentoSubstituicaoGarantia
+    permiteQuitarSaldoComProprioCredito : boolean
+  }
+  class Consorciado {
+    cpfCnpj
+    nome
+    contasAutorizadas : ContaBancaria[*]
+  }
+  class Cota {
+    numero
+    situacao : SituacaoCota
+    percentualAmortizado
+    saldoDevedor : Money
+  }
+}
+
+package "Contemplação e crédito" {
+  enum TipoContemplacao {
+    SORTEIO
+    LANCE_LIVRE
+    LANCE_FIXO
+    LANCE_EMBUTIDO
+    LANCE_FGTS
+    INDENIZACAO_SEGURO
+  }
+  class Contemplacao {
+    dataAGO : Date
+    tipo : TipoContemplacao
+    valorLance : Money
+    dataRecebimentoLance : Date [0..1]
+    dataHomologacao : Date [0..1]
+  }
+  class CreditoContemplado <<aggregate root>> {
+    valorAGO : Money
+    valorLanceEmbutido : Money
+    rendimentosAcumulados : Money
+    dataDisponibilizacao : Date
+    estado : EstadoCredito
+    --
+    saldoUtilizavel() : Money
+    tetoDespesasSobra() : Money
+    elegivelEspecie(hoje) : boolean
+  }
+  enum TipoMovimento {
+    RENDIMENTO
+    ATUALIZACAO
+    PAGAMENTO
+    DEVOLUCAO
+    DESPESA
+    ABATIMENTO
+  }
+  class MovimentoCredito {
+    data
+    tipo : TipoMovimento
+    valor : Money
+    referencia
+  }
+  class AnaliseCapacidade <<evidência 5 anos>> {
+    data
+    resultado
+    rendaComprovada : Money
+    evidenciaRef
+    reterAte : Date
+  }
+}
+
+package "Utilização" {
+  enum Finalidade {
+    AQUISICAO_BEM_MOVEL
+    AQUISICAO_IMOVEL_PRONTO
+    AQUISICAO_IMOVEL_PLANTA
+    AQUISICAO_TERRENO
+    CONSTRUCAO
+    REFORMA
+    AQUISICAO_SERVICO
+    QUITACAO_FINANCIAMENTO
+    ESPECIE
+    CREDITO_PARCIAL_EXCLUIDO
+  }
+  class SolicitacaoUtilizacao {
+    protocolo
+    finalidade : Finalidade
+    dataComunicacaoFormal : Date
+    estado : EstadoSolicitacao
+    sinalRessarcivel : Money
+  }
+  abstract class ObjetoUtilizacao {
+    descricao
+    valorNegociado : Money
+    emProducao : boolean
+  }
+  class BemMovel {
+    subcategoria : SubcategoriaMovel
+    novo : boolean
+    identificacao : chassi | RENAVAM | nº série
+    anoFabricacao
+  }
+  class BemImovel {
+    matricula
+    cartorioRI
+    tipo : PRONTO | PLANTA | TERRENO | EMPREENDIMENTO
+    residencial : boolean
+  }
+  class Servico {
+    escopo
+    prazoExecucao
+  }
+  class FinanciamentoQuitavel {
+    contratoOrigem
+    tipo : CREDITO | LEASING_FINANCEIRO | CONSORCIO
+    titularCpfCnpj
+    saldoQuitacao : Money
+    validadeSaldo : Date
+  }
+  class Avaliacao {
+    metodo : FIPE | LAUDO | ORCAMENTO | OUTRO
+    valorAvaliado : Money
+    data
+  }
+  class Documento {
+    tipo : TipoDocumento
+    status : PENDENTE | APROVADO | REJEITADO
+    validade : Date [0..1]
+  }
+  class ComposicaoRecursos {
+    fonte : CARTA | RECURSOS_PROPRIOS | FGTS | SOBRA
+    valor : Money
+  }
+}
+
+package "Partes" {
+  enum PapelBeneficiario {
+    VENDEDOR
+    FORNECEDOR
+    PRESTADOR
+    CONSTRUTORA
+    CREDOR
+  }
+  class Beneficiario {
+    cpfCnpj
+    nome
+    papel : PapelBeneficiario
+    conta : ContaBancaria
+  }
+  class ContratoAdiantamento {
+    dataAssinatura
+    valorMaximo : Money
+    responsabilidadeTotalAdministradora = true
+  }
+}
+
+package "Garantias" {
+  enum SituacaoGarantia {
+    PROPOSTA
+    CONSTITUIDA
+    REGISTRADA
+    EM_SUBSTITUICAO
+    EM_EXECUCAO
+    BAIXADA
+  }
+  abstract class Garantia {
+    valorCobertura : Money
+    provisoria : boolean
+    situacao : SituacaoGarantia
+    vinculadaAoBemAdquirido : boolean
+  }
+  class AlienacaoFiduciariaMovel {
+    gravameSNG
+  }
+  class AlienacaoFiduciariaImovel {
+    matricula
+    numeroRegistro
+  }
+  class GarantiaPessoal {
+    tipo : FIANCA | AVAL | CARTA_FIANCA
+    garantidorCpfCnpj
+  }
+  class RegistroGarantia {
+    orgao : DETRAN_SNG | RI | RTD | ANAC | MARINHA | OUTRO
+    protocolo
+    dataRegistro
+    dataBaixa [0..1]
+  }
+}
+
+package "Pagamentos" {
+  class PlanoPagamento {
+    forma : A_VISTA | ETAPAS
+    retencaoFinal : Percent [0..1]
+  }
+  class Etapa {
+    ordem
+    percentual
+    valor : Money
+    condicaoLiberacao
+    medicaoRef
+    status : PREVISTA | MEDIDA | LIBERADA
+  }
+  class OrdemPagamento {
+    valor : Money
+    meio : TED | PIX | BOLETO
+    finalidadeIdentificada
+    dataEfetivacao
+    status : AGENDADA | PAGA | ESTORNADA
+  }
+  enum TipoDestinacaoSobra {
+    DESPESAS_VINCULADAS
+    PRESTACOES_VINCENDAS
+    DEVOLUCAO
+  }
+  class DestinacaoSobra {
+    tipo : TipoDestinacaoSobra
+    valor : Money
+  }
+}
+
+Grupo "1" *-- "1" RegulamentoGrupo
+Grupo "1" *-- "*" Cota
+Consorciado "1" -- "*" Cota : titular
+Cota "1" -- "0..1" Contemplacao
+Contemplacao "1" -- "1" CreditoContemplado
+Contemplacao "1" -- "1" AnaliseCapacidade
+CreditoContemplado "1" *-- "*" MovimentoCredito
+CreditoContemplado "1" *-- "*" SolicitacaoUtilizacao
+SolicitacaoUtilizacao "1" *-- "1..*" ObjetoUtilizacao
+SolicitacaoUtilizacao "1" *-- "*" Documento
+SolicitacaoUtilizacao "1" *-- "1..*" ComposicaoRecursos
+SolicitacaoUtilizacao "1" *-- "0..1" PlanoPagamento
+SolicitacaoUtilizacao "1" -- "*" DestinacaoSobra
+ObjetoUtilizacao <|-- BemMovel
+ObjetoUtilizacao <|-- BemImovel
+ObjetoUtilizacao <|-- Servico
+ObjetoUtilizacao <|-- FinanciamentoQuitavel
+ObjetoUtilizacao "1" -- "0..1" Avaliacao
+ObjetoUtilizacao "*" -- "1" Beneficiario : recebe
+Beneficiario "1" -- "0..1" ContratoAdiantamento
+PlanoPagamento "1" *-- "1..*" Etapa
+Etapa "1" -- "0..1" OrdemPagamento
+OrdemPagamento "*" -- "1" Beneficiario
+Cota "1" -- "*" Garantia : garante saldo devedor
+Garantia <|-- AlienacaoFiduciariaMovel
+Garantia <|-- AlienacaoFiduciariaImovel
+Garantia <|-- GarantiaPessoal
+Garantia "1" -- "0..1" RegistroGarantia
+Garantia "0..1" -- "0..1" Garantia : substitui >
+
+note right of CreditoContemplado
+  Invariantes [NORMA]:
+  - saldoUtilizavel = valorAGO − lanceEmbutido
+    + rendimentos − pagamentos (arts. 13, 17)
+  - pagamento só a Beneficiario ≠ consorciado,
+    exceto sinal, sobra, espécie, crédito parcial
+    (art. 18; art. 15)
+  - elegivelEspecie ⇔ ≥ 180 dias da contemplação
+    ∧ cota quitada (art. 15 §2º)
+end note
+
+note bottom of DestinacaoSobra
+  Σ DESPESAS_VINCULADAS ≤ 10% do crédito
+  da contemplação (art. 18 §3º I).
+  DEVOLUCAO exige quitação (art. 18 §3º III).
+  [A CONFIRMAR] base dos 10% com lance embutido.
+end note
+
+note bottom of Garantia
+  Lei 11.795 art. 14:
+  §1º recai sobre o bem adquirido;
+  §3º serviço ou bem em produção → sem vínculo;
+  §5º II nunca baixar antes da quitação da cota.
+end note
+@enduml

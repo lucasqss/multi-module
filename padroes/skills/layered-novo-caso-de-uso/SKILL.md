@@ -20,7 +20,7 @@ Pelo **"Mapa do projeto"** do `copilot-instructions.md`/`AGENTS.md`, ou buscando
   Ordem: estado (409) → specs (422) → muda estado.
 - Dado novo com regra de formato → value object (`record` que valida).
 - Lógica entre várias entidades que não pertence a nenhuma → serviço de domínio (`domain/service`).
-- Persistência nova → método na porta de repositório + adapter. Sistema externo → skill
+- Persistência nova → método no repositório concreto em `adapter/` (falando domínio). Sistema externo → skill
   `layered-nova-integracao-externa`.
 - Consulta pura pode pular este passo.
 
@@ -32,7 +32,7 @@ Pelo **"Mapa do projeto"** do `copilot-instructions.md`/`AGENTS.md`, ou buscando
 @ApplicationScoped
 public class AprovarContratoUC {
 
-    private final ContratoRepository repository;
+    private final ContratoRepository repository;          // classe concreta de adapter/database
 
     public AprovarContratoUC(ContratoRepository repository) {   // injeção por construtor
         this.repository = repository;

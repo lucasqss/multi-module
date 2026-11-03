@@ -40,8 +40,8 @@ verificar_base() {
     '^import (static )?(jakarta|javax|io\.quarkus|org\.hibernate|org\.springframework|com\.fasterxml|org\.eclipse|io\.micronaut)\.'
   checar "domain não depende de application/adapter/entrypoint" "$base/domain" \
     "^import (static )?$p\\.(application|adapter|entrypoint)\\."
-  checar "application não depende de adapter/entrypoint" "$base/application" \
-    "^import (static )?$p\\.(adapter|entrypoint)\\."
+  checar "application não depende de entrypoint" "$base/application" \
+    "^import (static )?$p\\.entrypoint\\."
   checar "application não usa JPA/Hibernate" "$base/application" \
     '^import (static )?(jakarta\.persistence|javax\.persistence|org\.hibernate|io\.quarkus\.hibernate|org\.springframework\.data)\.'
   checar "adapter não depende de application/entrypoint" "$base/adapter" \

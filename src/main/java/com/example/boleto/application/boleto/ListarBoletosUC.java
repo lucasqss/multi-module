@@ -1,8 +1,8 @@
 package com.example.boleto.application.boleto;
 
+import com.example.boleto.adapter.database.BoletoRepository;
 import com.example.boleto.application.boleto.dto.BoletoOutput;
 import com.example.boleto.application.boleto.dto.ListarBoletosInput;
-import com.example.boleto.domain.repository.BoletoRepository;
 import com.example.boleto.shared.utils.Pagina;
 import jakarta.enterprise.context.ApplicationScoped;
 

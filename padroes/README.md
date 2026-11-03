@@ -2,7 +2,9 @@
 
 Versão **genérica** das skills e instruções deste repositório, para usar em **qualquer** projeto
 Java organizado em camadas (`domain` / `application` / `adapter` / `entrypoint` / `shared`) com
-domínio rico, Specification, State e exceções específicas.
+domínio rico, Specification, State e exceções específicas. As camadas se ligam por **injeção de
+dependência de classes concretas** (sem ports and adapters): use cases injetam repositórios e
+integrações de `adapter/`; o domínio não depende de nenhuma outra camada nem de framework.
 
 O projeto `pagamento-boleto` (este repositório) é a **implementação de referência**: as skills
 específicas dele ficam em `.github/skills/`; as genéricas, aqui.
@@ -23,7 +25,7 @@ específicas dele ficam em `.github/skills/`; as genéricas, aqui.
 | `layered-novo-caso-de-uso` | Nova ação de ponta a ponta (REST ou mensageria) |
 | `layered-nova-regra-de-negocio` | Nova validação de negócio (Specification) |
 | `layered-novo-estado` | Novo status/transição (State) ou primeira máquina de estados |
-| `layered-nova-integracao-externa` | Porta + adapter para sistema externo |
+| `layered-nova-integracao-externa` | Integração com sistema externo (classe em `adapter/`) |
 | `layered-revisao-arquitetura` | Revisão de camadas, domínio anêmico, SOLID, GRASP + script `verificar-camadas.sh` |
 
 ## Como as skills se adaptam a cada projeto

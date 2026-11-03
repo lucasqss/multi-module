@@ -1,9 +1,9 @@
 package com.example.boleto.adapter;
 
+import com.example.boleto.adapter.database.BoletoRepository;
 import com.example.boleto.domain.entity.Boleto;
 import com.example.boleto.domain.exception.AlteracaoConcorrenteException;
 import com.example.boleto.domain.factory.SolicitacaoBoletoFactory;
-import com.example.boleto.domain.repository.BoletoRepository;
 import com.example.boleto.domain.valueobject.BoletoId;
 import com.example.boleto.domain.valueobject.DadosBoleto;
 import com.example.boleto.domain.valueobject.Motivo;

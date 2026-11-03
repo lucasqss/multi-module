@@ -3,8 +3,7 @@ package com.example.boleto.adapter.database;
 import com.example.boleto.domain.entity.Boleto;
 import com.example.boleto.domain.enums.StatusBoleto;
 import com.example.boleto.domain.exception.AlteracaoConcorrenteException;
-import com.example.boleto.domain.repository.BoletoRepository;
-import com.example.boleto.domain.repository.FiltroBoleto;
+import com.example.boleto.domain.exception.BoletoNaoEncontradoException;
 import com.example.boleto.domain.state.EstadoBoleto;
 import com.example.boleto.domain.valueobject.BoletoId;
 import com.example.boleto.domain.valueobject.Documento;
@@ -23,16 +22,24 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Implementação da porta {@link BoletoRepository} com Panache/JPA. */
+/**
+ * Repositório de boletos (Panache/JPA), injetado DIRETAMENTE nos use cases (sem interface).
+ *
+ * <p>Fala a língua do domínio: recebe e devolve {@link Boleto}, nunca {@link BoletoJpaEntity}.
+ * A conversão fica no {@link BoletoMapper}, e exceções de JPA são traduzidas para exceções de domínio,
+ * então nada de persistência vaza para a application.
+ *
+ * <p>Os métodos herdados do Panache ({@code persist}, {@code find}...) trabalham com a entidade JPA;
+ * use cases devem usar só os métodos de domínio declarados aqui.
+ */
 @ApplicationScoped
-public class BoletoRepositoryPanache implements BoletoRepository, PanacheRepositoryBase<BoletoJpaEntity, UUID> {
+public class BoletoRepository implements PanacheRepositoryBase<BoletoJpaEntity, UUID> {
 
     /** Derivado do State pattern: a regra "o que é em aberto" não é duplicada aqui. */
     private static final List<StatusBoleto> STATUS_EM_ABERTO = Arrays.stream(StatusBoleto.values())
             .filter(status -> EstadoBoleto.de(status).emAberto())
             .toList();
 
-    @Override
     public void salvar(Boleto boleto) {
         var existente = findById(boleto.getId().valor());
         if (existente != null) {
@@ -51,12 +58,10 @@ public class BoletoRepositoryPanache implements BoletoRepository, PanacheReposit
         }
     }
 
-    @Override
     public Optional<Boleto> buscarPorId(BoletoId id) {
         return findByIdOptional(id.valor()).map(BoletoMapper::paraDominio);
     }
 
-    @Override
     public Pagina<Boleto> listar(FiltroBoleto filtro, int pagina, int tamanho) {
         var condicoes = new ArrayList<String>();
         Map<String, Object> parametros = new HashMap<>();
@@ -79,13 +84,16 @@ public class BoletoRepositoryPanache implements BoletoRepository, PanacheReposit
         return new Pagina<>(itens, pagina, tamanho, query.count());
     }
 
-    @Override
     public long contarEmAbertoPorPagador(Documento documento) {
         return count("pagadorDocumento = ?1 and status in ?2", documento.numero(), STATUS_EM_ABERTO);
     }
 
-    @Override
     public void remover(BoletoId id) {
         deleteById(id.valor());
+    }
+
+    /** Atalho usado por todos os use cases que operam sobre um boleto existente. */
+    public Boleto obter(BoletoId id) {
+        return buscarPorId(id).orElseThrow(() -> new BoletoNaoEncontradoException(id));
     }
 }

@@ -1,6 +1,6 @@
 package com.example.boleto.entrypoint;
 
-import com.example.boleto.adapter.notificacao.NotificadorBoletoFake;
+import com.example.boleto.adapter.notificacao.NotificadorBoleto;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.response.ValidatableResponse;
@@ -31,7 +31,7 @@ class BoletoResourceTest {
     private static final String PATH = "/api/v1/boletos";
 
     @Inject
-    NotificadorBoletoFake notificador;
+    NotificadorBoleto notificador;
 
     private static LocalDate hoje() {
         return LocalDate.now(ZoneId.of("America/Sao_Paulo"));

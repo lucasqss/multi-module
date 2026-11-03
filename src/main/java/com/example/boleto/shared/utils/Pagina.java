@@ -3,7 +3,7 @@ package com.example.boleto.shared.utils;
 import java.util.List;
 import java.util.function.Function;
 
-/** Resultado paginado genérico, usado da porta de repositório até a resposta HTTP. */
+/** Resultado paginado genérico, usado do repositório até a resposta HTTP. */
 public record Pagina<T>(List<T> itens, int pagina, int tamanho, long total) {
 
     public Pagina {

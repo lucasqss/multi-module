@@ -37,7 +37,7 @@ Para cada item violado, aponte arquivo:linha, o princípio e a correção concre
 ### Use cases
 - [ ] O UC só orquestra (buscar fatos → domínio decide → salvar → efeito externo → Output)?
 - [ ] Algum `if` no UC é regra de negócio? → vire spec (skill `nova-regra-de-negocio`).
-- [ ] Efeitos externos (gateways) acontecem **depois** de `salvar`?
+- [ ] Efeitos externos (integrações de `adapter`) acontecem **depois** de `salvar`?
 
 ### Specification
 - [ ] Regra nova é `RegraNegocio` no catálogo `RegrasBoleto`, com exceção específica?
@@ -57,10 +57,12 @@ Para cada item violado, aponte arquivo:linha, o princípio e a correção concre
 - **SRP**: a classe tem um único motivo para mudar? (factory que monta e também persiste = violação)
 - **OCP**: regra/estado novo entrou **sem** editar UCs, handler ou outras regras?
 - **LSP**: estados concretos só ampliam o que a base permite, sem quebrar contratos?
-- **ISP**: portas pequenas e focadas (`BoletoRepository` ≠ `NotificadorBoleto`)?
-- **DIP**: domain/application dependem de interfaces (portas), nunca de adapters?
+- **ISP / coesão**: repositório e integrações separados por responsabilidade (`BoletoRepository` ≠ `NotificadorBoleto`)?
+- **Dependências**: o projeto **não** usa ports and adapters; use cases injetam classes concretas de
+  `adapter`. Aponte como problema uma interface com uma única implementação criada "para o futuro".
+  O domínio, esse sim, nunca depende de `adapter`/framework.
 - **Creator / Information Expert / Low Coupling / Protected Variations**: quem cria tem os dados?
-  Quem decide tem a informação? Contratos externos isolados por DTO/porta?
+  Quem decide tem a informação? Contratos externos isolados por DTO dentro do adapter?
 
 ### Testes
 - [ ] Domínio testado com JUnit puro e `Cenarios`; exceção verificada pelo **tipo**?

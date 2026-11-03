@@ -86,7 +86,7 @@ o validador é fail-fast e o cliente recebe a primeira regra violada. Fundamenta
 ## 5. Se precisar de um fato novo
 
 1. Campo novo no candidato + ajuste na factory que monta o candidato.
-2. Consulta nova na porta (`domain/repository` ou gateway) + implementação no adapter.
+2. Consulta nova no repositório/integração de `adapter/` (devolvendo tipo de domínio ou primitivo).
 3. No use case: consultar e passar para a factory.
 4. Atualizar o builder de cenários dos testes.
 

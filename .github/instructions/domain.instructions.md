@@ -55,7 +55,9 @@ Sem anotações de framework (nem `@ApplicationScoped`): quem liga objetos de do
 - Estenda a família certa: `DadoInvalidoException`, `RecursoNaoEncontradoException`,
   `ConflitoException`, `RegraNegocioException`. Nunca estenda `DomainException` diretamente.
 
-## Portas
+## Sem repositórios nem integrações aqui
 
-- Persistência em `domain.repository`; integração externa em `domain.gateway`.
-- Interfaces com tipos de domínio. `default obter(id)` lança a exceção `*NaoEncontrado` específica.
+- O domínio **não** declara interfaces de repositório/integração (não usamos ports and adapters).
+  Persistência e integrações são classes concretas em `adapter/`, injetadas nos use cases.
+- O domínio só fornece o que elas precisam: entidades com `reconstituir(...)`, VOs e exceções
+  específicas (ex.: `BoletoNaoEncontradoException`, `AlteracaoConcorrenteException`).

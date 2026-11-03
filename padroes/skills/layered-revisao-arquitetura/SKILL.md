@@ -1,6 +1,6 @@
 ---
 name: layered-revisao-arquitetura
-description: Revisa código Java organizado em camadas (domain, application, adapter, entrypoint) contra a regra de dependência, domínio rico (não anêmico), SOLID, GRASP, Specification e State. Use ao revisar PR ou diff, antes de concluir uma mudança, ou quando pedirem "revise", "está no padrão?", "tem domínio anêmico?" ou "refatore".
+description: Revisa código Java organizado em camadas (domain, application, adapter, entrypoint, ligadas por injeção de dependência, sem ports and adapters) contra a regra de dependência, domínio rico (não anêmico), SOLID, GRASP, Specification e State. Use ao revisar PR ou diff, antes de concluir uma mudança, ou quando pedirem "revise", "está no padrão?", "tem domínio anêmico?" ou "refatore".
 ---
 
 # Revisão de arquitetura (projetos layered)
@@ -29,7 +29,8 @@ Para cada violação: `arquivo:linha`, princípio violado e correção concreta.
 
 ### Camadas
 - [ ] `domain` sem framework e sem importar `application`/`adapter`/`entrypoint`.
-- [ ] `application` só conhece `domain` (portas), nunca `adapter`/`entrypoint`/JPA.
+- [ ] `application` conhece `domain` e injeta classes concretas de `adapter`; nunca `entrypoint`
+      nem JPA direto (só os métodos de domínio do repositório).
 - [ ] `entrypoint` não acessa `adapter`. Vale para **todos** os entrypoints (REST `api.v1`,
       mensageria/IIB `iib.v1`, consumidores de fila): todos chamam os mesmos use cases.
 - [ ] Contratos separados: `*Request`/`*Response` (entrypoint) ≠ `*Input`/`*Output` (application)
@@ -48,7 +49,7 @@ Para cada violação: `arquivo:linha`, princípio violado e correção concreta.
       (`domain/service`), sem framework. Não a coloque no use case.
 
 ### Use cases
-- [ ] Só orquestra: buscar fatos nas portas → domínio decide → salvar → efeito externo → `*Output`.
+- [ ] Só orquestra: buscar fatos nos repositórios → domínio decide → salvar → efeito externo → `*Output`.
 - [ ] Nenhum `if` de regra de negócio; nenhum `switch` em status.
 - [ ] Efeitos externos depois de salvar; risco de "enviou e o commit falhou" documentado (Outbox).
 
@@ -70,8 +71,10 @@ Para cada violação: `arquivo:linha`, princípio violado e correção concreta.
 
 ### SOLID / GRASP
 - **SRP**: um motivo para mudar por classe. **OCP**: regra/estado novo sem editar UCs nem handler.
-- **LSP**: estados concretos não quebram o contrato da base. **ISP**: portas pequenas e focadas.
-- **DIP**: domain/application dependem de portas, nunca de adapters.
+- **LSP**: estados concretos não quebram o contrato da base. **ISP/coesão**: repositórios e integrações
+  separados por responsabilidade.
+- **Dependências**: sem ports and adapters; use cases injetam classes concretas de `adapter`.
+  Interface com uma única implementação "para o futuro" é problema. O domínio nunca depende de `adapter`/framework.
 - **Creator, Information Expert, Low Coupling, High Cohesion, Protected Variations, Indirection.**
 
 ### Testes
@@ -84,5 +87,5 @@ Para cada violação: `arquivo:linha`, princípio violado e correção concreta.
 2. Violações por gravidade: **bloqueante** (camadas, domínio anêmico, regra em UC/entrypoint) →
    **importante** (SOLID/GRASP, testes faltando) → **sugestão** (nomes, legibilidade).
 3. Cada uma: `arquivo:linha` — problema — princípio — correção (com trecho de código).
-4. Não proponha abstração especulativa (interface para UC com uma implementação, CQRS,
+4. Não proponha abstração especulativa (interface "de porta" ou para UC com uma implementação, CQRS,
    template genérico de UC). Simplicidade também é critério.

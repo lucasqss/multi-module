@@ -12,14 +12,19 @@ ao pagador e **recebimento do pagamento** informado pelo banco. Organizado em ca
 ## Camadas
 
 ```
-entrypoint ──▶ application ──▶ domain ◀── adapter
- (HTTP)        (use cases)    (regras)    (JPA, notificação)
+entrypoint ──▶ application ──▶ domain
+                    │             ▲
+                    └─▶ adapter ──┘
 ```
+
+As camadas se ligam por **injeção de dependência de classes concretas** (sem ports and adapters):
+o use case injeta `BoletoRepository` e `NotificadorBoleto` direto de `adapter`. O domínio continua
+sem nenhuma dependência de framework nem das outras camadas.
 
 | Pacote | Papel | Pode depender de |
 |---|---|---|
 | `entrypoint.api.v1` | Contrato HTTP próprio (`request/`, `response/`), validação **sintática** (`@NotNull`), `ApiExceptionHandler` | application |
-| `application.boleto` | Um `*UC` por ação: busca fatos, chama o domínio, persiste, devolve DTO. `@Transactional` aqui | domain |
+| `application.boleto` | Um `*UC` por ação: busca fatos, chama o domínio, persiste, devolve DTO. `@Transactional` aqui | domain, adapter |
 | `domain.entity` | `Boleto` (aggregate root) | — |
 | `domain.specification` | Infra genérica: `Specification`, `RegraNegocio`, `ValidadorRegras` | — |
 | `domain.specification.boleto` | Regras concretas + catálogo `RegrasBoleto` | — |
@@ -27,11 +32,9 @@ entrypoint ──▶ application ──▶ domain ◀── adapter
 | `domain.valueobject` | `Dinheiro`, `Documento`, `Pagador`, `LinhaDigitavel`, `Pagamento`... (auto-validados) | — |
 | `domain.model` | Candidatos das regras: `SolicitacaoBoleto`, `RecebimentoPagamento` | — |
 | `domain.factory` | `SolicitacaoBoletoFactory`: monta a solicitação com relógio (fuso do negócio) e config | — |
-| `domain.repository` | **Portas** de persistência | — |
-| `domain.gateway` | **Portas** de integração externa (`NotificadorBoleto`) | — |
 | `domain.exception` | Exceções específicas, em quatro famílias | — |
-| `adapter.database` | Implementa a porta com Panache; entidade JPA separada + mapper; traduz lock otimista | domain |
-| `adapter.notificacao` | Notificação **simulada** (log + lista em memória) | domain |
+| `adapter.database` | `BoletoRepository` (Panache) que recebe/devolve `Boleto`; entidade JPA separada + mapper; traduz lock otimista | domain |
+| `adapter.notificacao` | `NotificadorBoleto`: notificação **simulada** (log + lista em memória) | domain |
 | `shared` | `Pagina<T>`, producers CDI. **Única exceção à regra de dependência**: pode ser usado por qualquer camada, então só entra aqui o que é genérico e estável | — |
 
 ## Quem decide o quê
@@ -148,8 +151,8 @@ e atualize a tabela em `EstadoBoletoTest`.
 ## Notificação
 
 `NotificarBoletoUC` (1) valida a transição no domínio, (2) salva, o que detecta concorrência antes de
-qualquer efeito externo, e (3) só então chama a porta `NotificadorBoleto`. O adapter
-`NotificadorBoletoFake` só escreve no log e guarda o que "enviou".
+qualquer efeito externo, e (3) só então chama o `NotificadorBoleto` (injetado direto do adapter),
+que só escreve no log e guarda o que "enviou".
 Em produção, a janela "enviou, mas o commit falhou" se resolve com o padrão **Outbox**.
 
 ## API

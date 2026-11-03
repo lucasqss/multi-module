@@ -28,7 +28,7 @@ Para cada `templates/<caminho>/<Nome>.java.tmpl`:
 | `domain/exception/DomainException` + `DadoInvalido`/`RecursoNaoEncontrado`/`Conflito`/`RegraNegocio` | As quatro famílias (400/404/409/422) |
 | `domain/exception/{ValorMonetarioInvalido,MotivoInvalido}Exception` | Usadas por `Dinheiro` e `Motivo` |
 | `domain/valueobject/{Dinheiro,Motivo}` | VOs genéricos |
-| `shared/utils/Pagina` | Paginação da porta até a resposta |
+| `shared/utils/Pagina` | Paginação do repositório até a resposta |
 | `shared/config/DomainBeansProducer` | `Clock` no fuso do negócio (`app.fuso-horario`) |
 | `entrypoint/api/v1/handler/{ApiExceptionHandler,ErroResponse}` | Formato único de erro, status por família |
 | `entrypoint/api/v1/request/MotivoRequest`, `response/PaginaResponse` | Contratos HTTP reutilizáveis |
@@ -58,6 +58,8 @@ leem esse mapa primeiro. Acrescente também, antes do mapa, as regras inegociáv
 6. Value objects para conceitos com regra de formato; tempo sempre via `Clock`.
 7. Contratos separados: Request/Response ≠ Input/Output ≠ entidade ≠ JpaEntity.
 8. Ordem na entidade: estado autoriza (409) → specs validam (422) → muda estado.
+9. Sem ports and adapters: use cases injetam classes concretas de `adapter/` (repositórios e
+   integrações que falam domínio). Interface só com mais de uma implementação real.
 ```
 
 ## 5. Valide

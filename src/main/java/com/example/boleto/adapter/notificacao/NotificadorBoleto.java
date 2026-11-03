@@ -1,7 +1,6 @@
 package com.example.boleto.adapter.notificacao;
 
 import com.example.boleto.domain.entity.Boleto;
-import com.example.boleto.domain.gateway.NotificadorBoleto;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
@@ -9,17 +8,19 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Adapter SIMULADO de notificação. Na vida real seria um cliente de e-mail/SMS/fila.
- * Aqui só escreve no log e guarda o que "enviou" (útil para testes e para ver a simulação).
+ * Notificação ao pagador, injetada DIRETAMENTE no use case (sem interface).
+ *
+ * <p>SIMULAÇÃO: na vida real seria um cliente de e-mail/SMS/fila. Aqui só escreve no log e guarda o
+ * que "enviou" (útil para testes e para ver a simulação). Detalhes do sistema externo (DTOs, URLs,
+ * erros técnicos) ficam nesta classe; quem chama só conhece o {@link Boleto}.
  */
 @ApplicationScoped
-public class NotificadorBoletoFake implements NotificadorBoleto {
+public class NotificadorBoleto {
 
-    private static final Logger LOG = Logger.getLogger(NotificadorBoletoFake.class);
+    private static final Logger LOG = Logger.getLogger(NotificadorBoleto.class);
 
     private final List<NotificacaoEnviada> enviadas = new CopyOnWriteArrayList<>();
 
-    @Override
     public void notificarEmissao(Boleto boleto) {
         var notificacao = new NotificacaoEnviada(boleto.getPagador().email(), boleto.getLinhaDigitavel().valor());
         enviadas.add(notificacao);

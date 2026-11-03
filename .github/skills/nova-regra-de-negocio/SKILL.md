@@ -77,7 +77,7 @@ fundamentais (limites de valor) vêm antes das de detalhe.
 ## 5. Se a regra precisa de um fato novo
 
 1. Adicione o campo ao candidato (`SolicitacaoBoleto`) e ajuste `SolicitacaoBoletoFactory`.
-2. Adicione a consulta à porta (`BoletoRepository`) e implemente no adapter.
+2. Adicione a consulta em `adapter/database/BoletoRepository` (devolvendo tipo de domínio ou primitivo).
 3. No use case, consulte e passe para a factory (modelo: `contarEmAbertoPorPagador` em `EmitirBoletoUC`).
 4. Atualize o builder de teste `Cenarios`.
 

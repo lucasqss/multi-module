@@ -14,14 +14,14 @@ a de dentro.
   Se o status importa, ele chama o estado (skill `novo-estado`); se há regra sobre dados, as specs
   (skill `nova-regra-de-negocio`). Ordem: estado (409) → specs (422) → muda estado.
 - Dados novos com regra de formato viram **value object** em `domain/valueobject` (`record` que valida).
-- Precisa de dados persistidos de outra forma? Adicione o método na porta `BoletoRepository`
-  (e implemente em `adapter/database/BoletoRepositoryPanache`). Integração externa: skill `nova-integracao-externa`.
+- Precisa de dados persistidos de outra forma? Adicione o método em `adapter/database/BoletoRepository`
+  (recebendo/devolvendo tipos de domínio). Integração externa: skill `nova-integracao-externa`.
 - Consulta pura (sem mudança de estado) pode pular este passo.
 
 ## 2. Application
 
 `src/main/java/com/example/boleto/application/boleto/<Verbo>BoletoUC.java`. Modelos:
-`ReceberPagamentoBoletoUC` (com entrada), `CancelarBoletoUC` (simples), `NotificarBoletoUC` (com gateway).
+`ReceberPagamentoBoletoUC` (com entrada), `CancelarBoletoUC` (simples), `NotificarBoletoUC` (com integração externa).
 
 ```java
 @ApplicationScoped

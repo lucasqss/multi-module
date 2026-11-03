@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Verifica a regra de dependência entre camadas e sinais de domínio anêmico.
+# Verifica a regra de dependência entre camadas (sem ports and adapters: application pode
+# injetar adapter; domain não depende de ninguém) e sinais de domínio anêmico.
 # Uso: .github/skills/revisao-arquitetura/verificar-camadas.sh   (a partir da raiz do repositório)
 # Sai com código 1 se encontrar violação.
 set -uo pipefail
@@ -26,8 +27,8 @@ checar "domain não depende de framework" "$BASE/domain" \
   '^import (static )?(jakarta|javax|io\.quarkus|org\.hibernate|com\.fasterxml|org\.eclipse)\.'
 checar "domain não depende de application/adapter/entrypoint" "$BASE/domain" \
   '^import (static )?com\.example\.boleto\.(application|adapter|entrypoint)\.'
-checar "application não depende de adapter/entrypoint" "$BASE/application" \
-  '^import (static )?com\.example\.boleto\.(adapter|entrypoint)\.'
+checar "application não depende de entrypoint" "$BASE/application" \
+  '^import (static )?com\.example\.boleto\.entrypoint\.'
 checar "application não usa JPA/Hibernate" "$BASE/application" \
   '^import (static )?(jakarta\.persistence|org\.hibernate|io\.quarkus\.hibernate)\.'
 checar "adapter não depende de application/entrypoint" "$BASE/adapter" \

@@ -1,6 +1,6 @@
 ---
 name: layered-novo-agregado-crud
-description: Cria um novo agregado com CRUD completo em projeto Java layered (entidade rica, value objects, specifications, State, exceções específicas, portas, adapter JPA, use cases, API REST e testes). Use quando pedirem um novo cadastro, recurso, entidade ou módulo de negócio.
+description: Cria um novo agregado com CRUD completo em projeto Java layered (entidade rica, value objects, specifications, State, exceções específicas, repositório JPA, use cases, API REST e testes). Use quando pedirem um novo cadastro, recurso, entidade ou módulo de negócio.
 ---
 
 # Novo agregado com CRUD completo
@@ -33,8 +33,8 @@ description: Cria um novo agregado com CRUD completo em projeto Java layered (en
 | 6 | `domain/specification/contrato/*Spec` + `RegrasContrato` | skill `layered-nova-regra-de-negocio` |
 | 7 | `domain/entity/Contrato` | rica: construtor privado, `criar(Solicitacao)` que valida, `reconstituir(...)`, métodos de negócio, sem setters |
 | 8 | `domain/factory/SolicitacaoContratoFactory` + registro no producer CDI | monta o candidato com `Clock` e configuração |
-| 9 | `domain/repository/ContratoRepository` (+ `FiltroContrato`) | `salvar`, `buscarPorId`, `listar(filtro, pagina, tamanho)`, `remover`, `default obter(id)` → 404 |
-| 10 | `adapter/database/ContratoJpaEntity`, `ContratoMapper`, `ContratoRepositoryPanache` | JPA separada com `@Version`; `salvar` faz `flush` e traduz `OptimisticLockException` → `AlteracaoConcorrenteException` |
+| 9 | `adapter/database/ContratoJpaEntity`, `ContratoMapper` | JPA separada da entidade, com `@Version`; mapper `copiar`/`paraDominio` |
+| 10 | `adapter/database/ContratoRepository` (+ `FiltroContrato`) | classe concreta (Panache) injetada nos UCs, **falando domínio**: `salvar`, `buscarPorId`, `listar(filtro, pagina, tamanho)`, `remover`, `obter(id)` → 404; `salvar` faz `flush` e traduz `OptimisticLockException` → `AlteracaoConcorrenteException` |
 | 11 | `application/contrato/dto/*Input`, `ContratoOutput` | `record`s; Input monta VOs; `Output.de(entidade)` |
 | 12 | `application/contrato/<Verbo>ContratoUC` | um por ação, `@Transactional` quando escreve (skill `layered-novo-caso-de-uso`) |
 | 13 | `entrypoint/api/v1/request/*Request`, `response/ContratoResponse`, `ContratoResource` | Request sintático, Response próprio, resource fino |
@@ -86,7 +86,8 @@ public class Contrato {
 - `if` de regra ou `switch` de status em use case.
 - `*Output` como resposta HTTP, ou entidade como `*Output`.
 - Mapper HTTP por exceção (o handler mapeia por família).
-- Interface por use case, CQRS ou template genérico de UC sem necessidade real.
+- Interface "de porta" para repositório/integração, interface por use case, CQRS ou template
+  genérico de UC sem necessidade real (mais de uma implementação).
 
 ## Feche
 

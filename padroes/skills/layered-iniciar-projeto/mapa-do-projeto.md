@@ -11,9 +11,8 @@
 | Catálogo de regras | `RegrasContrato` — conjuntos `COMUNS`, `CRIACAO`, `ALTERACAO` |
 | Candidatos das regras | `SolicitacaoContrato` (`domain/model`), montado por `SolicitacaoContratoFactory` |
 | Máquina de estados | `EstadoContrato` (`domain/state`) + enum `StatusContrato` |
-| Portas de persistência | `domain/repository` (`ContratoRepository`) |
-| Portas de integração | `domain/gateway` (ou `domain/repository`, se o projeto já usa assim) |
-| Adapters | `adapter/database`, `adapter/<sigla-do-sistema>` |
+| Repositórios (injetados nos UCs) | `adapter/database/ContratoRepository` (Panache, fala domínio) |
+| Integrações externas (injetadas nos UCs) | `adapter/<sigla-do-sistema>/<Nome>` |
 | Handler de erros HTTP | `entrypoint/api/v1/handler/ApiExceptionHandler` |
 | Producer de beans de domínio / `Clock` | `shared/config/DomainBeansProducer` |
 | Builder de cenários de teste | `src/test/.../domain/Cenarios` |

@@ -1,10 +1,10 @@
 package com.example.boleto.application.boleto;
 
+import com.example.boleto.adapter.database.BoletoRepository;
 import com.example.boleto.application.boleto.dto.BoletoOutput;
 import com.example.boleto.application.boleto.dto.EmitirBoletoInput;
 import com.example.boleto.domain.entity.Boleto;
 import com.example.boleto.domain.factory.SolicitacaoBoletoFactory;
-import com.example.boleto.domain.repository.BoletoRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 

@@ -1,49 +1,47 @@
 ---
 name: nova-integracao-externa
-description: Adiciona uma integração com sistema externo (e-mail, SMS, fila, outro serviço, banco registrador) como porta em domain.gateway e adapter em adapter/, mantendo o domínio livre de frameworks. Use quando o sistema precisar chamar, consultar ou notificar algo fora da aplicação.
+description: Adiciona uma integração com sistema externo (e-mail, SMS, fila, outro serviço, banco registrador) como classe concreta em adapter/, injetada diretamente no use case, mantendo o domínio livre de frameworks. Use quando o sistema precisar chamar, consultar ou notificar algo fora da aplicação.
 ---
 
-# Nova integração externa (porta + adapter)
+# Nova integração externa (classe em `adapter/`, injetada no use case)
 
-Modelo existente: porta `domain/gateway/NotificadorBoleto` + adapter `adapter/notificacao/NotificadorBoletoFake`,
-usados por `application/boleto/NotificarBoletoUC`.
+Este projeto **não** usa ports and adapters: não há interface no domínio. A integração é uma classe
+concreta em `adapter/`, injetada pelo construtor no use case.
+Modelo existente: `adapter/notificacao/NotificadorBoleto`, usado por `application/boleto/NotificarBoletoUC`.
 
-## 1. Porta no domínio
+## 1. Classe da integração
 
-`src/main/java/com/example/boleto/domain/gateway/<Capacidade>.java`: interface pequena (ISP),
-nomeada pelo que o **domínio precisa** (`NotificadorBoleto`), não pela tecnologia (`SmtpClient`).
-Parâmetros e retornos são tipos de **domínio**. Sem anotações.
+`src/main/java/com/example/boleto/adapter/<sistema>/<Nome>.java`, `@ApplicationScoped`.
 
-- Persistência não é gateway: vai em `domain/repository`.
-- Se a integração devolve dados para uma **regra**, a regra continua pura: o use case chama o
-  gateway e entrega o resultado no candidato (ver skill `nova-regra-de-negocio`, passo 5).
-
-## 2. Adapter
-
-`src/main/java/com/example/boleto/adapter/<sistema>/<Nome>.java`, `@ApplicationScoped`, implementando a porta.
-
-- Converte tipos de domínio ↔ DTOs do sistema externo **dentro do adapter**.
-- Traduz erros técnicos (timeout, HTTP 5xx) para uma exceção de domínio específica, se o chamador
-  precisar reagir. Nunca deixe exceção de cliente HTTP/SDK vazar para application.
-- Simulação: sufixo `Fake` + Javadoc dizendo o que seria na vida real. Guarde o que foi "enviado"
-  numa lista thread-safe para testes (modelo: `NotificadorBoletoFake.enviadas()`).
+- Nome pelo que o negócio precisa (`NotificadorBoleto`, `ConsultaCliente`), não pela tecnologia (`SmtpClient`).
+- **Fala a língua do domínio**: métodos públicos recebem/devolvem entidades e VOs de domínio.
+  DTOs do sistema externo e a conversão ficam **dentro** do adapter.
+- Erros técnicos (timeout, HTTP 5xx) viram exceção de domínio específica quando o chamador precisa
+  reagir. Exceção de cliente HTTP/SDK nunca chega à application.
 - Configuração (URLs, credenciais): `application.properties` + `@ConfigProperty` **no adapter**.
+- Simulação: Javadoc dizendo o que seria na vida real; guarde o que foi "enviado" numa lista
+  thread-safe para testes (modelo: `NotificadorBoleto.enviadas()`).
+- **Não** crie interface para ela. Interface só se surgir uma segunda implementação real em produção.
+- Nunca importe `application` nem `entrypoint`.
 
-## 3. Use case
+## 2. Use case
 
-- Injete a **porta** (interface), nunca a classe do adapter.
+- Injete a classe pelo construtor.
 - Ordem: domínio valida/transiciona → `repository.salvar(...)` → **depois** a chamada externa.
   Assim, conflito de concorrência ou regra violada não disparam efeito externo.
 - Documente no Javadoc o risco restante ("enviou, mas o commit falhou") e que a solução de produção
   é o padrão **Outbox**, como em `NotificarBoletoUC`.
+- Se a integração devolve dados para uma **regra**, a regra continua pura: o use case chama a
+  integração e entrega o resultado no candidato (ver skill `nova-regra-de-negocio`, passo 5).
 
-## 4. Testes
+## 3. Testes
 
-- Domínio continua testável sem o adapter.
-- `@QuarkusTest`: injete o fake (`@Inject NotificadorBoletoFake`) e verifique o que ele registrou.
+- Domínio continua testável sem a integração.
+- `@QuarkusTest`: injete a classe (`@Inject NotificadorBoleto`) e verifique o que ela registrou.
+  Para uma integração real, use `@InjectMock` (quarkus-junit-mockito) ou um perfil de teste.
 - Garanta que o efeito externo **não** acontece quando o domínio recusa (409/422).
 
-## 5. Feche
+## 4. Feche
 
-- Adicione o pacote do adapter à tabela de camadas do `README.md`.
+- Adicione o pacote à tabela de camadas e ao "Mapa do projeto".
 - `.github/skills/revisao-arquitetura/verificar-camadas.sh` e `mvn test`.

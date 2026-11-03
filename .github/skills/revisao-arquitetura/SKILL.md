@@ -14,7 +14,7 @@ Na raiz do repositório:
 mvn test
 ```
 
-O script checa a regra de dependência entre camadas, setters/construtores públicos em entidades,
+O script checa a regra de dependência entre camadas, use case chamando use case, pastas fora da estrutura (aviso), setters/construtores públicos em entidades,
 `now()` sem `Clock` e `if`/`switch` em status. Qualquer ✗ é um problema bloqueante.
 
 ## 2. Checklist manual
@@ -33,6 +33,14 @@ Para cada item violado, aponte arquivo:linha, o princípio e a correção concre
 - [ ] Conceitos com regra de formato são value objects (não `String`/`BigDecimal` soltos)?
 - [ ] **Tell, don't ask**: algum código lê getters de um objeto para decidir por ele? Mova a decisão
       para o objeto dono do dado (Information Expert).
+
+### Estrutura e interação
+- [ ] Nenhuma pasta fora da estrutura enxuta (`domain/factory`, `model`, `enums`, `repository`,
+      `gateway`, `service`, `shared/<subpasta>`)? O script avisa com ⚠; destino de cada uma na seção
+      "Estrutura de pastas" de `.github/copilot-instructions.md`.
+- [ ] Quem chama quem: Resource → UC → (repositório/integração, candidato, entidade); entidade →
+      estado e regras. **UC não chama UC** (o script falha), nem spec ou estado direto.
+- [ ] Nenhuma classe `*Service`/`*Utils`/`*Helper` genérica: cada método vai para o dono do dado.
 
 ### Use cases
 - [ ] O UC só orquestra (buscar fatos → domínio decide → salvar → efeito externo → Output)?

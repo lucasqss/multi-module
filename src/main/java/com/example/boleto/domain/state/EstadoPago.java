@@ -1,6 +1,5 @@
 package com.example.boleto.domain.state;
 
-import com.example.boleto.domain.enums.StatusBoleto;
 
 /** Estado final: pagamento recebido. Nenhuma ação permitida. */
 public final class EstadoPago extends EstadoBoleto {

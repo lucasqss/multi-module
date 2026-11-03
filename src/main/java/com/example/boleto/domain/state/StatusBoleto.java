@@ -1,4 +1,4 @@
-package com.example.boleto.domain.enums;
+package com.example.boleto.domain.state;
 
 /**
  * Apenas o RÓTULO do estado (para persistir e expor na API).

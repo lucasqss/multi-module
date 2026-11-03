@@ -1,7 +1,6 @@
 package com.example.boleto.domain.specification.boleto;
 
 import com.example.boleto.domain.exception.VencimentoNoPassadoException;
-import com.example.boleto.domain.model.SolicitacaoBoleto;
 import com.example.boleto.domain.specification.RegraNegocio;
 
 /** Vencimento não pode ser anterior a hoje. */

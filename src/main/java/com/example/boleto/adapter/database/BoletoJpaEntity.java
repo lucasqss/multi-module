@@ -1,6 +1,6 @@
 package com.example.boleto.adapter.database;
 
-import com.example.boleto.domain.enums.StatusBoleto;
+import com.example.boleto.domain.state.StatusBoleto;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

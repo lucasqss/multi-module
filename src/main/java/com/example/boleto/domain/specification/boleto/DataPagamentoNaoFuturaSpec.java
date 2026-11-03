@@ -1,7 +1,6 @@
 package com.example.boleto.domain.specification.boleto;
 
 import com.example.boleto.domain.exception.DataPagamentoFuturaException;
-import com.example.boleto.domain.model.RecebimentoPagamento;
 import com.example.boleto.domain.specification.RegraNegocio;
 
 /** O banco não pode informar um pagamento que ainda não aconteceu. */

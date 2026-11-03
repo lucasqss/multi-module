@@ -27,15 +27,16 @@ sem nenhuma dependência de framework nem das outras camadas.
 | `application.boleto` | Um `*UC` por ação: busca fatos, chama o domínio, persiste, devolve DTO. `@Transactional` aqui | domain, adapter |
 | `domain.entity` | `Boleto` (aggregate root) | — |
 | `domain.specification` | Infra genérica: `Specification`, `RegraNegocio`, `ValidadorRegras` | — |
-| `domain.specification.boleto` | Regras concretas + catálogo `RegrasBoleto` | — |
-| `domain.state` | Um estado por classe (`EstadoEmitido`, `EstadoNotificado`...) | — |
+| `domain.specification.boleto` | Regras concretas, catálogo `RegrasBoleto` e candidatos `SolicitacaoBoleto` (com `paraEmissao`/`paraAlteracao`) e `RecebimentoPagamento` | — |
+| `domain.state` | Um estado por classe (`EstadoEmitido`, `EstadoNotificado`...) + enum `StatusBoleto` | — |
 | `domain.valueobject` | `Dinheiro`, `Documento`, `Pagador`, `LinhaDigitavel`, `Pagamento`... (auto-validados) | — |
-| `domain.model` | Candidatos das regras: `SolicitacaoBoleto`, `RecebimentoPagamento` | — |
-| `domain.factory` | `SolicitacaoBoletoFactory`: monta a solicitação com relógio (fuso do negócio) e config | — |
 | `domain.exception` | Exceções específicas, em quatro famílias | — |
 | `adapter.database` | `BoletoRepository` (Panache) que recebe/devolve `Boleto`; entidade JPA separada + mapper; traduz lock otimista | domain |
 | `adapter.notificacao` | `NotificadorBoleto`: notificação **simulada** (log + lista em memória) | domain |
-| `shared` | `Pagina<T>`, producers CDI. **Única exceção à regra de dependência**: pode ser usado por qualquer camada, então só entra aqui o que é genérico e estável | — |
+| `shared` | `Pagina<T>`, `ClockProducer` (sem subpastas). **Única exceção à regra de dependência**: pode ser usado por qualquer camada, então só entra aqui o que é genérico e estável | — |
+
+A estrutura de pastas é **por tipo e enxuta**: sem `factory`, `model`, `enums`, `repository` ou
+`service` no domínio. A justificativa e o mapa de quem chama quem estão em `.github/copilot-instructions.md`.
 
 ## Quem decide o quê
 
@@ -201,7 +202,7 @@ A linha digitável também é fake (47 dígitos, não segue o padrão FEBRABAN) 
 | `RegrasBoletoTest` | cada regra lança sua exceção, a partir de um cenário válido (`Cenarios`) | não |
 | `EstadoBoletoTest` | a máquina de estados inteira como tabela | não |
 | `BoletoTest` | a entidade aplica estado (409) antes das regras (422); linha digitável | não |
-| `SolicitacaoBoletoFactoryTest` | "hoje" no fuso do negócio, não no do servidor | não |
+| `SolicitacaoBoletoTest` | "hoje" no fuso do negócio, não no do servidor | não |
 | `ConcorrenciaTest` | lock otimista vira `AlteracaoConcorrenteException` | sim |
 | `BoletoResourceTest` | CRUD + ciclo emitir/notificar/pagar + códigos HTTP + formato único de erro | sim |
 

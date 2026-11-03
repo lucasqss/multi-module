@@ -1,5 +1,6 @@
-package com.example.boleto.domain.factory;
+package com.example.boleto.domain.specification;
 
+import com.example.boleto.domain.specification.boleto.SolicitacaoBoleto;
 import com.example.boleto.domain.valueobject.DadosBoleto;
 import com.example.boleto.domain.valueobject.Dinheiro;
 import com.example.boleto.domain.valueobject.Pagador;
@@ -12,7 +13,7 @@ import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class SolicitacaoBoletoFactoryTest {
+class SolicitacaoBoletoTest {
 
     private static final DadosBoleto DADOS = new DadosBoleto(
             Pagador.de("Maria", "12345678901", "maria@example.com"), Dinheiro.de("100"), LocalDate.of(2026, 11, 10));
@@ -21,9 +22,9 @@ class SolicitacaoBoletoFactoryTest {
     void hojeEhCalculadoNoFusoDoNegocioENaoEmUtc() {
         // 01:00 UTC do dia 04 = 22:00 do dia 03 em São Paulo
         var instante = Instant.parse("2026-11-04T01:00:00Z");
-        var factory = new SolicitacaoBoletoFactory(Clock.fixed(instante, ZoneId.of("America/Sao_Paulo")), 60);
+        var clock = Clock.fixed(instante, ZoneId.of("America/Sao_Paulo"));
 
-        var solicitacao = factory.paraEmissao(DADOS, 0);
+        var solicitacao = SolicitacaoBoleto.paraEmissao(DADOS, clock, 60, 0);
 
         assertEquals(LocalDate.of(2026, 11, 3), solicitacao.hoje());
         assertEquals(instante, solicitacao.momento());
@@ -31,9 +32,9 @@ class SolicitacaoBoletoFactoryTest {
 
     @Test
     void contagemDeBoletosEmAbertoSoValeNaEmissao() {
-        var factory = new SolicitacaoBoletoFactory(Clock.systemUTC(), 60);
+        var clock = Clock.systemUTC();
 
-        assertEquals(2, factory.paraEmissao(DADOS, 2).boletosEmAbertoDoPagador());
-        assertEquals(0, factory.paraAlteracao(DADOS).boletosEmAbertoDoPagador());
+        assertEquals(2, SolicitacaoBoleto.paraEmissao(DADOS, clock, 60, 2).boletosEmAbertoDoPagador());
+        assertEquals(0, SolicitacaoBoleto.paraAlteracao(DADOS, clock, 60).boletosEmAbertoDoPagador());
     }
 }

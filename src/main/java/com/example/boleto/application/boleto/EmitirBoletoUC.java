@@ -4,9 +4,12 @@ import com.example.boleto.adapter.database.BoletoRepository;
 import com.example.boleto.application.boleto.dto.BoletoOutput;
 import com.example.boleto.application.boleto.dto.EmitirBoletoInput;
 import com.example.boleto.domain.entity.Boleto;
-import com.example.boleto.domain.factory.SolicitacaoBoletoFactory;
+import com.example.boleto.domain.specification.boleto.SolicitacaoBoleto;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import java.time.Clock;
 
 /**
  * CREATE: simula a criação do boleto (gera a linha digitável). O use case ORQUESTRA, não decide:
@@ -22,11 +25,14 @@ import jakarta.transaction.Transactional;
 public class EmitirBoletoUC {
 
     private final BoletoRepository repository;
-    private final SolicitacaoBoletoFactory solicitacoes;
+    private final Clock clock;
+    private final int prazoMaximoVencimentoDias;
 
-    public EmitirBoletoUC(BoletoRepository repository, SolicitacaoBoletoFactory solicitacoes) {
+    public EmitirBoletoUC(BoletoRepository repository, Clock clock,
+                          @ConfigProperty(name = "boleto.prazo-maximo-vencimento-dias") int prazoMaximoVencimentoDias) {
         this.repository = repository;
-        this.solicitacoes = solicitacoes;
+        this.clock = clock;
+        this.prazoMaximoVencimentoDias = prazoMaximoVencimentoDias;
     }
 
     @Transactional
@@ -34,7 +40,7 @@ public class EmitirBoletoUC {
         var dados = input.dadosBoleto();
         var emAberto = repository.contarEmAbertoPorPagador(dados.pagador().documento());
 
-        var boleto = Boleto.emitir(solicitacoes.paraEmissao(dados, emAberto));
+        var boleto = Boleto.emitir(SolicitacaoBoleto.paraEmissao(dados, clock, prazoMaximoVencimentoDias, emAberto));
 
         repository.salvar(boleto);
         return BoletoOutput.de(boleto);

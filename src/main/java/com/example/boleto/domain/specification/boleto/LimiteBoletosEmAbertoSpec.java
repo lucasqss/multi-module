@@ -1,7 +1,6 @@
 package com.example.boleto.domain.specification.boleto;
 
 import com.example.boleto.domain.exception.LimiteBoletosEmAbertoExcedidoException;
-import com.example.boleto.domain.model.SolicitacaoBoleto;
 import com.example.boleto.domain.specification.RegraNegocio;
 
 /**

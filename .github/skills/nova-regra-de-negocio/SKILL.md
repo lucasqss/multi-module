@@ -13,7 +13,7 @@ Regra de negócio **nunca** vai em use case, resource ou adapter. Siga os passos
 |---|---|
 | É só formato do dado (tamanho, dígitos, casas decimais)? | Não é spec: valide no **value object** com exceção da família `DadoInvalidoException` (400). |
 | Depende do status do boleto ("não pode X se já pago")? | Não é spec: é **State** → skill `novo-estado`. |
-| Sobre que dados ela decide? | Emissão/alteração → candidato `SolicitacaoBoleto`. Recebimento → `RecebimentoPagamento`. Outro momento → crie um candidato novo em `domain.model`. |
+| Sobre que dados ela decide? | Emissão/alteração → candidato `SolicitacaoBoleto`. Recebimento → `RecebimentoPagamento`. Outro momento → crie um candidato novo (`record`) em `domain/specification/boleto`. |
 | Precisa de dado externo (banco, outro sistema, feriados)? | O **use case** consulta e o dado entra como campo do candidato. A spec continua pura. |
 
 ## 2. Crie a exceção específica
@@ -76,9 +76,9 @@ fundamentais (limites de valor) vêm antes das de detalhe.
 
 ## 5. Se a regra precisa de um fato novo
 
-1. Adicione o campo ao candidato (`SolicitacaoBoleto`) e ajuste `SolicitacaoBoletoFactory`.
+1. Adicione o campo ao candidato (`SolicitacaoBoleto`) e aos métodos `paraEmissao`/`paraAlteracao`.
 2. Adicione a consulta em `adapter/database/BoletoRepository` (devolvendo tipo de domínio ou primitivo).
-3. No use case, consulte e passe para a factory (modelo: `contarEmAbertoPorPagador` em `EmitirBoletoUC`).
+3. No use case, consulte e passe para `SolicitacaoBoleto.para<Momento>(...)` (modelo: `contarEmAbertoPorPagador` em `EmitirBoletoUC`).
 4. Atualize o builder de teste `Cenarios`.
 
 ## 6. Testes

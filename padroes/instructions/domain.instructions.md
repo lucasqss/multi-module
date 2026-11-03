@@ -4,10 +4,14 @@ applyTo: "**/src/main/java/**/domain/**/*.java"
 
 # Camada de domínio
 
+Pastas permitidas: `entity`, `valueobject`, `exception`, `specification` (+ `specification/<agregado>`)
+e `state`. **Não crie** `factory`, `model`, `enums`, `repository`, `gateway` nem `service`
+(veja a skill `layered-enxugar-estrutura` para o destino de cada conteúdo).
+
 O domínio é **Java puro**. Proibido importar `jakarta.*`, `io.quarkus.*`, `org.hibernate.*`,
 `com.fasterxml.*` ou qualquer pacote `application`, `adapter`, `entrypoint`.
 Sem anotações de framework (nem `@ApplicationScoped`): quem liga objetos de domínio ao CDI é
-o producer CDI de `shared/config` (ver "Mapa do projeto").
+o producer de `Clock` em `shared/` (os use cases recebem o `Clock` injetado).
 
 ## Entidades (`domain.entity`) — nunca anêmicas
 
@@ -39,7 +43,8 @@ o producer CDI de `shared/config` (ver "Mapa do projeto").
 - Regra com erro próprio: `extends RegraNegocio<Candidato>` com `isSatisfiedBy` + `violacao`.
 - Bloco de construção sem erro: `implements Specification<Candidato>`, para compor no catálogo
   com `and`/`or`/`not`/`quando(...).entao(...)`.
-- **Puras**: sem I/O, sem relógio, sem injeção. Tudo vem no candidato (`domain.model`).
+- **Puras**: sem I/O, sem relógio, sem injeção. Tudo vem no candidato, um `record` na mesma pasta
+  das specs (`specification/<agregado>`), criado por métodos estáticos `para<Momento>(...)`.
 - Registradas no catálogo de regras do agregado (`Regras<Agregado>`); a ordem da lista é a prioridade do erro (fail-fast).
 
 ## State (`domain.state`)

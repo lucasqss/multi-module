@@ -1,13 +1,13 @@
 package com.example.boleto.adapter.database;
 
 import com.example.boleto.domain.entity.Boleto;
-import com.example.boleto.domain.enums.StatusBoleto;
 import com.example.boleto.domain.exception.AlteracaoConcorrenteException;
 import com.example.boleto.domain.exception.BoletoNaoEncontradoException;
 import com.example.boleto.domain.state.EstadoBoleto;
+import com.example.boleto.domain.state.StatusBoleto;
 import com.example.boleto.domain.valueobject.BoletoId;
 import com.example.boleto.domain.valueobject.Documento;
-import com.example.boleto.shared.utils.Pagina;
+import com.example.boleto.shared.Pagina;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import io.quarkus.panache.common.Page;
 import io.quarkus.panache.common.Sort;

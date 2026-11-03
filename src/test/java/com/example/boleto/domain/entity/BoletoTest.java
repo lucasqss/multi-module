@@ -1,10 +1,10 @@
 package com.example.boleto.domain.entity;
 
-import com.example.boleto.domain.enums.StatusBoleto;
 import com.example.boleto.domain.exception.MotivoInvalidoException;
 import com.example.boleto.domain.exception.TransicaoEstadoInvalidaException;
 import com.example.boleto.domain.exception.ValorAbaixoDoMinimoException;
 import com.example.boleto.domain.exception.ValorPagoDivergenteException;
+import com.example.boleto.domain.state.StatusBoleto;
 import com.example.boleto.domain.valueobject.Dinheiro;
 import com.example.boleto.domain.valueobject.Motivo;
 import com.example.boleto.domain.valueobject.Pagamento;

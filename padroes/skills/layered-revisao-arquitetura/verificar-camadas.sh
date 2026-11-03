@@ -12,6 +12,36 @@ set -uo pipefail
 
 falhas=0
 
+uc_sem_uc() { # use case não injeta/chama outro use case
+  local dir="$1" achados
+  [ -d "$dir" ] || return 0
+  achados=$(find "$dir" -name '*UC.java' | while IFS= read -r f; do
+    grep -nE '\b[A-Z][A-Za-z0-9]*UC\b' "$f" | grep -vE "\b$(basename "$f" .java)\b" | sed "s#^#$f:#"
+  done)
+  if [ -n "$achados" ]; then
+    echo "✗ use case não chama outro use case (mova a lógica comum para entidade/VO/spec)"
+    echo "$achados" | sed 's/^/    /'
+    falhas=$((falhas + 1))
+  else
+    echo "✓ use case não chama outro use case"
+  fi
+}
+
+estrutura() { # aviso (não falha): pastas fora da estrutura enxuta
+  local base="$1" extras="" d
+  for d in factory model enums repository gateway service; do
+    [ -d "$base/domain/$d" ] && extras+=" domain/$d"
+  done
+  for d in "$base"/shared/*/; do
+    [ -d "$d" ] && extras+=" shared/$(basename "$d")"
+  done
+  if [ -n "$extras" ]; then
+    echo "⚠ pastas fora da estrutura enxuta:$extras (ver skill layered-enxugar-estrutura)"
+  else
+    echo "✓ estrutura enxuta (domain: entity, valueobject, exception, specification, state; shared sem subpastas)"
+  fi
+}
+
 checar() { # descrição, diretório, regex proibida
   local descricao="$1" dir="$2" padrao="$3"
   [ -d "$dir" ] || return 0
@@ -58,6 +88,9 @@ verificar_base() {
     '(status|getStatus\(\))\s*(==|!=)|switch\s*\(\s*(status|getStatus\(\))'
   checar "use cases sem if/switch em status (use State)" "$base/application" \
     '(getStatus\(\)|status\(\))\s*(==|!=)|switch\s*\(.*getStatus\(\)'
+  echo "== Interação e estrutura =="
+  uc_sem_uc "$base/application"
+  estrutura "$base"
   echo
 }
 

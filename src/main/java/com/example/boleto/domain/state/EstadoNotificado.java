@@ -1,6 +1,5 @@
 package com.example.boleto.domain.state;
 
-import com.example.boleto.domain.enums.StatusBoleto;
 
 /**
  * O pagador já recebeu o boleto: não pode mais ser alterado nem excluído

@@ -26,9 +26,56 @@ Pacote base `com.example.boleto`:
 | `domain` | só `java.*` e `shared` | `jakarta.*`, `io.quarkus.*`, `org.hibernate.*`, `application`, `adapter`, `entrypoint` |
 | `application` | `domain`, `adapter`, `shared`, `jakarta.transaction`, `jakarta.enterprise` | `entrypoint`, JPA (`jakarta.persistence`) |
 | `adapter` | `domain`, `shared`, frameworks | `application`, `entrypoint` |
-| `entrypoint` | `application`, `domain` (só enums/exceções), `shared` | `adapter` |
+| `entrypoint` | `application`, `domain` (só enums de status/valor e exceções), `shared` | `adapter` |
 
 Verifique com `./.github/skills/revisao-arquitetura/verificar-camadas.sh`.
+
+## Estrutura de pastas (por tipo, enxuta)
+
+```
+com.example.boleto
+├── domain
+│   ├── entity          entidades (aggregate roots)
+│   ├── valueobject     value objects (records) e enums de valor
+│   ├── exception       famílias + exceções específicas
+│   ├── specification   base genérica (Specification, RegraNegocio, ValidadorRegras)
+│   │   └── <agregado>  specs, catálogo Regras<Agregado> e candidatos (Solicitacao<Agregado>...)
+│   └── state           Estado<Agregado>, estados concretos e enum Status<Agregado>
+├── application
+│   └── <agregado>      *UC (+ dto/ com *Input/*Output)
+├── adapter
+│   ├── database        <Agregado>Repository, *JpaEntity, *Mapper, Filtro*
+│   └── <sistema>       uma pasta por sistema externo
+├── entrypoint
+│   └── api/v1          *Resource, request/, response/, handler/ (outros: iib/v1...)
+└── shared              Pagina, ClockProducer (sem subpastas)
+```
+
+**Não crie** estas pastas (cada uma tem um destino melhor):
+
+| Pasta | Para onde vai o conteúdo |
+|---|---|
+| `domain/factory` | Criação = método estático da entidade (`Boleto.emitir`) ou do candidato (`SolicitacaoBoleto.paraEmissao`) |
+| `domain/model` | Candidato das regras → `specification/<agregado>`; DTO → `application/.../dto` ou `adapter/<sistema>` |
+| `domain/enums` | Status → `state`; enum de valor → `valueobject`; enum usado por um só VO → método do VO |
+| `domain/repository`, `domain/gateway` | Repositório/integração concretos em `adapter/` (sem ports) |
+| `domain/service` | Lógica de uma entidade → na entidade; regra → spec; orquestração → use case |
+| `shared/utils`, `shared/config` | `shared/` direto; função de um conceito → método do VO |
+
+## Interação entre classes (quem chama quem)
+
+```
+Resource/Consumer ─▶ UC ─┬─▶ Repository / integração (adapter) ─▶ Mapper ─▶ Entidade.reconstituir
+                         ├─▶ Solicitacao<Agregado>.para<Momento>(...)   (monta o candidato)
+                         └─▶ Entidade.<metodoDeNegocio>(...) ─┬─▶ Estado (autoriza a ação)
+                                                              └─▶ Regras<Agregado> ─▶ *Spec ─▶ candidato
+```
+
+- Cada classe conversa só com a camada **imediatamente** abaixo dela nesse fluxo.
+- Resource não toca repositório nem entidade; **UC não chama outro UC**, nem spec, nem estado.
+- Entidade nunca chama repositório; spec só lê o candidato; estado só conhece estados.
+- Lógica reaproveitada entre UCs mora na entidade, num VO ou numa spec, nunca num UC compartilhado
+  nem numa classe `*Service`/`*Utils` genérica.
 
 ## Regras inegociáveis
 
@@ -89,12 +136,12 @@ acima, que apontam as classes-modelo concretas.
 | Agregados | `Boleto` (`domain/entity/Boleto`) |
 | Base de specs | `domain/specification/Specification`, `RegraNegocio`, `ValidadorRegras` |
 | Catálogo de regras | `RegrasBoleto` — conjuntos `COMUNS`, `EMISSAO`, `ALTERACAO`, `RECEBIMENTO` |
-| Candidatos das regras | `SolicitacaoBoleto` (montado por `SolicitacaoBoletoFactory`), `RecebimentoPagamento` (montado pela entidade) |
-| Máquina de estados | `EstadoBoleto` (`domain/state`) + enum `StatusBoleto` |
+| Candidatos das regras | `specification/boleto/SolicitacaoBoleto` (`paraEmissao`/`paraAlteracao`), `RecebimentoPagamento` (montado pela entidade) |
+| Máquina de estados | `domain/state`: `EstadoBoleto`, estados concretos e enum `StatusBoleto` |
 | Repositórios (injetados nos UCs) | `adapter/database/BoletoRepository` (Panache, fala domínio) |
 | Integrações externas (injetadas nos UCs) | `adapter/notificacao/NotificadorBoleto` |
 | Handler de erros HTTP | `entrypoint/api/v1/handler/ApiExceptionHandler` |
-| Producer de beans de domínio / `Clock` | `shared/config/DomainBeansProducer` |
+| `Clock` no fuso do negócio | `shared/ClockProducer` |
 | Builder de cenários de teste | `src/test/java/com/example/boleto/domain/Cenarios` |
 | Teste de tabela de estados | `EstadoBoletoTest` (mapa `PERMITIDAS`) |
 | Comandos | `mvn test`, `mvn quarkus:dev` |

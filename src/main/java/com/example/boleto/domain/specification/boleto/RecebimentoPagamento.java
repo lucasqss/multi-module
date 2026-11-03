@@ -1,4 +1,4 @@
-package com.example.boleto.domain.model;
+package com.example.boleto.domain.specification.boleto;
 
 import com.example.boleto.domain.valueobject.Dinheiro;
 import com.example.boleto.domain.valueobject.Pagamento;

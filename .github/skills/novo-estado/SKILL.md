@@ -34,7 +34,7 @@ use case. Ele mora nas classes de `src/main/java/com/example/boleto/domain/state
 
 ## B) Novo estado
 
-1. Adicione o valor em `domain/enums/StatusBoleto.java` e atualize o diagrama no Javadoc.
+1. Adicione o valor em `domain/state/StatusBoleto.java` e atualize o diagrama no Javadoc.
 2. Crie `domain/state/Estado<Nome>.java` (modelo: `EstadoPago` para final, `EstadoNotificado` para
    intermediário): `public final class`, `static final ... INSTANCIA`, construtor `private`,
    `status()`, e sobrescreva só as ações permitidas e consultas (`emAberto()`).

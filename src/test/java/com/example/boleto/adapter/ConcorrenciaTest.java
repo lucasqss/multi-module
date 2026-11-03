@@ -3,7 +3,7 @@ package com.example.boleto.adapter;
 import com.example.boleto.adapter.database.BoletoRepository;
 import com.example.boleto.domain.entity.Boleto;
 import com.example.boleto.domain.exception.AlteracaoConcorrenteException;
-import com.example.boleto.domain.factory.SolicitacaoBoletoFactory;
+import com.example.boleto.domain.specification.boleto.SolicitacaoBoleto;
 import com.example.boleto.domain.valueobject.BoletoId;
 import com.example.boleto.domain.valueobject.DadosBoleto;
 import com.example.boleto.domain.valueobject.Motivo;
@@ -14,6 +14,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
@@ -31,7 +32,7 @@ class ConcorrenciaTest {
     BoletoRepository boletos;
 
     @Inject
-    SolicitacaoBoletoFactory solicitacoes;
+    Clock clock;
 
     @Test
     void segundaGravacaoSobreVersaoAntigaFalha() {
@@ -39,7 +40,7 @@ class ConcorrenciaTest {
             var vencimento = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.TUESDAY));
             var dados = DadosBoleto.de(Pagador.de("Concorrência", "99999999999", "c@example.com"),
                     new BigDecimal("100.00"), vencimento);
-            Boleto novo = Boleto.emitir(solicitacoes.paraEmissao(dados, 0));
+            Boleto novo = Boleto.emitir(SolicitacaoBoleto.paraEmissao(dados, clock, 60, 0));
             boletos.salvar(novo);
             return novo.getId();
         });

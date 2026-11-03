@@ -11,7 +11,7 @@ use case. Ele mora em classes de `domain/state/`.
 ## 0. Localize os papéis
 
 Pelo **"Mapa do projeto"** do `copilot-instructions.md`/`AGENTS.md`, ou buscando:
-`abstract sealed class Estado` (base), `enum Status` em `domain/enums` (rótulo),
+`abstract sealed class Estado` (base), `enum Status` em `domain/state` (rótulo, junto dos estados),
 `TransicaoEstadoInvalidaException`, e o teste com a tabela de transições (procure `PERMITIDAS`).
 **Leia a base e um estado existente antes de escrever.** Se a entidade ainda não tem estados, vá ao passo C.
 
@@ -53,7 +53,7 @@ Pelo **"Mapa do projeto"** do `copilot-instructions.md`/`AGENTS.md`, ou buscando
 Exemplo com o agregado **Contrato**; troque pelo nome do seu (ex.: `EstadoPedido`, `StatusPedido`).
 
 ```java
-// domain/enums
+// domain/state (o enum de status mora junto dos estados)
 public enum StatusContrato { RASCUNHO, ATIVO, ENCERRADO }
 
 // domain/exception (se ainda não existir para este agregado)

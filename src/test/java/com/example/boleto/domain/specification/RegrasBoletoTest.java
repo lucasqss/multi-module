@@ -12,7 +12,7 @@ import com.example.boleto.domain.exception.ValorPagoDivergenteException;
 import com.example.boleto.domain.exception.VencimentoAlemDoPrazoException;
 import com.example.boleto.domain.exception.VencimentoEmDiaNaoUtilException;
 import com.example.boleto.domain.exception.VencimentoNoPassadoException;
-import com.example.boleto.domain.model.RecebimentoPagamento;
+import com.example.boleto.domain.specification.boleto.RecebimentoPagamento;
 import com.example.boleto.domain.specification.boleto.RegrasBoleto;
 import com.example.boleto.domain.valueobject.Dinheiro;
 import com.example.boleto.domain.valueobject.Pagamento;

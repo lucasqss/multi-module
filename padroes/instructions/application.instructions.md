@@ -22,3 +22,5 @@ applyTo: "**/src/main/java/**/application/**/*.java"
   (com `static de(Entidade)`).
 - Se precisar de uma decisão nova: crie a regra no domínio (skill `layered-nova-regra-de-negocio`),
   não aqui.
+- **Um UC não chama outro UC**, nem spec, nem estado diretamente. Lógica compartilhada entre UCs vai
+  para a entidade, um VO ou uma spec (nunca para um `*Service`/`*Utils` genérico).

@@ -1,6 +1,6 @@
 package com.example.boleto.domain.exception;
 
-import com.example.boleto.domain.enums.StatusBoleto;
+import com.example.boleto.domain.state.StatusBoleto;
 
 /**
  * A ação não é permitida no status atual. Lançada pelos estados do State pattern.

@@ -1,6 +1,5 @@
 package com.example.boleto.domain.state;
 
-import com.example.boleto.domain.enums.StatusBoleto;
 
 /**
  * Recém-emitido, o pagador ainda não foi avisado: é o único estado em que dá para

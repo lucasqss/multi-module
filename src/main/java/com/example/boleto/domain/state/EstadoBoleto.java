@@ -1,6 +1,5 @@
 package com.example.boleto.domain.state;
 
-import com.example.boleto.domain.enums.StatusBoleto;
 import com.example.boleto.domain.exception.TransicaoEstadoInvalidaException;
 
 /**

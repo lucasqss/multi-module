@@ -1,7 +1,7 @@
 package com.example.boleto.application.boleto.dto;
 
 import com.example.boleto.domain.entity.Boleto;
-import com.example.boleto.domain.enums.StatusBoleto;
+import com.example.boleto.domain.state.StatusBoleto;
 import com.example.boleto.domain.valueobject.Motivo;
 import com.example.boleto.domain.valueobject.Pagamento;
 

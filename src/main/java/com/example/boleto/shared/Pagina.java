@@ -1,4 +1,4 @@
-package __PACOTE__.shared.utils;
+package com.example.boleto.shared;
 
 import java.util.List;
 import java.util.function.Function;

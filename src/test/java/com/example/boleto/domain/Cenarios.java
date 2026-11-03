@@ -1,7 +1,7 @@
 package com.example.boleto.domain;
 
 import com.example.boleto.domain.entity.Boleto;
-import com.example.boleto.domain.model.SolicitacaoBoleto;
+import com.example.boleto.domain.specification.boleto.SolicitacaoBoleto;
 import com.example.boleto.domain.valueobject.DadosBoleto;
 import com.example.boleto.domain.valueobject.Dinheiro;
 import com.example.boleto.domain.valueobject.Pagador;

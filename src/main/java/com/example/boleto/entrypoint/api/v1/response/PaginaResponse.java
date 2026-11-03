@@ -1,6 +1,6 @@
 package com.example.boleto.entrypoint.api.v1.response;
 
-import com.example.boleto.shared.utils.Pagina;
+import com.example.boleto.shared.Pagina;
 
 import java.util.List;
 import java.util.function.Function;

@@ -3,8 +3,6 @@ package com.example.boleto.domain.specification.boleto;
 import com.example.boleto.domain.exception.LimitePessoaFisicaExcedidoException;
 import com.example.boleto.domain.exception.ValorAbaixoDoMinimoException;
 import com.example.boleto.domain.exception.ValorAcimaDoMaximoException;
-import com.example.boleto.domain.model.RecebimentoPagamento;
-import com.example.boleto.domain.model.SolicitacaoBoleto;
 import com.example.boleto.domain.specification.RegraNegocio;
 import com.example.boleto.domain.specification.ValidadorRegras;
 import com.example.boleto.domain.valueobject.Dinheiro;

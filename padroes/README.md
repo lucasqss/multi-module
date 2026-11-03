@@ -26,7 +26,55 @@ específicas dele ficam em `.github/skills/`; as genéricas, aqui.
 | `layered-nova-regra-de-negocio` | Nova validação de negócio (Specification) |
 | `layered-novo-estado` | Novo status/transição (State) ou primeira máquina de estados |
 | `layered-nova-integracao-externa` | Integração com sistema externo (classe em `adapter/`) |
+| `layered-enxugar-estrutura` | Eliminar pastas desnecessárias (`factory`, `model`, `enums`, `repository`, `service`, `shared/*`) e corrigir quem chama quem |
 | `layered-revisao-arquitetura` | Revisão de camadas, domínio anêmico, SOLID, GRASP + script `verificar-camadas.sh` |
+
+## Estrutura de pastas que as skills seguem (por tipo, enxuta)
+
+```
+<pacote-base>
+├── domain
+│   ├── entity          entidades (aggregate roots)
+│   ├── valueobject     value objects (records) e enums de valor
+│   ├── exception       famílias + exceções específicas
+│   ├── specification   base genérica (Specification, RegraNegocio, ValidadorRegras)
+│   │   └── <agregado>  specs, catálogo Regras<Agregado> e candidatos (Solicitacao<Agregado>...)
+│   └── state           Estado<Agregado>, estados concretos e enum Status<Agregado>
+├── application
+│   └── <agregado>      *UC (+ dto/ com *Input/*Output)
+├── adapter
+│   ├── database        <Agregado>Repository, *JpaEntity, *Mapper, Filtro*
+│   └── <sistema>       uma pasta por sistema externo
+├── entrypoint
+│   └── api/v1          *Resource, request/, response/, handler/ (outros: iib/v1...)
+└── shared              Pagina, ClockProducer (sem subpastas)
+```
+
+**Não crie** estas pastas (cada uma tem um destino melhor):
+
+| Pasta | Para onde vai o conteúdo |
+|---|---|
+| `domain/factory` | Criação = método estático da entidade (`Boleto.emitir`) ou do candidato (`SolicitacaoBoleto.paraEmissao`) |
+| `domain/model` | Candidato das regras → `specification/<agregado>`; DTO → `application/.../dto` ou `adapter/<sistema>` |
+| `domain/enums` | Status → `state`; enum de valor → `valueobject`; enum usado por um só VO → método do VO |
+| `domain/repository`, `domain/gateway` | Repositório/integração concretos em `adapter/` (sem ports) |
+| `domain/service` | Lógica de uma entidade → na entidade; regra → spec; orquestração → use case |
+| `shared/utils`, `shared/config` | `shared/` direto; função de um conceito → método do VO |
+
+## Interação entre classes que as skills seguem (quem chama quem)
+
+```
+Resource/Consumer ─▶ UC ─┬─▶ Repository / integração (adapter) ─▶ Mapper ─▶ Entidade.reconstituir
+                         ├─▶ Solicitacao<Agregado>.para<Momento>(...)   (monta o candidato)
+                         └─▶ Entidade.<metodoDeNegocio>(...) ─┬─▶ Estado (autoriza a ação)
+                                                              └─▶ Regras<Agregado> ─▶ *Spec ─▶ candidato
+```
+
+- Cada classe conversa só com a camada **imediatamente** abaixo dela nesse fluxo.
+- Resource não toca repositório nem entidade; **UC não chama outro UC**, nem spec, nem estado.
+- Entidade nunca chama repositório; spec só lê o candidato; estado só conhece estados.
+- Lógica reaproveitada entre UCs mora na entidade, num VO ou numa spec, nunca num UC compartilhado
+  nem numa classe `*Service`/`*Utils` genérica.
 
 ## Como as skills se adaptam a cada projeto
 
@@ -61,7 +109,9 @@ mkdir -p <projeto>/.github/instructions
 cp padroes/instructions/*.instructions.md <projeto>/.github/instructions/
 ```
 
-Depois, no projeto, peça ao Copilot (modo agente): **"use a skill layered-iniciar-projeto"**. Ela cria
+Depois, no projeto, peça ao Copilot (modo agente): **"use a skill layered-iniciar-projeto"**.
+Em projeto que já existe com muitas pastas, peça antes **"use a skill layered-enxugar-estrutura"**:
+ela mostra o inventário e o destino de cada classe antes de mover, e migra uma pasta por commit. Ela cria
 a base que faltar e o `copilot-instructions.md` com as regras e o mapa. Revise o mapa gerado.
 
 ### Verificação de camadas

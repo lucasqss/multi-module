@@ -26,13 +26,10 @@ description: Cria um novo agregado com CRUD completo em projeto Java layered (en
 | # | Arquivo | Conteúdo |
 |---|---|---|
 | 1 | `domain/valueobject/ContratoId` + VOs | `record`s que validam; formato inválido → exceção da família 400 |
-| 2 | `domain/enums/StatusContrato` | só o rótulo |
-| 3 | `domain/state/EstadoContrato` + um `final` por estado | skill `layered-novo-estado` (passo C) |
+| 3 | `domain/state/`: enum `StatusContrato`, `EstadoContrato` e um `final` por estado | skill `layered-novo-estado` (passo C) |
 | 4 | `domain/exception/*Exception` | uma por situação: `ContratoNaoEncontradoException` (404), `TransicaoEstadoInvalidaException`/`AlteracaoConcorrenteException` (409), uma por regra (422) |
-| 5 | `domain/model/SolicitacaoContrato` | candidato das regras: dados + momento + hoje + parâmetros + fatos |
-| 6 | `domain/specification/contrato/*Spec` + `RegrasContrato` | skill `layered-nova-regra-de-negocio` |
+| 6 | `domain/specification/contrato/`: candidato `SolicitacaoContrato` (dados + momento + hoje + parâmetros + fatos, com `paraCriacao(..., Clock, ...)`), `*Spec` e `RegrasContrato` | skill `layered-nova-regra-de-negocio` |
 | 7 | `domain/entity/Contrato` | rica: construtor privado, `criar(Solicitacao)` que valida, `reconstituir(...)`, métodos de negócio, sem setters |
-| 8 | `domain/factory/SolicitacaoContratoFactory` + registro no producer CDI | monta o candidato com `Clock` e configuração |
 | 9 | `adapter/database/ContratoJpaEntity`, `ContratoMapper` | JPA separada da entidade, com `@Version`; mapper `copiar`/`paraDominio` |
 | 10 | `adapter/database/ContratoRepository` (+ `FiltroContrato`) | classe concreta (Panache) injetada nos UCs, **falando domínio**: `salvar`, `buscarPorId`, `listar(filtro, pagina, tamanho)`, `remover`, `obter(id)` → 404; `salvar` faz `flush` e traduz `OptimisticLockException` → `AlteracaoConcorrenteException` |
 | 11 | `application/contrato/dto/*Input`, `ContratoOutput` | `record`s; Input monta VOs; `Output.de(entidade)` |
@@ -76,7 +73,7 @@ public class Contrato {
 | `RegrasContratoTest` | uma regra por teste, exceção pelo **tipo** |
 | `EstadoContratoTest` | tabela (status × ação) completa |
 | `ContratoTest` | entidade aplica estado (409) antes das regras (422) |
-| `SolicitacaoContratoFactoryTest` | "hoje" no fuso do negócio |
+| `SolicitacaoContratoTest` | "hoje" no fuso do negócio |
 | `ConcorrenciaTest` (integração) | lock otimista → 409 |
 | `ContratoResourceTest` (integração) | CRUD + ações + erros (status **e** `codigo`) |
 

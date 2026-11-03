@@ -28,8 +28,8 @@ Para cada `templates/<caminho>/<Nome>.java.tmpl`:
 | `domain/exception/DomainException` + `DadoInvalido`/`RecursoNaoEncontrado`/`Conflito`/`RegraNegocio` | As quatro famílias (400/404/409/422) |
 | `domain/exception/{ValorMonetarioInvalido,MotivoInvalido}Exception` | Usadas por `Dinheiro` e `Motivo` |
 | `domain/valueobject/{Dinheiro,Motivo}` | VOs genéricos |
-| `shared/utils/Pagina` | Paginação do repositório até a resposta |
-| `shared/config/DomainBeansProducer` | `Clock` no fuso do negócio (`app.fuso-horario`) |
+| `shared/Pagina` | Paginação do repositório até a resposta |
+| `shared/ClockProducer` | `Clock` no fuso do negócio (`app.fuso-horario`) |
 | `entrypoint/api/v1/handler/{ApiExceptionHandler,ErroResponse}` | Formato único de erro, status por família |
 | `entrypoint/api/v1/request/MotivoRequest`, `response/PaginaResponse` | Contratos HTTP reutilizáveis |
 | `test/domain/specification/SpecificationTest` | Testa a base de specs |
@@ -60,10 +60,15 @@ leem esse mapa primeiro. Acrescente também, antes do mapa, as regras inegociáv
 8. Ordem na entidade: estado autoriza (409) → specs validam (422) → muda estado.
 9. Sem ports and adapters: use cases injetam classes concretas de `adapter/` (repositórios e
    integrações que falam domínio). Interface só com mais de uma implementação real.
+10. Estrutura por tipo e enxuta: domain só com `entity`, `valueobject`, `exception`, `specification`,
+    `state`; nada de `factory`, `model`, `enums`, `repository`, `service`; `shared/` sem subpastas.
+11. Quem chama quem: Resource → UC → (repositório/integração, entidade); entidade → estado e regras.
+    UC não chama UC; nada de `*Service`/`*Utils` genéricos.
 ```
 
 ## 5. Valide
 
 1. Compile e rode os testes (`mvn test`): o `SpecificationTest` copiado deve passar.
 2. Rode `verificar-camadas.sh` da skill `layered-revisao-arquitetura`.
-3. Próximo passo: o primeiro agregado com a skill `layered-novo-agregado-crud`.
+3. Próximo passo: o primeiro agregado com a skill `layered-novo-agregado-crud`. Se o projeto já tem
+   pastas fora da estrutura alvo, rode antes a skill `layered-enxugar-estrutura`.

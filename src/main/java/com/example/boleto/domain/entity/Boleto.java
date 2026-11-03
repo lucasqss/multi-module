@@ -1,10 +1,10 @@
 package com.example.boleto.domain.entity;
 
-import com.example.boleto.domain.enums.StatusBoleto;
-import com.example.boleto.domain.model.RecebimentoPagamento;
-import com.example.boleto.domain.model.SolicitacaoBoleto;
+import com.example.boleto.domain.specification.boleto.RecebimentoPagamento;
 import com.example.boleto.domain.specification.boleto.RegrasBoleto;
+import com.example.boleto.domain.specification.boleto.SolicitacaoBoleto;
 import com.example.boleto.domain.state.EstadoBoleto;
+import com.example.boleto.domain.state.StatusBoleto;
 import com.example.boleto.domain.valueobject.BoletoId;
 import com.example.boleto.domain.valueobject.DadosBoleto;
 import com.example.boleto.domain.valueobject.Dinheiro;

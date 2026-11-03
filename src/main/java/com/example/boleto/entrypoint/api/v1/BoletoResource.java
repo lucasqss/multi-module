@@ -9,7 +9,7 @@ import com.example.boleto.application.boleto.ListarBoletosUC;
 import com.example.boleto.application.boleto.NotificarBoletoUC;
 import com.example.boleto.application.boleto.ReceberPagamentoBoletoUC;
 import com.example.boleto.application.boleto.dto.ListarBoletosInput;
-import com.example.boleto.domain.enums.StatusBoleto;
+import com.example.boleto.domain.state.StatusBoleto;
 import com.example.boleto.entrypoint.api.v1.request.AlterarBoletoRequest;
 import com.example.boleto.entrypoint.api.v1.request.EmitirBoletoRequest;
 import com.example.boleto.entrypoint.api.v1.request.MotivoRequest;

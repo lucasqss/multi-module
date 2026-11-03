@@ -1,6 +1,5 @@
 package com.example.boleto.domain.state;
 
-import com.example.boleto.domain.enums.StatusBoleto;
 import com.example.boleto.domain.exception.TransicaoEstadoInvalidaException;
 import org.junit.jupiter.api.Test;
 
@@ -8,10 +7,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
-import static com.example.boleto.domain.enums.StatusBoleto.CANCELADO;
-import static com.example.boleto.domain.enums.StatusBoleto.EMITIDO;
-import static com.example.boleto.domain.enums.StatusBoleto.NOTIFICADO;
-import static com.example.boleto.domain.enums.StatusBoleto.PAGO;
+import static com.example.boleto.domain.state.StatusBoleto.CANCELADO;
+import static com.example.boleto.domain.state.StatusBoleto.EMITIDO;
+import static com.example.boleto.domain.state.StatusBoleto.NOTIFICADO;
+import static com.example.boleto.domain.state.StatusBoleto.PAGO;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 

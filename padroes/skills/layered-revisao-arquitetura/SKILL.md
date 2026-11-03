@@ -20,7 +20,7 @@ bash <pasta-desta-skill>/verificar-camadas.sh            # descobre o pacote bas
 bash <pasta-desta-skill>/verificar-camadas.sh src/main/java/<pacote/base>   # ou informe
 ```
 
-Ele checa imports entre camadas, setters/construtores públicos em entidades, `now()` sem `Clock` e
+Ele checa imports entre camadas, use case chamando use case, pastas fora da estrutura (aviso), setters/construtores públicos em entidades, `now()` sem `Clock` e
 `if`/`switch` em status. Qualquer ✗ é bloqueante. Depois rode os testes do projeto (`mvn test`).
 
 ## 2. Checklist manual
@@ -47,6 +47,14 @@ Para cada violação: `arquivo:linha`, princípio violado e correção concreta.
       para o dono do dado (Information Expert).
 - [ ] Lógica que envolve várias entidades e não pertence a nenhuma → serviço de domínio
       (`domain/service`), sem framework. Não a coloque no use case.
+
+### Estrutura e interação
+- [ ] Nenhuma pasta fora da estrutura enxuta (`domain/factory`, `model`, `enums`, `repository`,
+      `gateway`, `service`, `shared/<subpasta>`)? O script avisa com ⚠; destino de cada uma na skill
+      `layered-enxugar-estrutura`.
+- [ ] Quem chama quem: Resource → UC → (repositório/integração, candidato, entidade); entidade →
+      estado e regras. **UC não chama UC** (o script falha), nem spec ou estado direto.
+- [ ] Nenhuma classe `*Service`/`*Utils`/`*Helper` genérica: cada método vai para o dono do dado.
 
 ### Use cases
 - [ ] Só orquestra: buscar fatos nos repositórios → domínio decide → salvar → efeito externo → `*Output`.

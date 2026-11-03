@@ -1,6 +1,6 @@
 package com.example.boleto.adapter.database;
 
-import com.example.boleto.domain.enums.StatusBoleto;
+import com.example.boleto.domain.state.StatusBoleto;
 
 /** Critérios opcionais de busca do {@link BoletoRepository} (null = não filtra). */
 public record FiltroBoleto(String documentoPagador, StatusBoleto status) {

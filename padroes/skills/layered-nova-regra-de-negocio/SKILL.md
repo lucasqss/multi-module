@@ -16,7 +16,7 @@ Use a seção **"Mapa do projeto"** do `copilot-instructions.md`/`AGENTS.md`, se
 | Base `Specification<T>` | `interface Specification<` em `domain/specification` |
 | Base `RegraNegocio<T>` | `abstract class RegraNegocio` |
 | Catálogo de regras do agregado | classe com constantes `ValidadorRegras<...>` (ex.: `Regras<Agregado>`) |
-| Candidatos | `record`s em `domain/model` usados como `T` das specs |
+| Candidatos | `record`s em `domain/specification/<agregado>` usados como `T` das specs (ex.: `Solicitacao<Agregado>`) |
 | Família 422 | `abstract class RegraNegocioException` |
 | Regras existentes | `extends RegraNegocio<` — **leia uma antes de escrever** e copie a forma |
 
@@ -28,7 +28,7 @@ Se a base não existir, use antes a skill `layered-iniciar-projeto`.
 |---|---|
 | É só formato do dado (tamanho, dígitos, casas decimais)? | Não é spec: valide no **value object**, exceção da família `DadoInvalidoException` (400). |
 | Depende do status ("não pode X se já Y")? | Não é spec: é **State** → skill `layered-novo-estado`. |
-| Sobre quais dados decide? | Use o candidato desse momento (criação, alteração, outra ação). Não existe? Crie um `record` em `domain/model`. |
+| Sobre quais dados decide? | Use o candidato desse momento (criação, alteração, outra ação). Não existe? Crie um `record` em `domain/specification/<agregado>`, com métodos estáticos `para<Momento>(...)`. |
 | Precisa de dado externo (banco, outro sistema)? | O **use case** consulta; o dado entra como campo do candidato. A spec continua pura. |
 
 ## 2. Exceção específica
@@ -85,9 +85,9 @@ o validador é fail-fast e o cliente recebe a primeira regra violada. Fundamenta
 
 ## 5. Se precisar de um fato novo
 
-1. Campo novo no candidato + ajuste na factory que monta o candidato.
+1. Campo novo no candidato + ajuste nos métodos estáticos `para<Momento>(...)` que o montam.
 2. Consulta nova no repositório/integração de `adapter/` (devolvendo tipo de domínio ou primitivo).
-3. No use case: consultar e passar para a factory.
+3. No use case: consultar e passar para `Solicitacao<Agregado>.para<Momento>(...)`.
 4. Atualizar o builder de cenários dos testes.
 
 ## 6. Testes

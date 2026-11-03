@@ -1,6 +1,5 @@
 package com.example.boleto.domain.valueobject;
 
-import com.example.boleto.domain.enums.TipoDocumento;
 import com.example.boleto.domain.exception.DocumentoInvalidoException;
 
 /**
@@ -15,12 +14,9 @@ public record Documento(String numero) {
         }
     }
 
-    public TipoDocumento tipo() {
-        return numero.length() == 11 ? TipoDocumento.CPF : TipoDocumento.CNPJ;
-    }
-
+    /** CPF (11 dígitos) = pessoa física; CNPJ (14 dígitos) = pessoa jurídica. */
     public boolean pessoaFisica() {
-        return tipo() == TipoDocumento.CPF;
+        return numero.length() == 11;
     }
 
     /** Mascarado: o documento completo nunca vai parar em log ou mensagem de erro (LGPD). */

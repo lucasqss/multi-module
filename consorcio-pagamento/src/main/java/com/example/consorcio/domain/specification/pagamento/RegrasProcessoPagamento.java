@@ -1,6 +1,10 @@
 package com.example.consorcio.domain.specification.pagamento;
 
 import com.example.consorcio.domain.enums.FormaPagamento;
+import com.example.consorcio.domain.exception.ContaDebitoIndevidaException;
+import com.example.consorcio.domain.exception.ContaDebitoObrigatoriaException;
+import com.example.consorcio.domain.exception.LimitePixExcedidoException;
+import com.example.consorcio.domain.exception.ValorMinimoBoletoException;
 import com.example.consorcio.domain.model.SolicitacaoPagamento;
 import com.example.consorcio.domain.specification.RegraNegocio;
 import com.example.consorcio.domain.specification.ValidadorRegras;
@@ -14,8 +18,11 @@ import static com.example.consorcio.domain.specification.Specification.quando;
  * <p>Regras simples moram em classes próprias (ex.: {@link ValorPositivoSpec}).
  * Regras condicionais são COMPOSTAS aqui a partir de blocos de construção.
  *
- * <p>Para criar uma regra nova: crie a spec (ou componha), e adicione-a em {@link #COMUNS},
- * {@link #ABERTURA} ou {@link #ALTERACAO}. Nenhum use case precisa mudar.
+ * <p>Para criar uma regra nova: crie a exceção específica (em {@code domain.exception}), a spec
+ * (ou componha), e adicione-a em {@link #COMUNS}, {@link #ABERTURA} ou {@link #ALTERACAO}.
+ * Nenhum use case precisa mudar.
+ *
+ * <p>A ORDEM das listas é a ordem de avaliação (fail-fast): a primeira regra violada é a que o cliente recebe.
  */
 public final class RegrasProcessoPagamento {
 
@@ -29,27 +36,23 @@ public final class RegrasProcessoPagamento {
 
     /** Se é PIX, então valor <= R$ 5.000 (regra fake). */
     public static final RegraNegocio<SolicitacaoPagamento> LIMITE_PIX_RESPEITADO = RegraNegocio.de(
-            "LIMITE_PIX_EXCEDIDO",
             quando(EH_PIX).entao(new ValorAteSpec(LIMITE_PIX)),
-            s -> "Pagamento via PIX limitado a " + LIMITE_PIX);
+            s -> new LimitePixExcedidoException(LIMITE_PIX));
 
     /** Se é boleto, então valor >= R$ 10 (regra fake). */
     public static final RegraNegocio<SolicitacaoPagamento> MINIMO_BOLETO_RESPEITADO = RegraNegocio.de(
-            "VALOR_MINIMO_BOLETO",
             quando(EH_BOLETO).entao(new ValorMinimoSpec(MINIMO_BOLETO)),
-            s -> "Boleto exige valor mínimo de " + MINIMO_BOLETO);
+            s -> new ValorMinimoBoletoException(MINIMO_BOLETO));
 
     /** Se é débito em conta, então a conta é obrigatória. */
     public static final RegraNegocio<SolicitacaoPagamento> CONTA_INFORMADA_PARA_DEBITO = RegraNegocio.de(
-            "CONTA_DEBITO_OBRIGATORIA",
             quando(EH_DEBITO).entao(POSSUI_CONTA),
-            s -> "Conta para débito é obrigatória para " + FormaPagamento.DEBITO_EM_CONTA);
+            s -> new ContaDebitoObrigatoriaException());
 
     /** Se tem conta, então tem que ser débito em conta (mesmos blocos, direção inversa). */
     public static final RegraNegocio<SolicitacaoPagamento> CONTA_SOMENTE_PARA_DEBITO = RegraNegocio.de(
-            "CONTA_DEBITO_INDEVIDA",
             quando(POSSUI_CONTA).entao(EH_DEBITO),
-            s -> "Conta para débito só deve ser informada para " + FormaPagamento.DEBITO_EM_CONTA);
+            s -> new ContaDebitoIndevidaException());
 
     /** Regras que valem tanto para abrir quanto para alterar um processo. */
     public static final ValidadorRegras<SolicitacaoPagamento> COMUNS = ValidadorRegras.de(

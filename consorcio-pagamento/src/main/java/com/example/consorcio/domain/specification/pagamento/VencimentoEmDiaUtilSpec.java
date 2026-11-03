@@ -1,5 +1,6 @@
 package com.example.consorcio.domain.specification.pagamento;
 
+import com.example.consorcio.domain.exception.VencimentoEmDiaNaoUtilException;
 import com.example.consorcio.domain.model.SolicitacaoPagamento;
 import com.example.consorcio.domain.specification.RegraNegocio;
 
@@ -18,12 +19,7 @@ public class VencimentoEmDiaUtilSpec extends RegraNegocio<SolicitacaoPagamento> 
     }
 
     @Override
-    public String codigo() {
-        return "VENCIMENTO_EM_DIA_NAO_UTIL";
-    }
-
-    @Override
-    public String mensagem(SolicitacaoPagamento s) {
-        return "Data de vencimento %s cai em fim de semana".formatted(s.dados().dataVencimento());
+    protected VencimentoEmDiaNaoUtilException violacao(SolicitacaoPagamento s) {
+        return new VencimentoEmDiaNaoUtilException(s.dados().dataVencimento());
     }
 }

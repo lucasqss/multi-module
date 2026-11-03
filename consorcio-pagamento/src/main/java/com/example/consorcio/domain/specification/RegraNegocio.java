@@ -1,34 +1,33 @@
 package com.example.consorcio.domain.specification;
 
-import com.example.consorcio.domain.exception.Violacao;
+import com.example.consorcio.domain.exception.RegraNegocioException;
 
-import java.util.Optional;
 import java.util.function.Function;
 
 /**
  * Specification que representa uma REGRA DE NEGÓCIO: além de dizer se o candidato satisfaz,
- * sabe o código e a mensagem do erro quando não satisfaz.
+ * sabe qual exceção ESPECÍFICA lançar quando não satisfaz.
  *
  * <p>Duas formas de criar:
  * <ul>
- *   <li>Classe própria (regra com lógica não trivial), estendendo esta classe;</li>
- *   <li>{@link #de(String, Specification, Function)}, compondo specifications menores.</li>
+ *   <li>classe própria, estendendo esta (regra com lógica não trivial);</li>
+ *   <li>{@link #de(Specification, Function)}, compondo specifications menores.</li>
  * </ul>
  */
 public abstract class RegraNegocio<T> implements Specification<T> {
 
-    public abstract String codigo();
+    /** A exceção específica desta regra, já com os dados do candidato na mensagem. */
+    protected abstract RegraNegocioException violacao(T candidato);
 
-    public abstract String mensagem(T candidato);
-
-    public final Optional<Violacao> avaliar(T candidato) {
-        return isSatisfiedBy(candidato)
-                ? Optional.empty()
-                : Optional.of(new Violacao(codigo(), mensagem(candidato)));
+    /** Lança a exceção específica se o candidato não satisfizer a regra. */
+    public final void exigir(T candidato) {
+        if (!isSatisfiedBy(candidato)) {
+            throw violacao(candidato);
+        }
     }
 
-    public static <T> RegraNegocio<T> de(String codigo, Specification<T> specification,
-                                         Function<? super T, String> mensagem) {
+    public static <T> RegraNegocio<T> de(Specification<T> specification,
+                                         Function<? super T, ? extends RegraNegocioException> violacao) {
         return new RegraNegocio<>() {
             @Override
             public boolean isSatisfiedBy(T candidato) {
@@ -36,13 +35,8 @@ public abstract class RegraNegocio<T> implements Specification<T> {
             }
 
             @Override
-            public String codigo() {
-                return codigo;
-            }
-
-            @Override
-            public String mensagem(T candidato) {
-                return mensagem.apply(candidato);
+            protected RegraNegocioException violacao(T candidato) {
+                return violacao.apply(candidato);
             }
         };
     }

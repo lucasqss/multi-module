@@ -1,5 +1,6 @@
 package com.example.consorcio.domain.specification.pagamento;
 
+import com.example.consorcio.domain.exception.VencimentoNoPassadoException;
 import com.example.consorcio.domain.model.SolicitacaoPagamento;
 import com.example.consorcio.domain.specification.RegraNegocio;
 
@@ -12,12 +13,7 @@ public class VencimentoNaoRetroativoSpec extends RegraNegocio<SolicitacaoPagamen
     }
 
     @Override
-    public String codigo() {
-        return "VENCIMENTO_NO_PASSADO";
-    }
-
-    @Override
-    public String mensagem(SolicitacaoPagamento s) {
-        return "Data de vencimento %s não pode estar no passado".formatted(s.dados().dataVencimento());
+    protected VencimentoNoPassadoException violacao(SolicitacaoPagamento s) {
+        return new VencimentoNoPassadoException(s.dados().dataVencimento());
     }
 }

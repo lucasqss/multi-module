@@ -1,5 +1,6 @@
 package com.example.consorcio.domain.specification.pagamento;
 
+import com.example.consorcio.domain.exception.VencimentoAlemDoPrazoException;
 import com.example.consorcio.domain.model.SolicitacaoPagamento;
 import com.example.consorcio.domain.specification.RegraNegocio;
 
@@ -12,12 +13,7 @@ public class VencimentoDentroDoPrazoSpec extends RegraNegocio<SolicitacaoPagamen
     }
 
     @Override
-    public String codigo() {
-        return "VENCIMENTO_ALEM_DO_PRAZO";
-    }
-
-    @Override
-    public String mensagem(SolicitacaoPagamento s) {
-        return "Data de vencimento deve ser em até %d dias".formatted(s.prazoMaximoVencimentoDias());
+    protected VencimentoAlemDoPrazoException violacao(SolicitacaoPagamento s) {
+        return new VencimentoAlemDoPrazoException(s.prazoMaximoVencimentoDias());
     }
 }

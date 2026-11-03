@@ -1,5 +1,6 @@
 package com.example.consorcio.domain.specification.pagamento;
 
+import com.example.consorcio.domain.exception.ValorNaoPositivoException;
 import com.example.consorcio.domain.model.SolicitacaoPagamento;
 import com.example.consorcio.domain.specification.RegraNegocio;
 
@@ -12,12 +13,7 @@ public class ValorPositivoSpec extends RegraNegocio<SolicitacaoPagamento> {
     }
 
     @Override
-    public String codigo() {
-        return "VALOR_NAO_POSITIVO";
-    }
-
-    @Override
-    public String mensagem(SolicitacaoPagamento s) {
-        return "Valor do pagamento deve ser maior que zero";
+    protected ValorNaoPositivoException violacao(SolicitacaoPagamento s) {
+        return new ValorNaoPositivoException();
     }
 }

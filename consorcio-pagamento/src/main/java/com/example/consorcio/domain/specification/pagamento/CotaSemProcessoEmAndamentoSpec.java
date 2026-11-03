@@ -1,5 +1,6 @@
 package com.example.consorcio.domain.specification.pagamento;
 
+import com.example.consorcio.domain.exception.CotaComProcessoEmAndamentoException;
 import com.example.consorcio.domain.model.SolicitacaoPagamento;
 import com.example.consorcio.domain.specification.RegraNegocio;
 
@@ -16,12 +17,7 @@ public class CotaSemProcessoEmAndamentoSpec extends RegraNegocio<SolicitacaoPaga
     }
 
     @Override
-    public String codigo() {
-        return "COTA_COM_PROCESSO_EM_ANDAMENTO";
-    }
-
-    @Override
-    public String mensagem(SolicitacaoPagamento s) {
-        return "Cota %s já possui um processo de pagamento em andamento".formatted(s.cota().identificador());
+    protected CotaComProcessoEmAndamentoException violacao(SolicitacaoPagamento s) {
+        return new CotaComProcessoEmAndamentoException(s.cota().identificador());
     }
 }

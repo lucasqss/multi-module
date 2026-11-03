@@ -1,8 +1,9 @@
 package com.example.consorcio.domain.exception;
 
-public class RecursoNaoEncontradoException extends DomainException {
+/** Família: o recurso procurado não existe. */
+public abstract class RecursoNaoEncontradoException extends DomainException {
 
-    public RecursoNaoEncontradoException(String recurso, Object identificador) {
-        super("NAO_ENCONTRADO", recurso + " não encontrado(a): " + identificador);
+    protected RecursoNaoEncontradoException(String codigo, String mensagem) {
+        super(codigo, mensagem);
     }
 }

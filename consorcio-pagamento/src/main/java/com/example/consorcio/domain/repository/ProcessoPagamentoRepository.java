@@ -1,7 +1,7 @@
 package com.example.consorcio.domain.repository;
 
 import com.example.consorcio.domain.entity.ProcessoPagamento;
-import com.example.consorcio.domain.exception.RecursoNaoEncontradoException;
+import com.example.consorcio.domain.exception.ProcessoPagamentoNaoEncontradoException;
 import com.example.consorcio.domain.valueobject.IdentificadorCota;
 import com.example.consorcio.domain.valueobject.ProcessoPagamentoId;
 import com.example.consorcio.shared.utils.Pagina;
@@ -23,6 +23,6 @@ public interface ProcessoPagamentoRepository {
 
     /** Atalho usado por todos os use cases que operam sobre um processo existente. */
     default ProcessoPagamento obter(ProcessoPagamentoId id) {
-        return buscarPorId(id).orElseThrow(() -> new RecursoNaoEncontradoException("Processo de pagamento", id));
+        return buscarPorId(id).orElseThrow(() -> new ProcessoPagamentoNaoEncontradoException(id));
     }
 }

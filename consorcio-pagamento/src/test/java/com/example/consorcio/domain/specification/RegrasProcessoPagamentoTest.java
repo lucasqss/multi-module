@@ -3,106 +3,114 @@ package com.example.consorcio.domain.specification;
 import com.example.consorcio.domain.Cenarios;
 import com.example.consorcio.domain.enums.FormaPagamento;
 import com.example.consorcio.domain.enums.SituacaoCota;
-import com.example.consorcio.domain.exception.Violacao;
+import com.example.consorcio.domain.exception.ContaDebitoIndevidaException;
+import com.example.consorcio.domain.exception.ContaDebitoObrigatoriaException;
+import com.example.consorcio.domain.exception.CotaComProcessoEmAndamentoException;
+import com.example.consorcio.domain.exception.CotaNaoAceitaPagamentoException;
+import com.example.consorcio.domain.exception.LimitePixExcedidoException;
+import com.example.consorcio.domain.exception.RegraNegocioException;
+import com.example.consorcio.domain.exception.ValorExcedeSaldoDevedorException;
+import com.example.consorcio.domain.exception.ValorMinimoBoletoException;
+import com.example.consorcio.domain.exception.ValorNaoPositivoException;
+import com.example.consorcio.domain.exception.VencimentoAlemDoPrazoException;
+import com.example.consorcio.domain.exception.VencimentoEmDiaNaoUtilException;
+import com.example.consorcio.domain.exception.VencimentoNoPassadoException;
 import com.example.consorcio.domain.specification.pagamento.RegrasProcessoPagamento;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-
 import static com.example.consorcio.domain.Cenarios.HOJE;
 import static com.example.consorcio.domain.Cenarios.solicitacao;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Cada regra é testada isoladamente via catálogo: parte-se de um cenário válido
- * e quebra-se exatamente uma coisa.
+ * Cada regra testada isoladamente: parte-se de um cenário válido, quebra-se exatamente uma coisa
+ * e verifica-se a exceção ESPECÍFICA esperada.
  */
 class RegrasProcessoPagamentoTest {
 
-    private List<String> violacoesDeAbertura(Cenarios cenario) {
-        return RegrasProcessoPagamento.ABERTURA.avaliar(cenario.build()).stream().map(Violacao::codigo).toList();
+    private static void assertViola(Class<? extends RegraNegocioException> esperada, Cenarios cenario) {
+        assertThrows(esperada, () -> RegrasProcessoPagamento.ABERTURA.validar(cenario.build()));
     }
 
-    private void assertViola(String codigo, Cenarios cenario) {
-        assertEquals(List.of(codigo), violacoesDeAbertura(cenario));
+    private static void assertValido(Cenarios cenario) {
+        assertDoesNotThrow(() -> RegrasProcessoPagamento.ABERTURA.validar(cenario.build()));
     }
 
     @Test
     void cenarioPadraoEhValido() {
-        assertTrue(violacoesDeAbertura(solicitacao()).isEmpty());
+        assertValido(solicitacao());
     }
 
     @Test
     void cotaCanceladaOuEncerradaNaoAceita() {
-        assertViola("COTA_NAO_ACEITA_PAGAMENTO", solicitacao().situacao(SituacaoCota.CANCELADA));
-        assertViola("COTA_NAO_ACEITA_PAGAMENTO", solicitacao().situacao(SituacaoCota.ENCERRADA));
+        assertViola(CotaNaoAceitaPagamentoException.class, solicitacao().situacao(SituacaoCota.CANCELADA));
+        assertViola(CotaNaoAceitaPagamentoException.class, solicitacao().situacao(SituacaoCota.ENCERRADA));
     }
 
     @Test
     void cotaInadimplenteAceita() {
-        assertTrue(violacoesDeAbertura(solicitacao().situacao(SituacaoCota.INADIMPLENTE)).isEmpty());
+        assertValido(solicitacao().situacao(SituacaoCota.INADIMPLENTE));
     }
 
     @Test
     void valorZero() {
-        assertViola("VALOR_NAO_POSITIVO", solicitacao().forma(FormaPagamento.PIX).valor("0"));
+        assertViola(ValorNaoPositivoException.class, solicitacao().forma(FormaPagamento.PIX).valor("0"));
     }
 
     @Test
     void valorAcimaDoSaldoDevedor() {
-        assertViola("VALOR_EXCEDE_SALDO_DEVEDOR", solicitacao().saldoDevedor("100.00").valor("100.01"));
+        assertViola(ValorExcedeSaldoDevedorException.class, solicitacao().saldoDevedor("100.00").valor("100.01"));
     }
 
     @Test
     void boletoAbaixoDoMinimo() {
-        assertViola("VALOR_MINIMO_BOLETO", solicitacao().forma(FormaPagamento.BOLETO).valor("9.99"));
-        assertTrue(violacoesDeAbertura(solicitacao().forma(FormaPagamento.PIX).valor("9.99")).isEmpty());
+        assertViola(ValorMinimoBoletoException.class, solicitacao().forma(FormaPagamento.BOLETO).valor("9.99"));
+        assertValido(solicitacao().forma(FormaPagamento.PIX).valor("9.99"));
     }
 
     @Test
     void pixAcimaDoLimite() {
-        assertViola("LIMITE_PIX_EXCEDIDO", solicitacao().forma(FormaPagamento.PIX).valor("5000.01"));
-        assertTrue(violacoesDeAbertura(solicitacao().forma(FormaPagamento.BOLETO).valor("5000.01")).isEmpty());
+        assertViola(LimitePixExcedidoException.class, solicitacao().forma(FormaPagamento.PIX).valor("5000.01"));
+        assertValido(solicitacao().forma(FormaPagamento.BOLETO).valor("5000.01"));
     }
 
     @Test
     void vencimentoNoPassado() {
-        assertViola("VENCIMENTO_NO_PASSADO", solicitacao().vencimento(HOJE.minusDays(1)));
+        assertViola(VencimentoNoPassadoException.class, solicitacao().vencimento(HOJE.minusDays(1)));
     }
 
     @Test
     void vencimentoAlemDoPrazo() {
-        assertViola("VENCIMENTO_ALEM_DO_PRAZO", solicitacao().vencimento(HOJE.plusDays(35))); // segunda
+        assertViola(VencimentoAlemDoPrazoException.class, solicitacao().vencimento(HOJE.plusDays(35))); // segunda
     }
 
     @Test
     void vencimentoNoFimDeSemana() {
-        assertViola("VENCIMENTO_EM_DIA_NAO_UTIL", solicitacao().vencimento(HOJE.plusDays(4))); // sábado
+        assertViola(VencimentoEmDiaNaoUtilException.class, solicitacao().vencimento(HOJE.plusDays(4))); // sábado
     }
 
     @Test
     void debitoSemConta() {
-        assertViola("CONTA_DEBITO_OBRIGATORIA", solicitacao().forma(FormaPagamento.DEBITO_EM_CONTA));
+        assertViola(ContaDebitoObrigatoriaException.class, solicitacao().forma(FormaPagamento.DEBITO_EM_CONTA));
     }
 
     @Test
     void contaSemSerDebito() {
-        assertViola("CONTA_DEBITO_INDEVIDA", solicitacao().forma(FormaPagamento.PIX).conta("1234", "99"));
+        assertViola(ContaDebitoIndevidaException.class, solicitacao().forma(FormaPagamento.PIX).conta("1234", "99"));
     }
 
     @Test
     void processoEmAndamentoSoBloqueiaAbertura() {
         var cenario = solicitacao().possuiEmAndamento(true);
-        assertViola("COTA_COM_PROCESSO_EM_ANDAMENTO", cenario);
-        assertTrue(RegrasProcessoPagamento.ALTERACAO.avaliar(cenario.build()).isEmpty());
+        assertViola(CotaComProcessoEmAndamentoException.class, cenario);
+        assertDoesNotThrow(() -> RegrasProcessoPagamento.ALTERACAO.validar(cenario.build()));
     }
 
     @Test
-    void acumulaVariasViolacoes() {
-        var cenario = solicitacao().forma(FormaPagamento.PIX).valor("6000").conta("1234", "1")
-                .vencimento(HOJE.plusDays(4));
-        assertEquals(List.of("LIMITE_PIX_EXCEDIDO", "VENCIMENTO_EM_DIA_NAO_UTIL", "CONTA_DEBITO_INDEVIDA"),
-                violacoesDeAbertura(cenario));
+    void ordemDoCatalogoDefineQualViolacaoAparece() {
+        // cota cancelada E valor zero: a regra da cota vem antes no catálogo
+        assertViola(CotaNaoAceitaPagamentoException.class,
+                solicitacao().situacao(SituacaoCota.CANCELADA).forma(FormaPagamento.PIX).valor("0"));
     }
 }

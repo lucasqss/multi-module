@@ -10,9 +10,7 @@ import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 
 /**
@@ -83,7 +81,8 @@ class ProcessoPagamentoResourceTest {
 
         // DELETE
         given().delete(PATH + "/" + id).then().statusCode(204);
-        given().get(PATH + "/" + id).then().statusCode(404);
+        given().get(PATH + "/" + id).then().statusCode(404)
+                .body("codigo", equalTo("PROCESSO_PAGAMENTO_NAO_ENCONTRADO"));
     }
 
     @Test
@@ -100,7 +99,7 @@ class ProcessoPagamentoResourceTest {
         // EM_PROCESSAMENTO: alterar e excluir são recusados pelo estado -> 409
         given().contentType(ContentType.JSON)
                 .body("{\"valor\":10.00,\"formaPagamento\":\"PIX\",\"dataVencimento\":\"" + diaUtil() + "\"}")
-                .put(processo).then().statusCode(409).body("codigo", equalTo("TRANSICAO_INVALIDA"));
+                .put(processo).then().statusCode(409).body("codigo", equalTo("TRANSICAO_ESTADO_INVALIDA"));
         given().delete(processo).then().statusCode(409);
 
         post(processo + "/rejeicao", "{\"motivo\":\"saldo insuficiente\"}")
@@ -126,13 +125,17 @@ class ProcessoPagamentoResourceTest {
     }
 
     @Test
-    void retornaTodasAsViolacoesDeUmaVez() {
-        post(PATH, corpo(4, "6000.00", "PIX", sabado(), ",\"agenciaDebito\":\"1234\",\"contaDebito\":\"1\""))
-                .statusCode(422)
-                .body("codigo", equalTo("REGRAS_DE_NEGOCIO_VIOLADAS"))
-                .body("violacoes", hasSize(3))
-                .body("violacoes.codigo", containsInAnyOrder(
-                        "LIMITE_PIX_EXCEDIDO", "VENCIMENTO_EM_DIA_NAO_UTIL", "CONTA_DEBITO_INDEVIDA"));
+    void regraDeNegocioRetorna422ComCodigoEspecifico() {
+        post(PATH, corpo(4, "6000.00", "PIX", diaUtil(), ""))
+                .statusCode(422).body("codigo", equalTo("LIMITE_PIX_EXCEDIDO"));
+        post(PATH, corpo(4, "100.00", "PIX", sabado(), ""))
+                .statusCode(422).body("codigo", equalTo("VENCIMENTO_EM_DIA_NAO_UTIL"));
+    }
+
+    @Test
+    void dadoMalFormadoRetorna400() {
+        post(PATH, corpo(4, "10.001", "PIX", diaUtil(), ""))
+                .statusCode(400).body("codigo", equalTo("VALOR_MONETARIO_INVALIDO"));
     }
 
     @Test
@@ -143,7 +146,8 @@ class ProcessoPagamentoResourceTest {
 
     @Test
     void cotaInexistenteRetorna404() {
-        post(PATH, corpo(999, "100.00", "PIX", diaUtil(), "")).statusCode(404);
+        post(PATH, corpo(999, "100.00", "PIX", diaUtil(), ""))
+                .statusCode(404).body("codigo", equalTo("COTA_NAO_ENCONTRADA"));
     }
 
     @Test

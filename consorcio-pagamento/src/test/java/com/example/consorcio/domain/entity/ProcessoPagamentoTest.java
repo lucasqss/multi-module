@@ -2,7 +2,9 @@ package com.example.consorcio.domain.entity;
 
 import com.example.consorcio.domain.enums.FormaPagamento;
 import com.example.consorcio.domain.enums.StatusProcessoPagamento;
-import com.example.consorcio.domain.exception.RegraNegocioException;
+import com.example.consorcio.domain.exception.MotivoInvalidoException;
+import com.example.consorcio.domain.exception.ValorMinimoBoletoException;
+import com.example.consorcio.domain.exception.ValorNaoPositivoException;
 import com.example.consorcio.domain.exception.TransicaoEstadoInvalidaException;
 import com.example.consorcio.domain.valueobject.Dinheiro;
 import com.example.consorcio.domain.valueobject.Motivo;
@@ -25,7 +27,7 @@ class ProcessoPagamentoTest {
 
     @Test
     void naoAbreComSolicitacaoInvalida() {
-        assertThrows(RegraNegocioException.class, () -> solicitacao().valor("0").forma(FormaPagamento.PIX).abrir());
+        assertThrows(ValorNaoPositivoException.class, () -> solicitacao().valor("0").forma(FormaPagamento.PIX).abrir());
     }
 
     @Test
@@ -38,7 +40,7 @@ class ProcessoPagamentoTest {
     @Test
     void alteracaoInvalidaNaoMudaNada() {
         var processo = solicitacao().abrir();
-        assertThrows(RegraNegocioException.class, () -> processo.alterar(solicitacao().valor("9.99").build()));
+        assertThrows(ValorMinimoBoletoException.class, () -> processo.alterar(solicitacao().valor("9.99").build()));
         assertEquals(Dinheiro.de("500"), processo.getValor());
     }
 
@@ -70,6 +72,6 @@ class ProcessoPagamentoTest {
 
     @Test
     void motivoEhObrigatorio() {
-        assertThrows(RegraNegocioException.class, () -> new Motivo("  "));
+        assertThrows(MotivoInvalidoException.class, () -> new Motivo("  "));
     }
 }

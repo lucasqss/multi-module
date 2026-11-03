@@ -1,6 +1,6 @@
 package com.example.consorcio.domain.valueobject;
 
-import com.example.consorcio.domain.exception.RegraNegocioException;
+import com.example.consorcio.domain.exception.ValorMonetarioInvalidoException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -17,10 +17,10 @@ public record Dinheiro(BigDecimal valor) implements Comparable<Dinheiro> {
     public Dinheiro {
         Objects.requireNonNull(valor, "valor é obrigatório");
         if (valor.signum() < 0) {
-            throw new RegraNegocioException("VALOR_NEGATIVO", "Valor monetário não pode ser negativo");
+            throw new ValorMonetarioInvalidoException("não pode ser negativo");
         }
         if (valor.stripTrailingZeros().scale() > 2) {
-            throw new RegraNegocioException("VALOR_CASAS_DECIMAIS", "Valor monetário aceita no máximo 2 casas decimais");
+            throw new ValorMonetarioInvalidoException("aceita no máximo 2 casas decimais");
         }
         valor = valor.setScale(2, RoundingMode.UNNECESSARY);
     }

@@ -1,6 +1,6 @@
 package com.example.consorcio.domain.valueobject;
 
-import com.example.consorcio.domain.exception.RegraNegocioException;
+import com.example.consorcio.domain.exception.MotivoInvalidoException;
 
 /** Justificativa de rejeição/cancelamento. */
 public record Motivo(String texto) {
@@ -9,12 +9,11 @@ public record Motivo(String texto) {
 
     public Motivo {
         if (texto == null || texto.isBlank()) {
-            throw new RegraNegocioException("MOTIVO_OBRIGATORIO", "Motivo é obrigatório");
+            throw new MotivoInvalidoException("é obrigatório");
         }
         texto = texto.strip();
         if (texto.length() > TAMANHO_MAXIMO) {
-            throw new RegraNegocioException("MOTIVO_MUITO_LONGO",
-                    "Motivo deve ter no máximo %d caracteres".formatted(TAMANHO_MAXIMO));
+            throw new MotivoInvalidoException("deve ter no máximo %d caracteres".formatted(TAMANHO_MAXIMO));
         }
     }
 

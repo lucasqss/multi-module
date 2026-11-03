@@ -1,15 +1,12 @@
 package com.example.consorcio.domain.specification;
 
-import com.example.consorcio.domain.exception.RegraNegocioException;
-import com.example.consorcio.domain.exception.Violacao;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 /**
- * Conjunto ordenado de regras avaliadas JUNTAS: acumula todas as violações
- * e lança uma única {@link RegraNegocioException} com a lista completa.
+ * Conjunto ORDENADO de regras. Avalia na ordem e para na primeira violada (fail-fast),
+ * lançando a exceção específica dela. A ordem importa: coloque primeiro as regras mais "fundamentais"
+ * (ex.: a cota aceita pagamento?) e depois as de detalhe.
  */
 public final class ValidadorRegras<T> {
 
@@ -32,17 +29,7 @@ public final class ValidadorRegras<T> {
         return new ValidadorRegras<>(todas);
     }
 
-    public List<Violacao> avaliar(T candidato) {
-        return regras.stream()
-                .map(regra -> regra.avaliar(candidato))
-                .flatMap(Optional::stream)
-                .toList();
-    }
-
     public void validar(T candidato) {
-        var violacoes = avaliar(candidato);
-        if (!violacoes.isEmpty()) {
-            throw new RegraNegocioException(violacoes);
-        }
+        regras.forEach(regra -> regra.exigir(candidato));
     }
 }

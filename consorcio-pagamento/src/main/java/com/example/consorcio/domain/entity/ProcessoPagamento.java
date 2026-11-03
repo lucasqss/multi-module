@@ -2,7 +2,6 @@ package com.example.consorcio.domain.entity;
 
 import com.example.consorcio.domain.enums.FormaPagamento;
 import com.example.consorcio.domain.enums.StatusProcessoPagamento;
-import com.example.consorcio.domain.exception.RegraNegocioException;
 import com.example.consorcio.domain.model.SolicitacaoPagamento;
 import com.example.consorcio.domain.specification.pagamento.RegrasProcessoPagamento;
 import com.example.consorcio.domain.state.EstadoProcessoPagamento;
@@ -53,7 +52,7 @@ public class ProcessoPagamento {
 
     // =============================== criação ===============================
 
-    /** Abre um novo processo. Lança {@link RegraNegocioException} com TODAS as regras violadas. */
+    /** Abre um novo processo. Lança a exceção específica da primeira regra violada. */
     public static ProcessoPagamento abrir(SolicitacaoPagamento solicitacao, Instant agora) {
         RegrasProcessoPagamento.ABERTURA.validar(solicitacao);
         return new ProcessoPagamento(ProcessoPagamentoId.novo(), solicitacao.cota().identificador(), agora,
@@ -74,7 +73,8 @@ public class ProcessoPagamento {
     public void alterar(SolicitacaoPagamento solicitacao) {
         estado.validarAlteracao();
         if (!solicitacao.cota().identificador().equals(cota)) {
-            throw new RegraNegocioException("COTA_NAO_ALTERAVEL", "A cota de um processo não pode ser alterada");
+            // erro de PROGRAMAÇÃO (o use case montou a solicitação errada), não de negócio
+            throw new IllegalArgumentException("Solicitação de outra cota: " + solicitacao.cota().identificador());
         }
         RegrasProcessoPagamento.ALTERACAO.validar(solicitacao);
         this.dados = solicitacao.dados();

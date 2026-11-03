@@ -1,5 +1,6 @@
 package com.example.consorcio.domain.specification.pagamento;
 
+import com.example.consorcio.domain.exception.ValorExcedeSaldoDevedorException;
 import com.example.consorcio.domain.model.SolicitacaoPagamento;
 import com.example.consorcio.domain.specification.RegraNegocio;
 
@@ -12,12 +13,7 @@ public class ValorDentroDoSaldoDevedorSpec extends RegraNegocio<SolicitacaoPagam
     }
 
     @Override
-    public String codigo() {
-        return "VALOR_EXCEDE_SALDO_DEVEDOR";
-    }
-
-    @Override
-    public String mensagem(SolicitacaoPagamento s) {
-        return "Valor %s excede o saldo devedor da cota (%s)".formatted(s.dados().valor(), s.cota().saldoDevedor());
+    protected ValorExcedeSaldoDevedorException violacao(SolicitacaoPagamento s) {
+        return new ValorExcedeSaldoDevedorException(s.dados().valor(), s.cota().saldoDevedor());
     }
 }

@@ -1,9 +1,10 @@
 package com.example.consorcio.domain.specification;
 
+import com.example.consorcio.domain.exception.RegraNegocioException;
 import org.junit.jupiter.api.Test;
 
 import static com.example.consorcio.domain.specification.Specification.quando;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,15 +32,25 @@ class SpecificationTest {
     }
 
     @Test
-    void validadorAcumulaTodasAsViolacoes() {
+    void validadorParaNaPrimeiraRegraVioladaELancaAExcecaoDela() {
         var validador = ValidadorRegras.<Integer>de(
-                RegraNegocio.de("NAO_POSITIVO", positivo, n -> n + " não é positivo"),
-                RegraNegocio.de("IMPAR", par, n -> n + " é ímpar"));
+                RegraNegocio.de(positivo, n -> new NaoPositivoException()),
+                RegraNegocio.de(par, n -> new ImparException()));
 
-        assertEquals(0, validador.avaliar(2).size());
-        var erro = assertThrows(com.example.consorcio.domain.exception.RegraNegocioException.class,
-                () -> validador.validar(-3));
-        assertEquals(2, erro.getViolacoes().size());
-        assertEquals("REGRAS_DE_NEGOCIO_VIOLADAS", erro.getCodigo());
+        assertDoesNotThrow(() -> validador.validar(2));
+        assertThrows(ImparException.class, () -> validador.validar(3));
+        assertThrows(NaoPositivoException.class, () -> validador.validar(-3)); // viola as duas: vale a 1ª
+    }
+
+    static class NaoPositivoException extends RegraNegocioException {
+        NaoPositivoException() {
+            super("NAO_POSITIVO", "não é positivo");
+        }
+    }
+
+    static class ImparException extends RegraNegocioException {
+        ImparException() {
+            super("IMPAR", "é ímpar");
+        }
     }
 }

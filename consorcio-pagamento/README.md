@@ -32,16 +32,38 @@ entrypoint ──▶ application ──▶ domain ◀── adapter
 
 ## Quem decide o quê
 
-| Pergunta | Quem responde | Erro | HTTP |
+| Pergunta | Quem responde | Família da exceção | HTTP |
 |---|---|---|---|
 | O JSON veio completo? | `entrypoint` (Bean Validation) | `ConstraintViolation` | 400 |
-| O dado tem formato válido? (ex.: 3 casas decimais) | value objects | `RegraNegocioException` | 422 |
-| **Essa ação é permitida no status atual?** | **State** (`domain.state`) | `TransicaoEstadoInvalidaException` | 409 |
-| **Os dados atendem às regras de negócio?** | **Specifications** | `RegraNegocioException` (com **todas** as violações) | 422 |
+| O dado tem formato válido? (ex.: 3 casas decimais) | value objects | `DadoInvalidoException` | 400 |
 | O recurso existe? | repositório (`obter`) | `RecursoNaoEncontradoException` | 404 |
+| **Essa ação é permitida no status atual?** | **State** (`domain.state`) | `TransicaoEstadoInvalidaException` | 409 |
+| **Os dados atendem às regras de negócio?** | **Specifications** | `RegraNegocioException` | 422 |
 
 A **entidade** é quem garante que estado e specifications sejam sempre aplicados:
 não existe caminho para abrir/alterar sem validar nem mudar o status sem passar pelo estado.
+
+## Exceções
+
+Cada situação tem a **sua** exceção, agrupada em quatro famílias abstratas:
+
+```
+DomainException (codigo + mensagem)
+├── DadoInvalidoException            → 400   ValorMonetarioInvalido, IdentificadorCotaInvalido,
+│                                            ContaDebitoInvalida, MotivoInvalido
+├── RecursoNaoEncontradoException    → 404   CotaNaoEncontrada, ProcessoPagamentoNaoEncontrado
+├── TransicaoEstadoInvalidaException → 409   (statusAtual + acao)
+└── RegraNegocioException            → 422   uma por regra: LimitePixExcedido, VencimentoNoPassado,
+                                             CotaComProcessoEmAndamento, ...
+```
+
+- Cada exceção concreta tem `CODIGO` fixo (`LimitePixExcedidoException.CODIGO = "LIMITE_PIX_EXCEDIDO"`)
+  e recebe os **dados** do erro no construtor; a mensagem é montada dentro dela.
+- O `DomainExceptionMapper` decide o status pela **família**: exceção nova não exige mudar o mapper.
+- Erros de programação (ex.: use case montou solicitação de outra cota) **não** são `DomainException`:
+  usam `IllegalArgumentException`/`IllegalStateException` e viram 500.
+
+Resposta: `{"codigo": "LIMITE_PIX_EXCEDIDO", "mensagem": "Pagamento via PIX limitado a R$ 5000.00"}`
 
 ## Specification pattern
 
@@ -49,13 +71,16 @@ não existe caminho para abrir/alterar sem validar nem mudar o status sem passar
 // bloco de construção: só diz sim/não
 record FormaPagamentoEhSpec(FormaPagamento forma) implements Specification<SolicitacaoPagamento>
 
-// regra em classe própria: sim/não + código + mensagem
-class ValorPositivoSpec extends RegraNegocio<SolicitacaoPagamento>
+// regra em classe própria: sim/não + qual exceção lançar
+class ValorPositivoSpec extends RegraNegocio<SolicitacaoPagamento> {
+    public boolean isSatisfiedBy(SolicitacaoPagamento s) { return s.dados().valor().ehPositivo(); }
+    protected ValorNaoPositivoException violacao(SolicitacaoPagamento s) { return new ValorNaoPositivoException(); }
+}
 
 // regra composta no catálogo
-RegraNegocio.de("LIMITE_PIX_EXCEDIDO",
+RegraNegocio.de(
         quando(EH_PIX).entao(new ValorAteSpec(LIMITE_PIX)),
-        s -> "Pagamento via PIX limitado a " + LIMITE_PIX);
+        s -> new LimitePixExcedidoException(LIMITE_PIX));
 
 // conjuntos
 ABERTURA  = COMUNS.mais(new CotaSemProcessoEmAndamentoSpec());
@@ -64,18 +89,16 @@ ALTERACAO = COMUNS;
 
 - Specs são **funções puras** sobre `SolicitacaoPagamento`. Fatos que exigem I/O
   (ex.: "existe processo em andamento?") são consultados pelo use case e **entregues** na solicitação.
-- `ValidadorRegras` avalia **todas** as regras e lança uma exceção só, com a lista de violações:
+- `ValidadorRegras` avalia na ordem do catálogo e **para na primeira regra violada** (fail-fast),
+  lançando a exceção específica dela. A ordem do catálogo é, portanto, a prioridade dos erros.
 
-```json
-{ "codigo": "REGRAS_DE_NEGOCIO_VIOLADAS",
-  "violacoes": [ {"codigo":"LIMITE_PIX_EXCEDIDO", ...},
-                 {"codigo":"VENCIMENTO_EM_DIA_NAO_UTIL", ...},
-                 {"codigo":"CONTA_DEBITO_INDEVIDA", ...} ] }
-```
+**Para criar uma regra nova:**
+1. crie a exceção em `domain.exception` estendendo `RegraNegocioException`;
+2. crie a spec em `domain.specification.pagamento` (ou componha blocos no catálogo);
+3. adicione-a em `RegrasProcessoPagamento` na posição desejada;
+4. teste com `assertThrows(SuaException.class, ...)` em `RegrasProcessoPagamentoTest`.
 
-**Para criar uma regra nova:** crie a classe em `domain.specification.pagamento` (ou componha blocos),
-adicione-a no catálogo `RegrasProcessoPagamento` e escreva o teste em `RegrasProcessoPagamentoTest`.
-Nenhum use case muda.
+Nenhum use case nem o mapper HTTP mudam.
 
 ## State pattern
 
@@ -125,7 +148,7 @@ mvn -pl consorcio-pagamento quarkus:dev   # http://localhost:8081
 
 ## Regras fake implementadas
 
-| Código | Regra |
+| Código (exceção `<Nome>Exception`) | Regra |
 |---|---|
 | `COTA_NAO_ACEITA_PAGAMENTO` | cota cancelada/encerrada não paga (inadimplente pode) |
 | `COTA_COM_PROCESSO_EM_ANDAMENTO` | um processo em andamento por cota (só na abertura) |
@@ -143,8 +166,8 @@ mvn -pl consorcio-pagamento quarkus:dev   # http://localhost:8081
 
 | Teste | O que cobre | Quarkus? |
 |---|---|---|
-| `SpecificationTest` | and/or/not, `quando().entao()`, acúmulo de violações | não |
-| `RegrasProcessoPagamentoTest` | cada regra isolada, a partir de um cenário válido (`Cenarios`) | não |
+| `SpecificationTest` | and/or/not, `quando().entao()`, fail-fast do validador | não |
+| `RegrasProcessoPagamentoTest` | cada regra lança sua exceção, a partir de um cenário válido (`Cenarios`) | não |
 | `EstadoProcessoPagamentoTest` | a máquina de estados inteira como tabela | não |
 | `ProcessoPagamentoTest` | a entidade aplica estado (409) antes das regras (422) | não |
 | `ProcessoPagamentoResourceTest` | CRUD + ciclo de estados + códigos HTTP ponta a ponta | sim |

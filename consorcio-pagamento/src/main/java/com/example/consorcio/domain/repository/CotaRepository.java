@@ -1,6 +1,6 @@
 package com.example.consorcio.domain.repository;
 
-import com.example.consorcio.domain.exception.RecursoNaoEncontradoException;
+import com.example.consorcio.domain.exception.CotaNaoEncontradaException;
 import com.example.consorcio.domain.model.Cota;
 import com.example.consorcio.domain.valueobject.IdentificadorCota;
 
@@ -12,6 +12,6 @@ public interface CotaRepository {
     Optional<Cota> buscar(IdentificadorCota identificador);
 
     default Cota obter(IdentificadorCota identificador) {
-        return buscar(identificador).orElseThrow(() -> new RecursoNaoEncontradoException("Cota", identificador));
+        return buscar(identificador).orElseThrow(() -> new CotaNaoEncontradaException(identificador));
     }
 }

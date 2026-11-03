@@ -3,9 +3,14 @@ package com.example.consorcio.domain.entity;
 import com.example.consorcio.domain.enums.FormaPagamento;
 import com.example.consorcio.domain.enums.StatusProcessoPagamento;
 import com.example.consorcio.domain.exception.RegraNegocioException;
+import com.example.consorcio.domain.model.SolicitacaoPagamento;
+import com.example.consorcio.domain.specification.pagamento.RegrasProcessoPagamento;
+import com.example.consorcio.domain.state.EstadoProcessoPagamento;
 import com.example.consorcio.domain.valueobject.ContaDebito;
+import com.example.consorcio.domain.valueobject.DadosPagamento;
 import com.example.consorcio.domain.valueobject.Dinheiro;
 import com.example.consorcio.domain.valueobject.IdentificadorCota;
+import com.example.consorcio.domain.valueobject.Motivo;
 import com.example.consorcio.domain.valueobject.ProcessoPagamentoId;
 
 import java.time.Instant;
@@ -16,114 +21,111 @@ import java.util.Optional;
 /**
  * Aggregate root do processo de pagamento de consórcio.
  *
- * <p>NÃO é anêmica: não existem setters públicos. Todo estado só muda por métodos com
- * significado de negócio ({@link #abrir}, {@link #confirmar}, {@link #cancelar}), e cada um
- * protege as próprias invariantes. É impossível existir um ProcessoPagamento inválido em memória.
+ * <p>Domínio RICO:
+ * <ul>
+ *   <li>Sem setters: o estado só muda por métodos com nome de negócio.</li>
+ *   <li>Regras de negócio: delegadas às specifications ({@link RegrasProcessoPagamento}).</li>
+ *   <li>Máquina de estados: delegada ao State pattern ({@link EstadoProcessoPagamento}).</li>
+ * </ul>
+ * A entidade é o ponto que GARANTE que ambas sejam aplicadas: não há como abrir/alterar
+ * sem validar, nem mudar de status sem passar pelo estado atual.
  */
 public class ProcessoPagamento {
 
     private final ProcessoPagamentoId id;
     private final IdentificadorCota cota;
-    private final Dinheiro valor;
-    private final FormaPagamento formaPagamento;
-    private final ContaDebito contaDebito;
-    private final LocalDate dataVencimento;
     private final Instant criadoEm;
-    private StatusProcessoPagamento status;
-    private String motivoCancelamento;
+    private DadosPagamento dados;
+    private EstadoProcessoPagamento estado;
+    private Motivo motivoRejeicao;
+    private Motivo motivoCancelamento;
 
-    private ProcessoPagamento(ProcessoPagamentoId id, IdentificadorCota cota, Dinheiro valor,
-                              FormaPagamento formaPagamento, ContaDebito contaDebito,
-                              LocalDate dataVencimento, Instant criadoEm,
-                              StatusProcessoPagamento status, String motivoCancelamento) {
+    private ProcessoPagamento(ProcessoPagamentoId id, IdentificadorCota cota, Instant criadoEm, DadosPagamento dados,
+                              EstadoProcessoPagamento estado, Motivo motivoRejeicao, Motivo motivoCancelamento) {
         this.id = Objects.requireNonNull(id);
         this.cota = Objects.requireNonNull(cota);
-        this.valor = Objects.requireNonNull(valor);
-        this.formaPagamento = Objects.requireNonNull(formaPagamento);
-        this.contaDebito = contaDebito;
-        this.dataVencimento = Objects.requireNonNull(dataVencimento);
         this.criadoEm = Objects.requireNonNull(criadoEm);
-        this.status = Objects.requireNonNull(status);
+        this.dados = Objects.requireNonNull(dados);
+        this.estado = Objects.requireNonNull(estado);
+        this.motivoRejeicao = motivoRejeicao;
         this.motivoCancelamento = motivoCancelamento;
     }
 
-    /**
-     * Cria um novo processo, validando as invariantes que dependem apenas dos próprios dados.
-     * Regras que dependem de OUTROS objetos (a cota) ficam na factory/specifications.
-     */
-    public static ProcessoPagamento abrir(IdentificadorCota cota, Dinheiro valor, FormaPagamento formaPagamento,
-                                          ContaDebito contaDebito, LocalDate dataVencimento,
-                                          Instant agora, LocalDate hoje, int prazoMaximoVencimentoDias) {
-        Objects.requireNonNull(formaPagamento, "forma de pagamento é obrigatória");
-        Objects.requireNonNull(dataVencimento, "data de vencimento é obrigatória");
+    // =============================== criação ===============================
 
-        if (!valor.ehPositivo()) {
-            throw new RegraNegocioException("VALOR_NAO_POSITIVO", "Valor do pagamento deve ser maior que zero");
-        }
-        if (dataVencimento.isBefore(hoje)) {
-            throw new RegraNegocioException("VENCIMENTO_NO_PASSADO", "Data de vencimento não pode estar no passado");
-        }
-        if (dataVencimento.isAfter(hoje.plusDays(prazoMaximoVencimentoDias))) {
-            throw new RegraNegocioException("VENCIMENTO_ALEM_DO_PRAZO",
-                    "Data de vencimento deve ser em até %d dias".formatted(prazoMaximoVencimentoDias));
-        }
-        if (formaPagamento.exigeContaDebito() && contaDebito == null) {
-            throw new RegraNegocioException("CONTA_DEBITO_OBRIGATORIA",
-                    "Conta para débito é obrigatória quando a forma de pagamento é " + formaPagamento);
-        }
-        if (!formaPagamento.exigeContaDebito() && contaDebito != null) {
-            throw new RegraNegocioException("CONTA_DEBITO_INDEVIDA",
-                    "Conta para débito só deve ser informada para " + FormaPagamento.DEBITO_EM_CONTA);
-        }
-
-        return new ProcessoPagamento(ProcessoPagamentoId.novo(), cota, valor, formaPagamento, contaDebito,
-                dataVencimento, agora, StatusProcessoPagamento.ABERTO, null);
+    /** Abre um novo processo. Lança {@link RegraNegocioException} com TODAS as regras violadas. */
+    public static ProcessoPagamento abrir(SolicitacaoPagamento solicitacao, Instant agora) {
+        RegrasProcessoPagamento.ABERTURA.validar(solicitacao);
+        return new ProcessoPagamento(ProcessoPagamentoId.novo(), solicitacao.cota().identificador(), agora,
+                solicitacao.dados(), EstadoProcessoPagamento.inicial(), null, null);
     }
 
-    /**
-     * Reconstrói um processo já existente (ex.: vindo do banco). Não reaplica regras de criação,
-     * pois o estado já foi validado quando o processo nasceu.
-     */
-    public static ProcessoPagamento reconstituir(ProcessoPagamentoId id, IdentificadorCota cota, Dinheiro valor,
-                                                 FormaPagamento formaPagamento, ContaDebito contaDebito,
-                                                 LocalDate dataVencimento, Instant criadoEm,
-                                                 StatusProcessoPagamento status, String motivoCancelamento) {
-        return new ProcessoPagamento(id, cota, valor, formaPagamento, contaDebito,
-                dataVencimento, criadoEm, status, motivoCancelamento);
+    /** Reconstrói a partir da persistência, sem reaplicar regras de criação (o dado já foi validado). */
+    public static ProcessoPagamento reconstituir(ProcessoPagamentoId id, IdentificadorCota cota, Instant criadoEm,
+                                                 DadosPagamento dados, StatusProcessoPagamento status,
+                                                 Motivo motivoRejeicao, Motivo motivoCancelamento) {
+        return new ProcessoPagamento(id, cota, criadoEm, dados, EstadoProcessoPagamento.de(status),
+                motivoRejeicao, motivoCancelamento);
+    }
+
+    // =============================== update / delete ===============================
+
+    /** 1º o ESTADO diz se pode alterar (409); 2º as SPECIFICATIONS dizem se os dados novos valem (422). */
+    public void alterar(SolicitacaoPagamento solicitacao) {
+        estado.validarAlteracao();
+        if (!solicitacao.cota().identificador().equals(cota)) {
+            throw new RegraNegocioException("COTA_NAO_ALTERAVEL", "A cota de um processo não pode ser alterada");
+        }
+        RegrasProcessoPagamento.ALTERACAO.validar(solicitacao);
+        this.dados = solicitacao.dados();
+    }
+
+    /** Só verifica: quem remove de fato é o repositório. */
+    public void validarExclusao() {
+        estado.validarExclusao();
+    }
+
+    // =============================== transições (State pattern) ===============================
+
+    public void enviarParaProcessamento() {
+        estado = estado.enviarParaProcessamento();
     }
 
     public void confirmar() {
-        transicionarPara(StatusProcessoPagamento.CONFIRMADO);
+        estado = estado.confirmar();
     }
 
-    public void cancelar(String motivo) {
-        if (motivo == null || motivo.isBlank()) {
-            throw new RegraNegocioException("MOTIVO_OBRIGATORIO", "Motivo do cancelamento é obrigatório");
-        }
-        transicionarPara(StatusProcessoPagamento.CANCELADO);
-        this.motivoCancelamento = motivo.strip();
+    public void rejeitar(Motivo motivo) {
+        Objects.requireNonNull(motivo, "motivo é obrigatório");
+        estado = estado.rejeitar();
+        motivoRejeicao = motivo;
     }
 
-    public boolean estaEmAberto() {
-        return status.emAberto();
+    public void reabrir() {
+        estado = estado.reabrir();
+        motivoRejeicao = null;
     }
 
-    private void transicionarPara(StatusProcessoPagamento destino) {
-        if (!status.podeTransicionarPara(destino)) {
-            throw new RegraNegocioException("TRANSICAO_INVALIDA",
-                    "Processo %s não pode ir de %s para %s".formatted(id, status, destino));
-        }
-        this.status = destino;
+    public void cancelar(Motivo motivo) {
+        Objects.requireNonNull(motivo, "motivo é obrigatório");
+        estado = estado.cancelar();
+        motivoCancelamento = motivo;
     }
 
-    // Somente getters: leitura livre, escrita só via comportamento.
+    // =============================== leitura ===============================
+
+    public boolean emAndamento() { return estado.emAndamento(); }
+    public boolean finalizado() { return estado.finalizado(); }
+
     public ProcessoPagamentoId getId() { return id; }
     public IdentificadorCota getCota() { return cota; }
-    public Dinheiro getValor() { return valor; }
-    public FormaPagamento getFormaPagamento() { return formaPagamento; }
-    public Optional<ContaDebito> getContaDebito() { return Optional.ofNullable(contaDebito); }
-    public LocalDate getDataVencimento() { return dataVencimento; }
     public Instant getCriadoEm() { return criadoEm; }
-    public StatusProcessoPagamento getStatus() { return status; }
-    public Optional<String> getMotivoCancelamento() { return Optional.ofNullable(motivoCancelamento); }
+    public DadosPagamento getDados() { return dados; }
+    public Dinheiro getValor() { return dados.valor(); }
+    public FormaPagamento getFormaPagamento() { return dados.formaPagamento(); }
+    public LocalDate getDataVencimento() { return dados.dataVencimento(); }
+    public Optional<ContaDebito> getContaDebito() { return dados.conta(); }
+    public StatusProcessoPagamento getStatus() { return estado.status(); }
+    public Optional<Motivo> getMotivoRejeicao() { return Optional.ofNullable(motivoRejeicao); }
+    public Optional<Motivo> getMotivoCancelamento() { return Optional.ofNullable(motivoCancelamento); }
 }

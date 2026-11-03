@@ -13,10 +13,6 @@ public record ProcessoPagamentoId(UUID valor) {
         return new ProcessoPagamentoId(UUID.randomUUID());
     }
 
-    public static ProcessoPagamentoId de(String valor) {
-        return new ProcessoPagamentoId(UUID.fromString(valor));
-    }
-
     @Override
     public String toString() {
         return valor.toString();

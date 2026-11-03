@@ -1,24 +1,21 @@
 package com.example.consorcio.domain.enums;
 
-import java.util.Set;
-
 /**
- * Status do processo com as transições permitidas.
- * (Para máquinas de estado maiores, migre para o pacote {@code domain.state} com o padrão State.)
+ * Apenas o RÓTULO do estado (para persistir e expor na API).
+ * O COMPORTAMENTO de cada estado está em {@code domain.state}.
+ *
+ * <pre>
+ *   ABERTO ──enviar──▶ EM_PROCESSAMENTO ──confirmar──▶ CONFIRMADO
+ *     │  ▲                     │
+ *     │  └──────reabrir─── REJEITADO ◀──rejeitar──┘
+ *     │                        │
+ *     └──cancelar──▶ CANCELADO ◀──cancelar──┘
+ * </pre>
  */
 public enum StatusProcessoPagamento {
     ABERTO,
+    EM_PROCESSAMENTO,
+    REJEITADO,
     CONFIRMADO,
-    CANCELADO;
-
-    public boolean podeTransicionarPara(StatusProcessoPagamento destino) {
-        return switch (this) {
-            case ABERTO -> Set.of(CONFIRMADO, CANCELADO).contains(destino);
-            case CONFIRMADO, CANCELADO -> false;
-        };
-    }
-
-    public boolean emAberto() {
-        return this == ABERTO;
-    }
+    CANCELADO
 }

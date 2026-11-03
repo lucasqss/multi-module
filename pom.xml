@@ -13,6 +13,7 @@
     <modules>
         <module>crud</module>
         <module>string-generator</module>
+        <module>consorcio-pagamento</module>
     </modules>
 
     <properties>

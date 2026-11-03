@@ -66,3 +66,28 @@ o builder `Cenarios`. Só testes de API/adapter usam `@QuarkusTest`.
 - `novo-agregado-crud` — criar outro CRUD completo seguindo este modelo
 - `nova-integracao-externa` — nova porta (`domain.gateway`) + adapter
 - `revisao-arquitetura` — checklist de SOLID/GRASP/camadas/domínio anêmico para revisar mudanças
+
+Versões genéricas (para outros projetos) ficam em `padroes/`. Neste repositório, prefira as skills
+acima, que apontam as classes-modelo concretas.
+
+## Mapa do projeto
+
+<!-- Lido pelas skills genéricas layered-* (padroes/skills). Mantenha os nomes em dia. -->
+
+| Papel | Neste projeto |
+|---|---|
+| Pacote base | `com.example.boleto` (`src/main/java/com/example/boleto`) |
+| Entrypoints | `entrypoint/api/v1` (REST) |
+| Agregados | `Boleto` (`domain/entity/Boleto`) |
+| Base de specs | `domain/specification/Specification`, `RegraNegocio`, `ValidadorRegras` |
+| Catálogo de regras | `RegrasBoleto` — conjuntos `COMUNS`, `EMISSAO`, `ALTERACAO`, `RECEBIMENTO` |
+| Candidatos das regras | `SolicitacaoBoleto` (montado por `SolicitacaoBoletoFactory`), `RecebimentoPagamento` (montado pela entidade) |
+| Máquina de estados | `EstadoBoleto` (`domain/state`) + enum `StatusBoleto` |
+| Portas de persistência | `domain/repository` (`BoletoRepository`) |
+| Portas de integração | `domain/gateway` (`NotificadorBoleto`) |
+| Adapters | `adapter/database`, `adapter/notificacao` |
+| Handler de erros HTTP | `entrypoint/api/v1/handler/ApiExceptionHandler` |
+| Producer de beans de domínio / `Clock` | `shared/config/DomainBeansProducer` |
+| Builder de cenários de teste | `src/test/java/com/example/boleto/domain/Cenarios` |
+| Teste de tabela de estados | `EstadoBoletoTest` (mapa `PERMITIDAS`) |
+| Comandos | `mvn test`, `mvn quarkus:dev` |

@@ -216,3 +216,6 @@ Skills: `nova-regra-de-negocio`, `novo-estado`, `novo-caso-de-uso`, `novo-agrega
 `nova-integracao-externa` e `revisao-arquitetura`. Esta última inclui
 `.github/skills/revisao-arquitetura/verificar-camadas.sh`, que falha se alguma camada importar o que
 não deve ou se a entidade ganhar setter, construtor público, `now()` sem `Clock` ou `if` em status.
+
+Versões **genéricas** dessas skills e instruções, para usar em outros projetos (com o modelo de
+"Mapa do projeto" e os templates da base genérica), estão em [`padroes/`](padroes/README.md).

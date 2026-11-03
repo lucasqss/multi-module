@@ -1,0 +1,26 @@
+package __PACOTE__.shared.config;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Produces;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import java.time.Clock;
+import java.time.ZoneId;
+
+/**
+ * Liga objetos de domínio (Java puro) ao CDI, para o domínio não precisar de anotações de framework.
+ * Registre aqui as factories de domínio: {@code @Produces @ApplicationScoped MinhaFactory f(Clock c) {...}}.
+ */
+@ApplicationScoped
+public class DomainBeansProducer {
+
+    /**
+     * Fuso EXPLÍCITO: "hoje" é a data no fuso do negócio, não no do servidor
+     * (containers costumam rodar em UTC, onde 21h de Brasília já é "amanhã").
+     */
+    @Produces
+    @ApplicationScoped
+    Clock clock(@ConfigProperty(name = "app.fuso-horario", defaultValue = "America/Sao_Paulo") ZoneId fusoHorario) {
+        return Clock.system(fusoHorario);
+    }
+}

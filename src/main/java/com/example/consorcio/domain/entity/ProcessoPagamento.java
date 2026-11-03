@@ -53,9 +53,9 @@ public class ProcessoPagamento {
     // =============================== criação ===============================
 
     /** Abre um novo processo. Lança a exceção específica da primeira regra violada. */
-    public static ProcessoPagamento abrir(SolicitacaoPagamento solicitacao, Instant agora) {
+    public static ProcessoPagamento abrir(SolicitacaoPagamento solicitacao) {
         RegrasProcessoPagamento.ABERTURA.validar(solicitacao);
-        return new ProcessoPagamento(ProcessoPagamentoId.novo(), solicitacao.cota().identificador(), agora,
+        return new ProcessoPagamento(ProcessoPagamentoId.novo(), solicitacao.cota().identificador(), solicitacao.momento(),
                 solicitacao.dados(), EstadoProcessoPagamento.inicial(), null, null);
     }
 

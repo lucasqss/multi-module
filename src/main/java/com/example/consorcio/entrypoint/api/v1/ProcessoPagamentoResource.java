@@ -11,12 +11,12 @@ import com.example.consorcio.application.processopagamento.ListarProcessosPagame
 import com.example.consorcio.application.processopagamento.ReabrirProcessoPagamentoUC;
 import com.example.consorcio.application.processopagamento.RejeitarProcessoPagamentoUC;
 import com.example.consorcio.application.processopagamento.dto.ListarProcessosPagamentoInput;
-import com.example.consorcio.application.processopagamento.dto.ProcessoPagamentoOutput;
 import com.example.consorcio.domain.enums.StatusProcessoPagamento;
 import com.example.consorcio.entrypoint.api.v1.request.AlterarProcessoPagamentoRequest;
 import com.example.consorcio.entrypoint.api.v1.request.CriarProcessoPagamentoRequest;
 import com.example.consorcio.entrypoint.api.v1.request.MotivoRequest;
-import com.example.consorcio.shared.utils.Pagina;
+import com.example.consorcio.entrypoint.api.v1.response.PaginaResponse;
+import com.example.consorcio.entrypoint.api.v1.response.ProcessoPagamentoResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -76,31 +76,32 @@ public class ProcessoPagamentoResource {
 
     @POST
     public Response criar(@Valid @NotNull CriarProcessoPagamentoRequest request, @Context UriInfo uriInfo) {
-        var criado = criar.executar(request.paraInput());
+        var criado = ProcessoPagamentoResponse.de(criar.executar(request.paraInput()));
         var location = uriInfo.getAbsolutePathBuilder().path(criado.id().toString()).build();
         return Response.created(location).entity(criado).build();
     }
 
     @GET
-    public Pagina<ProcessoPagamentoOutput> listar(@QueryParam("grupo") Integer grupo,
+    public PaginaResponse<ProcessoPagamentoResponse> listar(@QueryParam("grupo") Integer grupo,
                                                   @QueryParam("cota") Integer cota,
                                                   @QueryParam("status") StatusProcessoPagamento status,
                                                   @QueryParam("pagina") @DefaultValue("0") @Min(0) int pagina,
                                                   @QueryParam("tamanho") @DefaultValue("20") @Min(1) @Max(100) int tamanho) {
-        return listar.executar(new ListarProcessosPagamentoInput(grupo, cota, status, pagina, tamanho));
+        var resultado = listar.executar(new ListarProcessosPagamentoInput(grupo, cota, status, pagina, tamanho));
+        return PaginaResponse.de(resultado, ProcessoPagamentoResponse::de);
     }
 
     @GET
     @Path("/{id}")
-    public ProcessoPagamentoOutput consultar(@PathParam("id") UUID id) {
-        return consultar.executar(id);
+    public ProcessoPagamentoResponse consultar(@PathParam("id") UUID id) {
+        return ProcessoPagamentoResponse.de(consultar.executar(id));
     }
 
     @PUT
     @Path("/{id}")
-    public ProcessoPagamentoOutput alterar(@PathParam("id") UUID id,
-                                           @Valid @NotNull AlterarProcessoPagamentoRequest request) {
-        return alterar.executar(request.paraInput(id));
+    public ProcessoPagamentoResponse alterar(@PathParam("id") UUID id,
+                                             @Valid @NotNull AlterarProcessoPagamentoRequest request) {
+        return ProcessoPagamentoResponse.de(alterar.executar(request.paraInput(id)));
     }
 
     @DELETE
@@ -114,31 +115,31 @@ public class ProcessoPagamentoResource {
 
     @POST
     @Path("/{id}/envio")
-    public ProcessoPagamentoOutput enviar(@PathParam("id") UUID id) {
-        return enviar.executar(id);
+    public ProcessoPagamentoResponse enviar(@PathParam("id") UUID id) {
+        return ProcessoPagamentoResponse.de(enviar.executar(id));
     }
 
     @POST
     @Path("/{id}/confirmacao")
-    public ProcessoPagamentoOutput confirmar(@PathParam("id") UUID id) {
-        return confirmar.executar(id);
+    public ProcessoPagamentoResponse confirmar(@PathParam("id") UUID id) {
+        return ProcessoPagamentoResponse.de(confirmar.executar(id));
     }
 
     @POST
     @Path("/{id}/rejeicao")
-    public ProcessoPagamentoOutput rejeitar(@PathParam("id") UUID id, @Valid @NotNull MotivoRequest request) {
-        return rejeitar.executar(id, request.motivo());
+    public ProcessoPagamentoResponse rejeitar(@PathParam("id") UUID id, @Valid @NotNull MotivoRequest request) {
+        return ProcessoPagamentoResponse.de(rejeitar.executar(id, request.motivo()));
     }
 
     @POST
     @Path("/{id}/reabertura")
-    public ProcessoPagamentoOutput reabrir(@PathParam("id") UUID id) {
-        return reabrir.executar(id);
+    public ProcessoPagamentoResponse reabrir(@PathParam("id") UUID id) {
+        return ProcessoPagamentoResponse.de(reabrir.executar(id));
     }
 
     @POST
     @Path("/{id}/cancelamento")
-    public ProcessoPagamentoOutput cancelar(@PathParam("id") UUID id, @Valid @NotNull MotivoRequest request) {
-        return cancelar.executar(id, request.motivo());
+    public ProcessoPagamentoResponse cancelar(@PathParam("id") UUID id, @Valid @NotNull MotivoRequest request) {
+        return ProcessoPagamentoResponse.de(cancelar.executar(id, request.motivo()));
     }
 }

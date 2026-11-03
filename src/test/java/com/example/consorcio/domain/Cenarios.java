@@ -44,10 +44,10 @@ public final class Cenarios {
     public SolicitacaoPagamento build() {
         var cota = new Cota(ID_COTA, situacao, Dinheiro.de(saldoDevedor));
         var dados = new DadosPagamento(Dinheiro.de(valor), forma, vencimento, conta);
-        return new SolicitacaoPagamento(cota, dados, HOJE, 30, possuiEmAndamento);
+        return new SolicitacaoPagamento(cota, dados, AGORA, HOJE, 30, possuiEmAndamento);
     }
 
     public ProcessoPagamento abrir() {
-        return ProcessoPagamento.abrir(build(), AGORA);
+        return ProcessoPagamento.abrir(build());
     }
 }

@@ -3,11 +3,11 @@ package com.example.consorcio.domain.exception;
 import com.example.consorcio.domain.enums.StatusProcessoPagamento;
 
 /**
- * Família (e caso concreto): a ação não é permitida no status atual. Lançada pelos estados do State pattern.
+ * A ação não é permitida no status atual. Lançada pelos estados do State pattern.
  * Uma classe só basta aqui: status atual + ação já identificam o caso. Se precisar diferenciar
  * (ex.: tratar "confirmar processo cancelado" de forma especial), crie subclasses.
  */
-public class TransicaoEstadoInvalidaException extends DomainException {
+public class TransicaoEstadoInvalidaException extends ConflitoException {
 
     public static final String CODIGO = "TRANSICAO_ESTADO_INVALIDA";
 

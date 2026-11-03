@@ -2,7 +2,8 @@ package com.example.consorcio.application.processopagamento;
 
 import com.example.consorcio.application.processopagamento.dto.CriarProcessoPagamentoInput;
 import com.example.consorcio.application.processopagamento.dto.ProcessoPagamentoOutput;
-import com.example.consorcio.domain.factory.ProcessoPagamentoFactory;
+import com.example.consorcio.domain.entity.ProcessoPagamento;
+import com.example.consorcio.domain.factory.SolicitacaoPagamentoFactory;
 import com.example.consorcio.domain.repository.CotaRepository;
 import com.example.consorcio.domain.repository.ProcessoPagamentoRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -23,13 +24,13 @@ public class CriarProcessoPagamentoUC {
 
     private final CotaRepository cotaRepository;
     private final ProcessoPagamentoRepository processoRepository;
-    private final ProcessoPagamentoFactory factory;
+    private final SolicitacaoPagamentoFactory solicitacoes;
 
     public CriarProcessoPagamentoUC(CotaRepository cotaRepository, ProcessoPagamentoRepository processoRepository,
-                                    ProcessoPagamentoFactory factory) {
+                                    SolicitacaoPagamentoFactory solicitacoes) {
         this.cotaRepository = cotaRepository;
         this.processoRepository = processoRepository;
-        this.factory = factory;
+        this.solicitacoes = solicitacoes;
     }
 
     @Transactional
@@ -38,7 +39,7 @@ public class CriarProcessoPagamentoUC {
         var cota = cotaRepository.obter(identificador);
         var possuiEmAndamento = processoRepository.existeProcessoEmAndamentoParaCota(identificador);
 
-        var processo = factory.abrir(cota, input.dadosPagamento(), possuiEmAndamento);
+        var processo = ProcessoPagamento.abrir(solicitacoes.paraAbertura(cota, input.dadosPagamento(), possuiEmAndamento));
 
         processoRepository.salvar(processo);
         return ProcessoPagamentoOutput.de(processo);

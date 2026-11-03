@@ -16,7 +16,7 @@ entrypoint ──▶ application ──▶ domain ◀── adapter
 
 | Pacote | Papel | Pode depender de |
 |---|---|---|
-| `entrypoint.api.v1` | Contrato HTTP, validação **sintática** (`@NotNull`), tradução de exceções → status | application |
+| `entrypoint.api.v1` | Contrato HTTP próprio (`request/`, `response/`), validação **sintática** (`@NotNull`), `ApiExceptionHandler` | application |
 | `application.processopagamento` | Um `*UC` por ação: busca fatos, chama o domínio, persiste, devolve DTO. `@Transactional` aqui | domain |
 | `domain.entity` | `ProcessoPagamento` (aggregate root) | — |
 | `domain.specification` | Infra genérica: `Specification`, `RegraNegocio`, `ValidadorRegras` | — |
@@ -24,11 +24,11 @@ entrypoint ──▶ application ──▶ domain ◀── adapter
 | `domain.state` | Um estado por classe (`EstadoAberto`, `EstadoEmProcessamento`...) | — |
 | `domain.valueobject` | `Dinheiro`, `IdentificadorCota`, `DadosPagamento`, `Motivo`... (auto-validados) | — |
 | `domain.model` | `Cota` (dado externo), `SolicitacaoPagamento` (candidato das specs) | — |
-| `domain.factory` | Monta a solicitação com relógio e parâmetros de config | — |
+| `domain.factory` | `SolicitacaoPagamentoFactory`: monta a solicitação com relógio (fuso do negócio) e config | — |
 | `domain.repository` | **Portas** (interfaces) | — |
-| `adapter.database` | Implementa a porta com Panache; entidade JPA separada + mapper | domain |
+| `adapter.database` | Implementa a porta com Panache; entidade JPA separada + mapper; traduz lock otimista | domain |
 | `adapter.cota` | Stub do sistema dono das cotas | domain |
-| `shared` | `Pagina<T>`, producers CDI | — |
+| `shared` | `Pagina<T>`, producers CDI. **Única exceção à regra de dependência**: pode ser usado por qualquer camada, então só entra aqui o que é genérico e estável | — |
 
 ## Quem decide o quê
 
@@ -38,6 +38,7 @@ entrypoint ──▶ application ──▶ domain ◀── adapter
 | O dado tem formato válido? (ex.: 3 casas decimais) | value objects | `DadoInvalidoException` | 400 |
 | O recurso existe? | repositório (`obter`) | `RecursoNaoEncontradoException` | 404 |
 | **Essa ação é permitida no status atual?** | **State** (`domain.state`) | `TransicaoEstadoInvalidaException` | 409 |
+| Outra requisição alterou o processo antes? | adapter (lock otimista com `@Version`) | `AlteracaoConcorrenteException` | 409 |
 | **Os dados atendem às regras de negócio?** | **Specifications** | `RegraNegocioException` | 422 |
 
 A **entidade** é quem garante que estado e specifications sejam sempre aplicados:
@@ -52,18 +53,25 @@ DomainException (codigo + mensagem)
 ├── DadoInvalidoException            → 400   ValorMonetarioInvalido, IdentificadorCotaInvalido,
 │                                            ContaDebitoInvalida, MotivoInvalido
 ├── RecursoNaoEncontradoException    → 404   CotaNaoEncontrada, ProcessoPagamentoNaoEncontrado
-├── TransicaoEstadoInvalidaException → 409   (statusAtual + acao)
+├── ConflitoException                → 409   TransicaoEstadoInvalida (statusAtual + acao),
+│                                            AlteracaoConcorrente (lock otimista)
 └── RegraNegocioException            → 422   uma por regra: LimitePixExcedido, VencimentoNoPassado,
                                              CotaComProcessoEmAndamento, ...
 ```
 
 - Cada exceção concreta tem `CODIGO` fixo (`LimitePixExcedidoException.CODIGO = "LIMITE_PIX_EXCEDIDO"`)
   e recebe os **dados** do erro no construtor; a mensagem é montada dentro dela.
-- O `DomainExceptionMapper` decide o status pela **família**: exceção nova não exige mudar o mapper.
+- O `ApiExceptionHandler` decide o status pela **família**: exceção nova não exige mudar o handler.
+- **Todo** erro sai no mesmo formato, inclusive os que não vêm do domínio: Bean Validation (com a lista
+  `campos`), JSON mal formado, rota/UUID inexistente e erro inesperado (500 sem stack trace, com log).
 - Erros de programação (ex.: use case montou solicitação de outra cota) **não** são `DomainException`:
   usam `IllegalArgumentException`/`IllegalStateException` e viram 500.
 
-Resposta: `{"codigo": "LIMITE_PIX_EXCEDIDO", "mensagem": "Pagamento via PIX limitado a R$ 5000.00"}`
+```json
+{"codigo": "LIMITE_PIX_EXCEDIDO", "mensagem": "Pagamento via PIX limitado a R$ 5000.00"}
+{"codigo": "REQUISICAO_INVALIDA", "mensagem": "Campos inválidos na requisição",
+ "campos": [{"campo": "valor", "mensagem": "must not be null"}]}
+```
 
 ## Specification pattern
 
@@ -98,7 +106,12 @@ ALTERACAO = COMUNS;
 3. adicione-a em `RegrasProcessoPagamento` na posição desejada;
 4. teste com `assertThrows(SuaException.class, ...)` em `RegrasProcessoPagamentoTest`.
 
-Nenhum use case nem o mapper HTTP mudam.
+Nenhum use case nem o handler HTTP mudam.
+
+**Limite consciente:** a entidade usa o catálogo de forma estática, o que exige specs **puras**.
+Se uma regra precisar de algo externo (calendário de feriados, limite vindo de outro sistema),
+não injete dependência na spec: o use case consulta o dado e o entrega na `SolicitacaoPagamento`,
+como já é feito com `cotaPossuiProcessoEmAndamento`.
 
 ## State pattern
 
@@ -170,4 +183,6 @@ mvn quarkus:dev   # http://localhost:8081
 | `RegrasProcessoPagamentoTest` | cada regra lança sua exceção, a partir de um cenário válido (`Cenarios`) | não |
 | `EstadoProcessoPagamentoTest` | a máquina de estados inteira como tabela | não |
 | `ProcessoPagamentoTest` | a entidade aplica estado (409) antes das regras (422) | não |
-| `ProcessoPagamentoResourceTest` | CRUD + ciclo de estados + códigos HTTP ponta a ponta | sim |
+| `SolicitacaoPagamentoFactoryTest` | "hoje" no fuso do negócio, não no do servidor | não |
+| `ConcorrenciaTest` | lock otimista vira `AlteracaoConcorrenteException` | sim |
+| `ProcessoPagamentoResourceTest` | CRUD + ciclo de estados + códigos HTTP + formato único de erro | sim |

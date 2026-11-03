@@ -2,6 +2,7 @@ package com.example.consorcio.adapter.database;
 
 import com.example.consorcio.domain.entity.ProcessoPagamento;
 import com.example.consorcio.domain.enums.StatusProcessoPagamento;
+import com.example.consorcio.domain.exception.AlteracaoConcorrenteException;
 import com.example.consorcio.domain.repository.FiltroProcessoPagamento;
 import com.example.consorcio.domain.repository.ProcessoPagamentoRepository;
 import com.example.consorcio.domain.state.EstadoProcessoPagamento;
@@ -12,6 +13,7 @@ import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import io.quarkus.panache.common.Page;
 import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.OptimisticLockException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,6 +42,13 @@ public class ProcessoPagamentoRepositoryPanache
             var nova = new ProcessoPagamentoJpaEntity();
             ProcessoPagamentoMapper.copiar(processo, nova);
             persist(nova);
+        }
+        try {
+            // força o UPDATE agora (e não no commit), para o conflito de versão estourar AQUI
+            // e ser traduzido para uma exceção de domínio, sem vazar JPA para as outras camadas
+            flush();
+        } catch (OptimisticLockException e) {
+            throw new AlteracaoConcorrenteException(processo.getId());
         }
     }
 

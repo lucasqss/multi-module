@@ -8,7 +8,9 @@ package com.example.consorcio.domain.exception;
  * DomainException
  * ├── DadoInvalidoException              formato inválido (value objects)          → 400
  * ├── RecursoNaoEncontradoException      não existe                                → 404
- * ├── TransicaoEstadoInvalidaException   ação proibida no status atual (State)     → 409
+ * ├── ConflitoException                  conflita com o estado atual               → 409
+ * │   ├── TransicaoEstadoInvalidaException   ação proibida no status (State)
+ * │   └── AlteracaoConcorrenteException      outra requisição alterou antes (lock otimista)
  * └── RegraNegocioException              regra de negócio violada (Specification)  → 422
  * </pre>
  *

@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 
@@ -68,6 +69,7 @@ class ProcessoPagamentoResourceTest {
         given().queryParam("grupo", 1234).queryParam("cota", 1)
                 .get(PATH).then().statusCode(200)
                 .body("total", equalTo(1))
+                .body("totalPaginas", equalTo(1))
                 .body("itens[0].id", equalTo(id));
 
         // UPDATE
@@ -150,13 +152,27 @@ class ProcessoPagamentoResourceTest {
                 .statusCode(404).body("codigo", equalTo("COTA_NAO_ENCONTRADA"));
     }
 
+    // ===================== formato único de erro =====================
+
     @Test
-    void campoObrigatorioAusenteRetorna400() {
-        post(PATH, "{\"grupo\":1234,\"cota\":5}").statusCode(400);
+    void campoObrigatorioAusenteRetorna400ComOsCampos() {
+        post(PATH, "{\"grupo\":1234,\"cota\":5}")
+                .statusCode(400)
+                .body("codigo", equalTo("REQUISICAO_INVALIDA"))
+                .body("campos.campo", contains("dataVencimento", "formaPagamento", "valor"));
     }
 
     @Test
-    void idInvalidoRetorna404() {
-        given().get(PATH + "/nao-e-uuid").then().statusCode(404);
+    void enumInexistenteOuJsonMalFormadoRetorna400() {
+        post(PATH, corpo(5, "100.00", "CHEQUE", diaUtil(), ""))
+                .statusCode(400).body("codigo", equalTo("REQUISICAO_INVALIDA"));
+        post(PATH, "{ isso não é json")
+                .statusCode(400).body("codigo", equalTo("REQUISICAO_INVALIDA"));
+    }
+
+    @Test
+    void idInvalidoRetorna404ComCorpoPadrao() {
+        given().get(PATH + "/nao-e-uuid").then()
+                .statusCode(404).body("codigo", equalTo("RECURSO_NAO_ENCONTRADO"));
     }
 }

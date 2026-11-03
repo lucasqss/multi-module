@@ -201,3 +201,18 @@ A linha digitável também é fake (47 dígitos, não segue o padrão FEBRABAN) 
 | `SolicitacaoBoletoFactoryTest` | "hoje" no fuso do negócio, não no do servidor | não |
 | `ConcorrenciaTest` | lock otimista vira `AlteracaoConcorrenteException` | sim |
 | `BoletoResourceTest` | CRUD + ciclo emitir/notificar/pagar + códigos HTTP + formato único de erro | sim |
+
+## Assistentes de código (GitHub Copilot)
+
+As regras deste README também estão em `.github/`, para o Copilot segui-las automaticamente:
+
+| Arquivo | Quando é usado |
+|---|---|
+| `.github/copilot-instructions.md` | Em toda requisição: arquitetura, regras inegociáveis, comandos |
+| `.github/instructions/<camada>.instructions.md` | Ao mexer em arquivos da camada (`applyTo` por caminho) |
+| `.github/skills/<skill>/SKILL.md` | Quando a tarefa combina com a skill (ou ao pedir pelo nome) |
+
+Skills: `nova-regra-de-negocio`, `novo-estado`, `novo-caso-de-uso`, `novo-agregado-crud`,
+`nova-integracao-externa` e `revisao-arquitetura`. Esta última inclui
+`.github/skills/revisao-arquitetura/verificar-camadas.sh`, que falha se alguma camada importar o que
+não deve ou se a entidade ganhar setter, construtor público, `now()` sem `Clock` ou `if` em status.

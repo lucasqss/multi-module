@@ -57,6 +57,9 @@ Para cada violação: `arquivo:linha`, princípio violado e correção concreta.
 - [ ] Nenhuma classe `*Service`/`*Utils`/`*Helper` genérica: cada método vai para o dono do dado.
 
 ### Use cases
+- [ ] Cada UC é **uma intenção** (um `executar`)? UC com vários métodos públicos, UC por entidade-parte
+      ou por operação técnica (incluir/alterar/remover item) é violação (critério na skill `layered-novo-caso-de-uso`).
+- [ ] Completude só no UC de finalização; regras de seção no salvamento da seção.
 - [ ] Só orquestra: buscar fatos nos repositórios → domínio decide → salvar → efeito externo → `*Output`.
 - [ ] Nenhum `if` de regra de negócio; nenhum `switch` em status.
 - [ ] Efeitos externos depois de salvar; risco de "enviou e o commit falhou" documentado (Outbox).

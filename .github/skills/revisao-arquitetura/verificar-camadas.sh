@@ -12,7 +12,7 @@ uc_sem_uc() { # use case não injeta/chama outro use case
   local dir="$1" achados
   [ -d "$dir" ] || return 0
   achados=$(find "$dir" -name '*UC.java' | while IFS= read -r f; do
-    grep -nE '\b[A-Z][A-Za-z0-9]*UC\b' "$f" | grep -vE "\b$(basename "$f" .java)\b" | sed "s#^#$f:#"
+    grep -nE '\b[A-Z][A-Za-z0-9]*UC\b' "$f" | grep -vE '^[0-9]+:\s*(\*|/\*|//)' | grep -vE "\b$(basename "$f" .java)\b" | sed "s#^#$f:#"
   done)
   if [ -n "$achados" ]; then
     echo "✗ use case não chama outro use case (mova a lógica comum para entidade/VO/spec)"

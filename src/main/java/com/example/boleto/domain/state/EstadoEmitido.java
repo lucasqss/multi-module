@@ -2,8 +2,8 @@ package com.example.boleto.domain.state;
 
 
 /**
- * Recém-emitido, o pagador ainda não foi avisado: é o único estado em que dá para
- * alterar ou excluir (ninguém de fora conhece este boleto ainda).
+ * Emitido (completo, com linha digitável), o pagador ainda não foi avisado.
+ * Não aceita mais edição: para mudar algo, cancele e crie outro.
  */
 public final class EstadoEmitido extends EstadoBoleto {
 
@@ -31,16 +31,6 @@ public final class EstadoEmitido extends EstadoBoleto {
     @Override
     public EstadoBoleto cancelar() {
         return EstadoCancelado.INSTANCIA;
-    }
-
-    @Override
-    public void validarAlteracao() {
-        // permitido
-    }
-
-    @Override
-    public void validarExclusao() {
-        // permitido
     }
 
     @Override

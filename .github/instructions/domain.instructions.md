@@ -13,7 +13,7 @@ Sem anotações de framework (nem `@ApplicationScoped`): quem liga objetos de do
 
 - Campos `private`; `final` para o que não muda (id, data de criação).
 - **Sem setters.** Construtor `private`. Criação por fábrica estática que **valida**
-  (`Boleto.emitir(SolicitacaoBoleto)`) e `reconstituir(...)` para o adapter, sem revalidar.
+  (`Boleto.criar(...)`) e `reconstituir(...)` para o adapter, sem revalidar.
 - Métodos com **nome de negócio** e esta ordem fixa:
   ```java
   public void receberPagamento(Pagamento p, LocalDate hoje) {
@@ -27,11 +27,18 @@ Sem anotações de framework (nem `@ApplicationScoped`): quem liga objetos de do
 - Se um método só lê campos de OUTRO objeto para decidir algo, a lógica pertence ao outro objeto
   (Information Expert). Ex.: `documento.pessoaFisica()`, não `documento.numero().length() == 11`.
 
+## Agregado com partes
+
+- Partes (itens, destinatários) só mudam por métodos do agregado (`salvarItens`, `salvarDestinatarios`),
+  que chamam `estado.validarEdicao()` e as regras **da seção**. Completude só no método de finalização
+  (`emitir`), com as regras de finalização. Partes não têm repositório nem use case próprios.
+
 ## Value objects (`domain.valueobject`)
 
 - `record` com construtor compacto que valida e normaliza. Formato inválido → exceção específica
   da família `DadoInvalidoException` (400).
-- Imutáveis; operações retornam nova instância (`DadosBoleto.comValorEVencimento`).
+- Imutáveis; operações retornam nova instância. Partes de um agregado substituídas inteiras
+  (seções) podem ser VOs: `ItensBoleto`, `Destinatarios`.
 - Dados sensíveis mascarados no `toString()` (ver `Documento`).
 
 ## Specifications (`domain.specification`)

@@ -17,6 +17,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasLength;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -47,19 +48,39 @@ class BoletoResourceTest {
         return util.toString();
     }
 
-    private static String corpo(String documento, String valor, String vencimento) {
+    private static String rascunho(String documento, String vencimento) {
         return """
                 {"pagador":{"nome":"Maria Silva","documento":"%s","email":"maria@example.com"},
-                 "valor":%s,"dataVencimento":"%s"}
-                """.formatted(documento, valor, vencimento);
+                 "dataVencimento":"%s"}
+                """.formatted(documento, vencimento);
+    }
+
+    private static String itens(String... valores) {
+        var json = new StringBuilder("{\"itens\":[");
+        for (int i = 0; i < valores.length; i++) {
+            json.append(i == 0 ? "" : ",").append("{\"descricao\":\"Item %d\",\"valor\":%s}".formatted(i, valores[i]));
+        }
+        return json.append("]}").toString();
     }
 
     private static ValidatableResponse post(String path, String body) {
         return given().contentType(ContentType.JSON).body(body).when().post(path).then();
     }
 
-    private static String emitir(String documento) {
-        return post(PATH, corpo(documento, "500.00", diaUtil())).statusCode(201).extract().path("id");
+    private static ValidatableResponse put(String path, String body) {
+        return given().contentType(ContentType.JSON).body(body).when().put(path).then();
+    }
+
+    private static String criar(String documento) {
+        return post(PATH, rascunho(documento, diaUtil())).statusCode(201).extract().path("id");
+    }
+
+    /** Cria, preenche os itens e emite. */
+    private static String emitido(String documento, String... valores) {
+        String id = criar(documento);
+        put(PATH + "/" + id + "/itens", itens(valores)).statusCode(200);
+        post(PATH + "/" + id + "/emissao", "").statusCode(200);
+        return id;
     }
 
     private static String pagamento(String valor) {
@@ -67,110 +88,131 @@ class BoletoResourceTest {
     }
 
     @Test
-    void crudCompleto() {
-        // CREATE
-        String id = post(PATH, corpo("11111111111", "1500.00", diaUtil()))
+    void edicaoPorPartesAteAEmissao() {
+        // 1. cria o rascunho: incompleto, sem linha digitável
+        String id = post(PATH, rascunho("11111111111", diaUtil()))
                 .statusCode(201)
                 .header("Location", notNullValue())
+                .body("status", equalTo("EM_EDICAO"))
+                .body("itens", hasSize(0))
+                .body("linhaDigitavel", nullValue())
+                .extract().path("id");
+        String boleto = PATH + "/" + id;
+
+        // 2. emitir agora falha por COMPLETUDE (422), e o boleto continua editável
+        post(boleto + "/emissao", "").statusCode(422).body("codigo", equalTo("BOLETO_SEM_ITENS"));
+
+        // 3. cada seção é salva por um caso de uso próprio, em qualquer ordem
+        put(boleto + "/itens", itens("300.00", "200.00"))
+                .statusCode(200).body("valor", equalTo(500.00f)).body("itens", hasSize(2));
+        put(boleto + "/destinatarios", "{\"emails\":[\"financeiro@empresa.com\"]}")
+                .statusCode(200).body("destinatarios", contains("financeiro@empresa.com"));
+        put(boleto, "{\"dataVencimento\":\"" + diaUtil() + "\"}").statusCode(200);
+
+        // 4. regra de SEÇÃO (422) não depende de o boleto estar completo
+        put(boleto + "/itens", itens("100.00", "0")).statusCode(422).body("codigo", equalTo("ITEM_COM_VALOR_ZERADO"));
+
+        // 5. emissão: completo -> EMITIDO com linha digitável do valor total
+        post(boleto + "/emissao", "")
+                .statusCode(200)
                 .body("status", equalTo("EMITIDO"))
                 .body("linhaDigitavel", hasLength(47))
-                .body("pagador.nome", equalTo("Maria Silva"))
-                .extract().path("id");
+                .body("linhaDigitavel", endsWith("0000050000"))
+                .body("emitidoEm", notNullValue());
 
-        // READ
-        given().get(PATH + "/" + id).then().statusCode(200).body("valor", equalTo(1500.00f));
-
-        // LIST
-        given().queryParam("documentoPagador", "11111111111")
-                .get(PATH).then().statusCode(200)
-                .body("total", equalTo(1))
-                .body("totalPaginas", equalTo(1))
-                .body("itens[0].id", equalTo(id));
-
-        // UPDATE
-        given().contentType(ContentType.JSON)
-                .body("{\"valor\":800.00,\"dataVencimento\":\"" + diaUtil() + "\"}")
-                .put(PATH + "/" + id)
-                .then().statusCode(200)
-                .body("valor", equalTo(800.00f))
-                .body("linhaDigitavel", endsWith("0000080000"));
-
-        // DELETE
-        given().delete(PATH + "/" + id).then().statusCode(204);
-        given().get(PATH + "/" + id).then().statusCode(404).body("codigo", equalTo("BOLETO_NAO_ENCONTRADO"));
+        // 6. emitido: seções, vencimento e exclusão são recusados pelo estado (409)
+        put(boleto + "/itens", itens("10.00")).statusCode(409).body("codigo", equalTo("TRANSICAO_ESTADO_INVALIDA"));
+        put(boleto, "{\"dataVencimento\":\"" + diaUtil() + "\"}").statusCode(409);
+        given().delete(boleto).then().statusCode(409);
     }
 
     @Test
     void cicloDeVidaEmitirNotificarPagar() {
-        String id = emitir("22222222222");
-        String boleto = PATH + "/" + id;
-
-        // notificação de emissão
+        String boleto = PATH + "/" + emitido("22222222222", "500.00");
+        // notificação de emissão: pagador + destinatários extras
         post(boleto + "/notificacao", "")
                 .statusCode(200).body("status", equalTo("NOTIFICADO")).body("notificadoEm", notNullValue());
         assertTrue(notificador.enviadas().stream().anyMatch(n -> n.destinatario().equals("maria@example.com")));
+        post(boleto + "/notificacao", "").statusCode(200).body("status", equalTo("NOTIFICADO")); // reenvio
 
-        // notificado: não altera nem exclui mais (409); reenviar notificação é permitido
-        given().contentType(ContentType.JSON)
-                .body("{\"valor\":10.00,\"dataVencimento\":\"" + diaUtil() + "\"}")
-                .put(boleto).then().statusCode(409).body("codigo", equalTo("TRANSICAO_ESTADO_INVALIDA"));
-        given().delete(boleto).then().statusCode(409);
-        post(boleto + "/notificacao", "").statusCode(200).body("status", equalTo("NOTIFICADO"));
-
-        // pagamento com valor errado: regra de negócio (422), boleto continua aberto
-        post(boleto + "/pagamento", pagamento("499.99"))
-                .statusCode(422).body("codigo", equalTo("VALOR_PAGO_DIVERGENTE"));
-
-        // recebimento do pagamento
+        post(boleto + "/pagamento", pagamento("499.99")).statusCode(422).body("codigo", equalTo("VALOR_PAGO_DIVERGENTE"));
         post(boleto + "/pagamento", pagamento("500.00"))
-                .statusCode(200)
-                .body("status", equalTo("PAGO"))
-                .body("pagamento.valorPago", equalTo(500.00f));
+                .statusCode(200).body("status", equalTo("PAGO")).body("pagamento.valorPago", equalTo(500.00f));
 
-        // estado final
         post(boleto + "/pagamento", pagamento("500.00")).statusCode(409);
         post(boleto + "/cancelamento", "{\"motivo\":\"desistência\"}").statusCode(409);
     }
 
     @Test
-    void cancelamento() {
-        String boleto = PATH + "/" + emitir("33333333333");
+    void notificacaoVaiTambemParaOsDestinatariosExtras() {
+        String id = criar("23232323232");
+        put(PATH + "/" + id + "/itens", itens("50.00")).statusCode(200);
+        put(PATH + "/" + id + "/destinatarios", "{\"emails\":[\"extra@empresa.com\"]}").statusCode(200);
+        post(PATH + "/" + id + "/emissao", "").statusCode(200);
+        post(PATH + "/" + id + "/notificacao", "").statusCode(200);
+        assertTrue(notificador.enviadas().stream().anyMatch(n -> n.destinatario().equals("extra@empresa.com")));
+    }
+
+    @Test
+    void crudDoRascunho() {
+        String id = criar("33333333333");
+        given().get(PATH + "/" + id).then().statusCode(200).body("status", equalTo("EM_EDICAO"));
+        given().queryParam("documentoPagador", "33333333333").get(PATH).then().statusCode(200)
+                .body("total", equalTo(1)).body("totalPaginas", equalTo(1)).body("itens[0].id", equalTo(id));
+        given().delete(PATH + "/" + id).then().statusCode(204);
+        given().get(PATH + "/" + id).then().statusCode(404).body("codigo", equalTo("BOLETO_NAO_ENCONTRADO"));
+    }
+
+    @Test
+    void cancelamentoDeBoletoEmitido() {
+        String boleto = PATH + "/" + emitido("34343434343", "100.00");
         post(boleto + "/cancelamento", "{\"motivo\":\"\"}").statusCode(400);
         post(boleto + "/cancelamento", "{\"motivo\":\"emitido por engano\"}")
-                .statusCode(200).body("status", equalTo("CANCELADO")).body("pagamento", nullValue());
+                .statusCode(200).body("status", equalTo("CANCELADO"));
         post(boleto + "/notificacao", "").statusCode(409);
     }
 
     @Test
-    void limiteDeBoletosEmAbertoPorPagador() {
-        String primeiro = emitir("44444444444");
-        emitir("44444444444");
-        emitir("44444444444");
-        post(PATH, corpo("44444444444", "500.00", diaUtil()))
+    void limiteDeBoletosEmAbertoContaSoOsEmitidos() {
+        String primeiro = emitido("44444444444", "500.00");
+        emitido("44444444444", "500.00");
+        emitido("44444444444", "500.00");
+        String quarto = criar("44444444444"); // rascunho não conta no limite
+        put(PATH + "/" + quarto + "/itens", itens("500.00")).statusCode(200);
+        post(PATH + "/" + quarto + "/emissao", "")
                 .statusCode(422).body("codigo", equalTo("LIMITE_BOLETOS_EM_ABERTO_EXCEDIDO"));
 
-        // pago não está mais "em aberto": libera uma vaga
-        post(PATH + "/" + primeiro + "/pagamento", pagamento("500.00")).statusCode(200);
-        emitir("44444444444");
+        post(PATH + "/" + primeiro + "/pagamento", pagamento("500.00")).statusCode(200); // libera uma vaga
+        post(PATH + "/" + quarto + "/emissao", "").statusCode(200);
     }
 
     @Test
-    void regraDeNegocioRetorna422ComCodigoEspecifico() {
-        post(PATH, corpo("55555555555", "10000.01", diaUtil()))
-                .statusCode(422).body("codigo", equalTo("LIMITE_PESSOA_FISICA_EXCEDIDO"));
+    void regrasDeEmissaoRetornam422ComCodigoEspecifico() {
+        String id = criar("55555555555");
+        put(PATH + "/" + id + "/itens", itens("6000.00", "4000.01")).statusCode(200);
+        post(PATH + "/" + id + "/emissao", "").statusCode(422).body("codigo", equalTo("LIMITE_PESSOA_FISICA_EXCEDIDO"));
+
         var sabado = hoje().with(TemporalAdjusters.next(DayOfWeek.SATURDAY)).toString();
-        post(PATH, corpo("55555555555", "100.00", sabado))
-                .statusCode(422).body("codigo", equalTo("VENCIMENTO_EM_DIA_NAO_UTIL"));
+        String outro = post(PATH, rascunho("55555555555", sabado)).statusCode(201).extract().path("id");
+        put(PATH + "/" + outro + "/itens", itens("100.00")).statusCode(200);
+        post(PATH + "/" + outro + "/emissao", "").statusCode(422).body("codigo", equalTo("VENCIMENTO_EM_DIA_NAO_UTIL"));
+    }
+
+    @Test
+    void regraDeSecaoDeDestinatarios() {
+        String boleto = PATH + "/" + criar("56565656565");
+        put(boleto + "/destinatarios", "{\"emails\":[\"maria@example.com\"]}")
+                .statusCode(422).body("codigo", equalTo("DESTINATARIO_REPETIDO"));
     }
 
     // ===================== formato único de erro =====================
 
     @Test
     void dadoMalFormadoRetorna400() {
-        post(PATH, corpo("123", "100.00", diaUtil()))
-                .statusCode(400).body("codigo", equalTo("DOCUMENTO_INVALIDO"));
-        post(PATH, corpo("66666666666", "10.001", diaUtil()))
-                .statusCode(400).body("codigo", equalTo("VALOR_MONETARIO_INVALIDO"));
+        post(PATH, rascunho("123", diaUtil())).statusCode(400).body("codigo", equalTo("DOCUMENTO_INVALIDO"));
+        String boleto = PATH + "/" + criar("66666666666");
+        put(boleto + "/itens", itens("10.001")).statusCode(400).body("codigo", equalTo("VALOR_MONETARIO_INVALIDO"));
+        put(boleto + "/destinatarios", "{\"emails\":[\"nao-e-email\"]}").statusCode(400).body("codigo", equalTo("EMAIL_INVALIDO"));
     }
 
     @Test
@@ -178,7 +220,7 @@ class BoletoResourceTest {
         post(PATH, "{\"pagador\":{\"nome\":\"Maria\",\"documento\":\"77777777777\",\"email\":\"m@example.com\"}}")
                 .statusCode(400)
                 .body("codigo", equalTo("REQUISICAO_INVALIDA"))
-                .body("campos.campo", contains("dataVencimento", "valor"));
+                .body("campos.campo", contains("dataVencimento"));
     }
 
     @Test

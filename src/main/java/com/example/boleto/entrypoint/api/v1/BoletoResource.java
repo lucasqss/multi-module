@@ -3,17 +3,22 @@ package com.example.boleto.entrypoint.api.v1;
 import com.example.boleto.application.boleto.AlterarBoletoUC;
 import com.example.boleto.application.boleto.CancelarBoletoUC;
 import com.example.boleto.application.boleto.ConsultarBoletoUC;
+import com.example.boleto.application.boleto.CriarBoletoUC;
 import com.example.boleto.application.boleto.EmitirBoletoUC;
 import com.example.boleto.application.boleto.ExcluirBoletoUC;
 import com.example.boleto.application.boleto.ListarBoletosUC;
 import com.example.boleto.application.boleto.NotificarBoletoUC;
 import com.example.boleto.application.boleto.ReceberPagamentoBoletoUC;
+import com.example.boleto.application.boleto.SalvarDestinatariosBoletoUC;
+import com.example.boleto.application.boleto.SalvarItensBoletoUC;
 import com.example.boleto.application.boleto.dto.ListarBoletosInput;
 import com.example.boleto.domain.state.StatusBoleto;
 import com.example.boleto.entrypoint.api.v1.request.AlterarBoletoRequest;
-import com.example.boleto.entrypoint.api.v1.request.EmitirBoletoRequest;
+import com.example.boleto.entrypoint.api.v1.request.CriarBoletoRequest;
 import com.example.boleto.entrypoint.api.v1.request.MotivoRequest;
 import com.example.boleto.entrypoint.api.v1.request.ReceberPagamentoRequest;
+import com.example.boleto.entrypoint.api.v1.request.SalvarDestinatariosBoletoRequest;
+import com.example.boleto.entrypoint.api.v1.request.SalvarItensBoletoRequest;
 import com.example.boleto.entrypoint.api.v1.response.BoletoResponse;
 import com.example.boleto.entrypoint.api.v1.response.PaginaResponse;
 import jakarta.validation.Valid;
@@ -37,24 +42,36 @@ import java.util.UUID;
 /**
  * Entrypoint fino: traduz HTTP <-> caso de uso. Nenhuma regra de negócio aqui.
  *
- * <p>CRUD em verbos HTTP; transições de estado como sub-recursos com POST
- * (ex.: {@code POST /{id}/pagamento}), pois são eventos de negócio, não edições de campo.
+ * <p>Um endpoint por CASO DE USO (intenção do usuário):
+ * <ul>
+ *   <li>CRUD do rascunho nos verbos HTTP ({@code POST}, {@code GET}, {@code PUT /{id}}, {@code DELETE /{id}});</li>
+ *   <li>cada SEÇÃO do boleto como sub-recurso substituído inteiro ({@code PUT /{id}/itens});</li>
+ *   <li>transições/eventos de negócio como {@code POST /{id}/<substantivo>} ({@code /emissao}, {@code /pagamento}).</li>
+ * </ul>
  */
 @Path("/api/v1/boletos")
 public class BoletoResource {
 
-    private final EmitirBoletoUC emitir;
+    private final CriarBoletoUC criar;
     private final ConsultarBoletoUC consultar;
     private final ListarBoletosUC listar;
     private final AlterarBoletoUC alterar;
+    private final SalvarItensBoletoUC salvarItens;
+    private final SalvarDestinatariosBoletoUC salvarDestinatarios;
     private final ExcluirBoletoUC excluir;
+    private final EmitirBoletoUC emitir;
     private final NotificarBoletoUC notificar;
     private final ReceberPagamentoBoletoUC receberPagamento;
     private final CancelarBoletoUC cancelar;
 
-    public BoletoResource(EmitirBoletoUC emitir, ConsultarBoletoUC consultar, ListarBoletosUC listar,
-                          AlterarBoletoUC alterar, ExcluirBoletoUC excluir, NotificarBoletoUC notificar,
+    public BoletoResource(CriarBoletoUC criar, ConsultarBoletoUC consultar, ListarBoletosUC listar,
+                          AlterarBoletoUC alterar, SalvarItensBoletoUC salvarItens,
+                          SalvarDestinatariosBoletoUC salvarDestinatarios, ExcluirBoletoUC excluir,
+                          EmitirBoletoUC emitir, NotificarBoletoUC notificar,
                           ReceberPagamentoBoletoUC receberPagamento, CancelarBoletoUC cancelar) {
+        this.criar = criar;
+        this.salvarItens = salvarItens;
+        this.salvarDestinatarios = salvarDestinatarios;
         this.emitir = emitir;
         this.consultar = consultar;
         this.listar = listar;
@@ -65,13 +82,14 @@ public class BoletoResource {
         this.cancelar = cancelar;
     }
 
-    // ============================== CRUD ==============================
+    // ============================== CRUD (rascunho) ==============================
 
+    /** Cria o boleto em EM_EDICAO (rascunho), só com pagador e vencimento. */
     @POST
-    public Response emitir(@Valid @NotNull EmitirBoletoRequest request, @Context UriInfo uriInfo) {
-        var emitido = BoletoResponse.de(emitir.executar(request.paraInput()));
-        var location = uriInfo.getAbsolutePathBuilder().path(emitido.id().toString()).build();
-        return Response.created(location).entity(emitido).build();
+    public Response criar(@Valid @NotNull CriarBoletoRequest request, @Context UriInfo uriInfo) {
+        var criado = BoletoResponse.de(criar.executar(request.paraInput()));
+        var location = uriInfo.getAbsolutePathBuilder().path(criado.id().toString()).build();
+        return Response.created(location).entity(criado).build();
     }
 
     @GET
@@ -95,6 +113,21 @@ public class BoletoResource {
         return BoletoResponse.de(alterar.executar(request.paraInput(id)));
     }
 
+    // ======================= seções (só em EM_EDICAO) =======================
+
+    @PUT
+    @Path("/{id}/itens")
+    public BoletoResponse salvarItens(@PathParam("id") UUID id, @Valid @NotNull SalvarItensBoletoRequest request) {
+        return BoletoResponse.de(salvarItens.executar(request.paraInput(id)));
+    }
+
+    @PUT
+    @Path("/{id}/destinatarios")
+    public BoletoResponse salvarDestinatarios(@PathParam("id") UUID id,
+                                              @Valid @NotNull SalvarDestinatariosBoletoRequest request) {
+        return BoletoResponse.de(salvarDestinatarios.executar(request.paraInput(id)));
+    }
+
     @DELETE
     @Path("/{id}")
     public Response excluir(@PathParam("id") UUID id) {
@@ -103,6 +136,13 @@ public class BoletoResource {
     }
 
     // ======================= eventos do ciclo de vida =======================
+
+    /** Finaliza a edição: exige completude e simula a criação do boleto (gera a linha digitável). */
+    @POST
+    @Path("/{id}/emissao")
+    public BoletoResponse emitir(@PathParam("id") UUID id) {
+        return BoletoResponse.de(emitir.executar(id));
+    }
 
     /** Simula o envio da notificação de emissão ao pagador (e o reenvio, se já notificado). */
     @POST

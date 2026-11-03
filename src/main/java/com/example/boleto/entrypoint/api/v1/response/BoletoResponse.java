@@ -5,6 +5,7 @@ import com.example.boleto.application.boleto.dto.BoletoOutput;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -14,17 +15,23 @@ import java.util.UUID;
  */
 public record BoletoResponse(
         UUID id,
-        PagadorResponse pagador,
-        BigDecimal valor,
-        LocalDate dataVencimento,
-        String linhaDigitavel,
         String status,
+        PagadorResponse pagador,
+        LocalDate dataVencimento,
+        List<ItemResponse> itens,
+        BigDecimal valor,
+        List<String> destinatarios,
+        String linhaDigitavel,
+        Instant criadoEm,
         Instant emitidoEm,
         Instant notificadoEm,
         PagamentoResponse pagamento,
         String motivoCancelamento) {
 
     public record PagadorResponse(String nome, String documento, String email) {
+    }
+
+    public record ItemResponse(String descricao, BigDecimal valor) {
     }
 
     public record PagamentoResponse(BigDecimal valorPago, LocalDate dataPagamento) {
@@ -34,11 +41,14 @@ public record BoletoResponse(
         var pagamento = o.valorPago() == null ? null : new PagamentoResponse(o.valorPago(), o.dataPagamento());
         return new BoletoResponse(
                 o.id(),
-                new PagadorResponse(o.nomePagador(), o.documentoPagador(), o.emailPagador()),
-                o.valor(),
-                o.dataVencimento(),
-                o.linhaDigitavel(),
                 o.status().name(),
+                new PagadorResponse(o.nomePagador(), o.documentoPagador(), o.emailPagador()),
+                o.dataVencimento(),
+                o.itens().stream().map(i -> new ItemResponse(i.descricao(), i.valor())).toList(),
+                o.valor(),
+                o.destinatarios(),
+                o.linhaDigitavel(),
+                o.criadoEm(),
                 o.emitidoEm(),
                 o.notificadoEm(),
                 pagamento,

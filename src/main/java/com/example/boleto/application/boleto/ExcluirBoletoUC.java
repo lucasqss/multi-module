@@ -8,8 +8,8 @@ import jakarta.transaction.Transactional;
 import java.util.UUID;
 
 /**
- * DELETE (exclusão física). Só é permitida enquanto ninguém de fora conhece o boleto (EMITIDO);
- * depois de notificado, o caminho é CANCELAR, que preserva o histórico. Quem decide é o estado.
+ * DELETE (exclusão física). Só é permitida no rascunho (EM_EDICAO), que ninguém de fora conhece;
+ * depois de emitido, o caminho é CANCELAR, que preserva o histórico. Quem decide é o estado.
  */
 @ApplicationScoped
 public class ExcluirBoletoUC {

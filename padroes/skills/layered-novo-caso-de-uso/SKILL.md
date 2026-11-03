@@ -1,13 +1,50 @@
 ---
 name: layered-novo-caso-de-uso
-description: Cria uma nova ação de ponta a ponta em projeto Java layered (comportamento na entidade, use case, DTOs Input/Output, Request/Response, endpoint e testes). Use quando pedirem uma nova operação, endpoint, comando, consulta ou consumo de mensagem.
+description: Decide se algo é um caso de uso (uma intenção do usuário, um executar, uma transação; partes de agregado passam pelo agregado; um UC por seção editada; completude só na finalização) e cria a ação de ponta a ponta em projeto Java layered (entidade, use case, DTOs, endpoint e testes). Use quando pedirem uma nova operação, endpoint, comando, consulta, consumo de mensagem, ou perguntarem quantos casos de uso criar.
 ---
 
 # Novo caso de uso (de ponta a ponta)
 
 Construa **de dentro para fora**: domínio → application → entrypoint → testes.
 
-## 0. Localize os modelos
+## 0. Isto é UM caso de uso? (decida antes de codificar)
+
+**Um caso de uso = uma intenção do usuário (ou de outro sistema) com significado de negócio**,
+executada numa transação. Teste rápido: dá para dizer "o <ator> quer <verbo> <algo>" e a tela ou o
+sistema dispara isso como **uma** ação? Então é um caso de uso.
+
+- **Uma classe, um `executar`, uma transação.** Nunca um UC com vários métodos públicos: isso é um
+  `*Service` disfarçado (vários motivos para mudar, dependências acumuladas, transações misturadas).
+- **Não é um por entidade.** Partes de um agregado (itens, destinatários, parcelas, documentos) não têm
+  UC nem repositório próprios: o UC carrega o agregado, chama o método dele e salva o agregado inteiro.
+- **Não é um por operação técnica** (incluir/alterar/remover item). Seção que a tela edita como um
+  bloco → **um UC por seção**, com `PUT` substituindo a seção inteira.
+- **Separe** em UCs diferentes quando muda: a regra, a permissão, a transição de estado ou o ator/gatilho
+  (usuário × banco × job). **Junte** quando sempre acontecem juntos, com a mesma regra e o mesmo gatilho.
+
+| Situação | Quantos casos de uso | Exemplo |
+|---|---|---|
+| Criar o agregado | 1 — nasce em `EM_EDICAO` se pode ficar incompleto | `CriarContratoUC` |
+| Editar uma seção/parte editada como bloco | 1 por seção (`PUT` substitui a seção) | `SalvarParcelasContratoUC`, `SalvarBeneficiariosContratoUC` |
+| Incluir/remover uma parte que é ação de negócio própria (regras, permissão ou evento próprios) | 1 por ação | `AnexarDocumentoUC` |
+| Finalizar a edição (exige completude) | 1 | `FinalizarEdicaoContratoUC` |
+| Transição de estado / evento de negócio | 1 por transição | `AprovarContratoUC`, `CancelarContratoUC` |
+| Consultar | 1 por consulta | `ConsultarContratoUC`, `ListarContratosUC` |
+| Entidade com vida própria, usada por vários agregados | CRUD próprio; aqui só o id | `Pagador` cadastrado à parte |
+
+#### Agregado editado por partes (padrão `EM_EDICAO`)
+
+1. `CriarContratoUC` cria o rascunho em `EM_EDICAO` só com o mínimo.
+2. Um `Salvar<Secao>ContratoUC` por seção; cada um valida **só a seção** (regras de seção no catálogo).
+   O agregado pode continuar incompleto.
+3. `FinalizarEdicaoContratoUC` exige a **completude** (conjunto de regras de finalização no catálogo, sobre o agregado
+   inteiro) e muda o estado. Só a partir daí o agregado "vale" (é cobrável, visível, enviado...).
+4. O estado `EM_EDICAO` permite editar/excluir; os seguintes não (`validarEdicao()` → 409).
+5. `@Version` no agregado: duas edições concorrentes, mesmo de seções diferentes, não se sobrescrevem.
+
+Nunca acrescente um segundo método público a um UC existente: crie outro UC.
+
+## 0.1 Localize os modelos
 
 Pelo **"Mapa do projeto"** do `copilot-instructions.md`/`AGENTS.md`, ou buscando: classes `*UC` em
 `application/`, resources/consumers em `entrypoint/`, `*Request`/`*Response`, `*Input`/`*Output`.

@@ -4,6 +4,7 @@ import com.example.boleto.domain.entity.Boleto;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -21,11 +22,19 @@ public class NotificadorBoleto {
 
     private final List<NotificacaoEnviada> enviadas = new CopyOnWriteArrayList<>();
 
+    /** Avisa o pagador e os destinatários extras. Só chamado para boleto emitido (com linha digitável). */
     public void notificarEmissao(Boleto boleto) {
-        var notificacao = new NotificacaoEnviada(boleto.getPagador().email(), boleto.getLinhaDigitavel().valor());
-        enviadas.add(notificacao);
-        LOG.infof("[SIMULAÇÃO] E-mail para %s: boleto de %s vence em %s. Linha digitável: %s",
-                notificacao.destinatario(), boleto.getValor(), boleto.getDataVencimento(), notificacao.linhaDigitavel());
+        var linha = boleto.getLinhaDigitavel()
+                .orElseThrow(() -> new IllegalStateException("Boleto sem linha digitável: " + boleto.getId()))
+                .valor();
+        var para = new ArrayList<String>();
+        para.add(boleto.getPagador().email().valor());
+        boleto.getDestinatarios().emails().forEach(e -> para.add(e.valor()));
+        for (var destinatario : para) {
+            enviadas.add(new NotificacaoEnviada(destinatario, linha));
+            LOG.infof("[SIMULAÇÃO] E-mail para %s: boleto de %s vence em %s. Linha digitável: %s",
+                    destinatario, boleto.getValor(), boleto.getDataVencimento(), linha);
+        }
     }
 
     public List<NotificacaoEnviada> enviadas() {

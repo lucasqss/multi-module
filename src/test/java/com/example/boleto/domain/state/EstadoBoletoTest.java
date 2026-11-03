@@ -9,6 +9,7 @@ import java.util.function.Function;
 
 import static com.example.boleto.domain.state.StatusBoleto.CANCELADO;
 import static com.example.boleto.domain.state.StatusBoleto.EMITIDO;
+import static com.example.boleto.domain.state.StatusBoleto.EM_EDICAO;
 import static com.example.boleto.domain.state.StatusBoleto.NOTIFICADO;
 import static com.example.boleto.domain.state.StatusBoleto.PAGO;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,12 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class EstadoBoletoTest {
 
     private static final Map<String, Function<EstadoBoleto, EstadoBoleto>> ACOES = Map.of(
+            "emitir", EstadoBoleto::emitir,
             "notificar", EstadoBoleto::notificar,
             "receberPagamento", EstadoBoleto::receberPagamento,
             "cancelar", EstadoBoleto::cancelar);
 
     /** Transições PERMITIDAS. Tudo que não está aqui deve falhar. */
     private static final Map<StatusBoleto, Map<String, StatusBoleto>> PERMITIDAS = Map.of(
+            EM_EDICAO, Map.of("emitir", EMITIDO),
             EMITIDO, Map.of("notificar", NOTIFICADO, "receberPagamento", PAGO, "cancelar", CANCELADO),
             NOTIFICADO, Map.of("notificar", NOTIFICADO, "receberPagamento", PAGO, "cancelar", CANCELADO),
             PAGO, Map.of(),
@@ -51,22 +54,22 @@ class EstadoBoletoTest {
     }
 
     @Test
-    void somenteEmitidoPermiteAlterarEExcluir() {
+    void somenteEmEdicaoPermiteEditarEExcluir() {
         for (var status : StatusBoleto.values()) {
             var estado = EstadoBoleto.de(status);
-            if (status == EMITIDO) {
-                estado.validarAlteracao();
+            if (status == EM_EDICAO) {
+                estado.validarEdicao();
                 estado.validarExclusao();
             } else {
-                assertThrows(TransicaoEstadoInvalidaException.class, estado::validarAlteracao);
+                assertThrows(TransicaoEstadoInvalidaException.class, estado::validarEdicao);
                 assertThrows(TransicaoEstadoInvalidaException.class, estado::validarExclusao);
             }
         }
     }
 
     @Test
-    void emAberto() {
-        var emAberto = Set.of(EMITIDO, NOTIFICADO);
+    void emAbertoSoDepoisDeEmitido() {
+        var emAberto = Set.of(EMITIDO, NOTIFICADO); // rascunho não é cobrável nem conta no limite
         for (var status : StatusBoleto.values()) {
             assertEquals(emAberto.contains(status), EstadoBoleto.de(status).emAberto(), status.name());
         }

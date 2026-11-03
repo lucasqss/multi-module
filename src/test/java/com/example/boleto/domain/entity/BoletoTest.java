@@ -1,66 +1,105 @@
 package com.example.boleto.domain.entity;
 
+import com.example.boleto.domain.exception.BoletoSemItensException;
 import com.example.boleto.domain.exception.MotivoInvalidoException;
+import com.example.boleto.domain.exception.QuantidadeMaximaItensExcedidaException;
 import com.example.boleto.domain.exception.TransicaoEstadoInvalidaException;
-import com.example.boleto.domain.exception.ValorAbaixoDoMinimoException;
 import com.example.boleto.domain.exception.ValorPagoDivergenteException;
 import com.example.boleto.domain.state.StatusBoleto;
+import com.example.boleto.domain.valueobject.Destinatarios;
 import com.example.boleto.domain.valueobject.Dinheiro;
+import com.example.boleto.domain.valueobject.Email;
+import com.example.boleto.domain.valueobject.ItemBoleto;
+import com.example.boleto.domain.valueobject.ItensBoleto;
 import com.example.boleto.domain.valueobject.Motivo;
 import com.example.boleto.domain.valueobject.Pagamento;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
+import java.util.List;
+
 import static com.example.boleto.domain.Cenarios.AGORA;
 import static com.example.boleto.domain.Cenarios.HOJE;
-import static com.example.boleto.domain.Cenarios.solicitacao;
+import static com.example.boleto.domain.Cenarios.boleto;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Garante que a entidade APLICA specifications e state; as regras em si já são testadas à parte. */
 class BoletoTest {
 
+    private static ItensBoleto itens(String... valores) {
+        return new ItensBoleto(List.of(valores).stream().map(v -> new ItemBoleto("Item " + v, Dinheiro.de(v))).toList());
+    }
+
     private static Pagamento pagamentoDe(String valor) {
         return new Pagamento(Dinheiro.de(valor), HOJE);
     }
 
     @Test
-    void emiteComLinhaDigitavelEStatusEmitido() {
-        var boleto = solicitacao().emitir();
+    void nasceEmEdicaoIncompletoESemLinhaDigitavel() {
+        var boleto = boleto().semItens().rascunho();
+        assertEquals(StatusBoleto.EM_EDICAO, boleto.getStatus());
+        assertTrue(boleto.getItens().vazio());
+        assertTrue(boleto.getLinhaDigitavel().isEmpty());
+        assertFalse(boleto.emAberto()); // rascunho não conta no limite de boletos em aberto
+    }
+
+    @Test
+    void secoesSaoSalvasPorPartesEOValorEhASomaDosItens() {
+        var boleto = boleto().semItens().rascunho();
+        boleto.salvarItens(itens("300.00", "200.00"));
+        boleto.salvarDestinatarios(new Destinatarios(List.of(new Email("financeiro@empresa.com"))));
+        boleto.alterarVencimento(HOJE.plusDays(14));
+
+        assertEquals(Dinheiro.de("500"), boleto.getValor());
+        assertEquals(1, boleto.getDestinatarios().quantidade());
+        assertEquals(StatusBoleto.EM_EDICAO, boleto.getStatus());
+    }
+
+    @Test
+    void secaoInvalidaNaoMudaNada() {
+        var boleto = boleto().rascunho();
+        var muitos = Collections.nCopies(21, "10.00").toArray(String[]::new);
+        assertThrows(QuantidadeMaximaItensExcedidaException.class, () -> boleto.salvarItens(itens(muitos)));
+        assertEquals(Dinheiro.de("500"), boleto.getValor());
+    }
+
+    @Test
+    void emissaoExigeCompletude() {
+        var boleto = boleto().semItens().rascunho();
+        assertThrows(BoletoSemItensException.class, () -> boleto.emitir(boleto().condicoes()));
+        assertEquals(StatusBoleto.EM_EDICAO, boleto.getStatus()); // continua editável
+    }
+
+    @Test
+    void emissaoGeraLinhaDigitavelComOValorTotal() {
+        var boleto = boleto().emitido();
         assertEquals(StatusBoleto.EMITIDO, boleto.getStatus());
-        assertEquals(47, boleto.getLinhaDigitavel().valor().length());
-        assertTrue(boleto.getLinhaDigitavel().valor().endsWith("0000050000")); // R$ 500,00 em centavos
+        assertTrue(boleto.getLinhaDigitavel().orElseThrow().valor().endsWith("0000050000")); // R$ 500,00
+        assertEquals(AGORA, boleto.getEmitidoEm().orElseThrow());
         assertTrue(boleto.emAberto());
     }
 
     @Test
-    void naoEmiteComSolicitacaoInvalida() {
-        assertThrows(ValorAbaixoDoMinimoException.class, () -> solicitacao().valor("1.00").emitir());
-    }
-
-    @Test
-    void alterarRegeraALinhaDigitavel() {
-        var boleto = solicitacao().emitir();
-        var linhaOriginal = boleto.getLinhaDigitavel();
-
-        boleto.alterar(solicitacao().valor("750.00").build());
-
-        assertEquals(Dinheiro.de("750"), boleto.getValor());
-        assertNotEquals(linhaOriginal, boleto.getLinhaDigitavel());
-    }
-
-    @Test
-    void estadoBloqueiaAlteracaoAntesDasRegras() {
-        var boleto = solicitacao().emitir();
-        boleto.registrarNotificacao(AGORA);
+    void depoisDeEmitidoNaoEditaNemExclui_estadoAntesDasRegras() {
+        var boleto = boleto().emitido();
         // mesmo com dados inválidos, o erro é de ESTADO (409), não de regra (422)
-        assertThrows(TransicaoEstadoInvalidaException.class, () -> boleto.alterar(solicitacao().valor("1.00").build()));
+        assertThrows(TransicaoEstadoInvalidaException.class, () -> boleto.salvarItens(itens("0")));
+        assertThrows(TransicaoEstadoInvalidaException.class, () -> boleto.alterarVencimento(HOJE.plusDays(10)));
+        assertThrows(TransicaoEstadoInvalidaException.class, boleto::validarExclusao);
+    }
+
+    @Test
+    void rascunhoNaoRecebePagamento() {
+        var boleto = boleto().rascunho();
+        assertThrows(TransicaoEstadoInvalidaException.class, () -> boleto.receberPagamento(pagamentoDe("500.00"), HOJE));
     }
 
     @Test
     void cicloEmitirNotificarReenviarPagar() {
-        var boleto = solicitacao().emitir();
+        var boleto = boleto().emitido();
         boleto.registrarNotificacao(AGORA);
         boleto.registrarNotificacao(AGORA.plusSeconds(60)); // reenvio
         assertEquals(StatusBoleto.NOTIFICADO, boleto.getStatus());
@@ -69,23 +108,14 @@ class BoletoTest {
         boleto.receberPagamento(pagamentoDe("500.00"), HOJE);
 
         assertEquals(StatusBoleto.PAGO, boleto.getStatus());
-        assertEquals(Dinheiro.de("500"), boleto.getPagamento().orElseThrow().valorPago());
         assertThrows(TransicaoEstadoInvalidaException.class, () -> boleto.cancelar(new Motivo("tarde demais")));
     }
 
     @Test
     void pagamentoInvalidoNaoMudaOEstado() {
-        var boleto = solicitacao().emitir();
+        var boleto = boleto().emitido();
         assertThrows(ValorPagoDivergenteException.class, () -> boleto.receberPagamento(pagamentoDe("100.00"), HOJE));
         assertEquals(StatusBoleto.EMITIDO, boleto.getStatus());
-        assertTrue(boleto.getPagamento().isEmpty());
-    }
-
-    @Test
-    void boletoCanceladoNaoRecebePagamento() {
-        var boleto = solicitacao().emitir();
-        boleto.cancelar(new Motivo("emitido por engano"));
-        assertThrows(TransicaoEstadoInvalidaException.class, () -> boleto.receberPagamento(pagamentoDe("500.00"), HOJE));
     }
 
     @Test

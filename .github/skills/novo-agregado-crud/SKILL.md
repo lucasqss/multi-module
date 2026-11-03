@@ -25,16 +25,23 @@ mais de um (`domain/entity`, `application/<agregado>`, `adapter/database`...).
 | 1 | `domain/valueobject/<Agregado>Id`, demais VOs | `BoletoId`, `Documento`, `Pagador` |
 | 3 | `domain/state/`: enum `Status<Agregado>` (só o rótulo), `Estado<Agregado>` (`sealed`) e um `final` por estado | `StatusBoleto`, `EstadoBoleto`, `EstadoEmitido` |
 | 4 | `domain/exception/<Situacao>Exception` (uma por caso, na família certa) | `BoletoNaoEncontradoException`, `BoletoVencidoException` |
-| 6 | `domain/specification/<agregado>/`: candidato `Solicitacao<Agregado>` (com `para<Momento>(...)`), `...Spec` e catálogo `Regras<Agregado>` | `SolicitacaoBoleto`, `specification/boleto/*`, `RegrasBoleto` |
+| 6 | `domain/specification/<agregado>/`: candidatos por momento (seções, finalização + `Condicoes*`), `...Spec` e catálogo `Regras<Agregado>` | `EmissaoBoleto`, `CondicoesEmissao`, `DestinatariosDoBoleto`, `RegrasBoleto` |
 | 7 | `domain/entity/<Agregado>` (rica: fábrica estática, `reconstituir`, sem setters) | `Boleto` |
 | 9 | `adapter/database/<Agregado>JpaEntity` (`@Version`), `<Agregado>Mapper` | `BoletoJpaEntity`, `BoletoMapper` |
 | 10 | `adapter/database/<Agregado>Repository` (+ `Filtro<Agregado>`): classe concreta que fala domínio, com `obter(id)` | `BoletoRepository`, `FiltroBoleto` |
-| 11 | `application/<agregado>/dto/*Input`, `<Agregado>Output` | `EmitirBoletoInput`, `BoletoOutput` |
+| 11 | `application/<agregado>/dto/*Input`, `<Agregado>Output` | `CriarBoletoInput`, `SalvarItensBoletoInput`, `BoletoOutput` |
 | 12 | `application/<agregado>/<Verbo><Agregado>UC` (um por ação) | `EmitirBoletoUC`, `CancelarBoletoUC` |
-| 13 | `entrypoint/api/v1/request/*Request`, `response/<Agregado>Response`, `<Agregado>Resource` | `EmitirBoletoRequest`, `BoletoResponse`, `BoletoResource` |
+| 13 | `entrypoint/api/v1/request/*Request`, `response/<Agregado>Response`, `<Agregado>Resource` | `CriarBoletoRequest`, `SalvarItensBoletoRequest`, `BoletoResponse`, `BoletoResource` |
 
 **Reaproveite, não duplique:** `Specification`, `RegraNegocio`, `ValidadorRegras`, famílias de
 exceção, `Dinheiro`, `Motivo`, `Pagina`, `PaginaResponse`, `ApiExceptionHandler`, `ErroResponse`, `Clock`.
+
+## Quantos casos de uso?
+
+Um por **intenção** (critério em "O que é um caso de uso", `.github/copilot-instructions.md`). Se o
+agregado tem partes e pode ficar incompleto enquanto é preenchido, siga o padrão do `Boleto`:
+`Criar` (nasce `EM_EDICAO`) → um `Salvar<Secao>` por seção (`PUT`) → um UC de finalização que exige
+completude (`EmitirBoletoUC`). Partes não ganham repositório nem UC por entidade.
 
 ## Testes (mesma estrutura dos do Boleto)
 
@@ -44,7 +51,7 @@ exceção, `Dinheiro`, `Motivo`, `Pagina`, `PaginaResponse`, `ApiExceptionHandle
 | Uma regra por teste, verificando o tipo da exceção | `RegrasBoletoTest` |
 | Máquina de estados como tabela | `EstadoBoletoTest` |
 | Entidade aplica estado (409) antes das regras (422) | `BoletoTest` |
-| Fuso do negócio no candidato | `SolicitacaoBoletoTest` |
+| Fuso do negócio nas condições | `CondicoesEmissaoTest` |
 | Lock otimista vira `AlteracaoConcorrenteException` | `ConcorrenciaTest` |
 | CRUD + ciclo de vida + erros HTTP (status e `codigo`) | `BoletoResourceTest` |
 

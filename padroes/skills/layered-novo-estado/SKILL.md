@@ -21,7 +21,7 @@ Pelo **"Mapa do projeto"** do `copilot-instructions.md`/`AGENTS.md`, ou buscando
 - **Base** `EstadoContrato`: `abstract sealed`, toda ação lança `TransicaoEstadoInvalidaException` (409).
 - **Estados concretos**: `final`, singleton `INSTANCIA`, sobrescrevem **só** o permitido.
 - Transições **retornam** o próximo estado; a entidade faz `estado = estado.acao()`. Sem setter.
-- Ações que dependem do status sem mudá-lo: `validarAlteracao()`, `validarExclusao()`.
+- Ações que dependem do status sem mudá-lo: `validarEdicao()`, `validarExclusao()`.
 - Consultas (`emAberto()`, `finalizado()`) moram nos estados; o adapter deriva queries delas.
 - Auto-transição é válida (`return this`), ex.: reenviar algo sem mudar de estado.
 
@@ -54,7 +54,7 @@ Exemplo com o agregado **Contrato**; troque pelo nome do seu (ex.: `EstadoPedido
 
 ```java
 // domain/state (o enum de status mora junto dos estados)
-public enum StatusContrato { RASCUNHO, ATIVO, ENCERRADO }
+public enum StatusContrato { EM_EDICAO, ATIVO, ENCERRADO }
 
 // domain/exception (se ainda não existir para este agregado)
 public class TransicaoEstadoInvalidaException extends ConflitoException {
@@ -65,13 +65,13 @@ public class TransicaoEstadoInvalidaException extends ConflitoException {
 }
 
 // domain/state
-public abstract sealed class EstadoContrato permits EstadoRascunho, EstadoAtivo, EstadoEncerrado {
+public abstract sealed class EstadoContrato permits EstadoEmEdicao, EstadoAtivo, EstadoEncerrado {
 
     public abstract StatusContrato status();
 
     public EstadoContrato ativar() { throw acaoNaoPermitida("ativar"); }
     public EstadoContrato encerrar() { throw acaoNaoPermitida("encerrar"); }
-    public void validarAlteracao() { throw acaoNaoPermitida("alterar"); }
+    public void validarEdicao() { throw acaoNaoPermitida("editar"); }
 
     protected final TransicaoEstadoInvalidaException acaoNaoPermitida(String acao) {
         return new TransicaoEstadoInvalidaException(status(), acao);
@@ -79,21 +79,21 @@ public abstract sealed class EstadoContrato permits EstadoRascunho, EstadoAtivo,
 
     public static EstadoContrato de(StatusContrato status) {
         return switch (status) {
-            case RASCUNHO -> EstadoRascunho.INSTANCIA;
+            case EM_EDICAO -> EstadoEmEdicao.INSTANCIA;
             case ATIVO -> EstadoAtivo.INSTANCIA;
             case ENCERRADO -> EstadoEncerrado.INSTANCIA;
         };
     }
 
-    public static EstadoContrato inicial() { return EstadoRascunho.INSTANCIA; }
+    public static EstadoContrato inicial() { return EstadoEmEdicao.INSTANCIA; }
 }
 
-public final class EstadoRascunho extends EstadoContrato {
-    static final EstadoRascunho INSTANCIA = new EstadoRascunho();
-    private EstadoRascunho() { }
-    @Override public StatusContrato status() { return StatusContrato.RASCUNHO; }
+public final class EstadoEmEdicao extends EstadoContrato {
+    static final EstadoEmEdicao INSTANCIA = new EstadoEmEdicao();
+    private EstadoEmEdicao() { }
+    @Override public StatusContrato status() { return StatusContrato.EM_EDICAO; }
     @Override public EstadoContrato ativar() { return EstadoAtivo.INSTANCIA; }
-    @Override public void validarAlteracao() { /* permitido */ }
+    @Override public void validarEdicao() { /* permitido */ }
 }
 ```
 
@@ -106,7 +106,7 @@ Teste de **tabela**: para cada (status × ação), o destino esperado ou `Transi
 
 ```java
 private static final Map<StatusContrato, Map<String, StatusContrato>> PERMITIDAS = Map.of(
-        RASCUNHO, Map.of("ativar", ATIVO),
+        EM_EDICAO, Map.of("ativar", ATIVO),
         ATIVO, Map.of("encerrar", ENCERRADO),
         ENCERRADO, Map.of());
 // percorra StatusContrato.values() × ACOES e compare com PERMITIDAS

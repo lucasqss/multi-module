@@ -64,6 +64,9 @@ leem esse mapa primeiro. Acrescente também, antes do mapa, as regras inegociáv
     `state`; nada de `factory`, `model`, `enums`, `repository`, `service`; `shared/` sem subpastas.
 11. Quem chama quem: Resource → UC → (repositório/integração, entidade); entidade → estado e regras.
     UC não chama UC; nada de `*Service`/`*Utils` genéricos.
+12. Caso de uso = uma intenção do usuário: uma classe, um `executar`, uma transação. Nada de UC com
+    vários métodos nem UC por entidade-parte; seção editada como bloco = um UC `Salvar<Secao>` (`PUT`);
+    agregado que pode ficar incompleto nasce `EM_EDICAO` e só a finalização exige completude.
 ```
 
 ## 5. Valide

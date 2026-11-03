@@ -7,18 +7,18 @@ import com.example.boleto.domain.specification.RegraNegocio;
  * Vencimento precisa cair em dia útil.
  * (Regra fake simplificada: só olha fim de semana. Feriados viriam de um calendário, entregue na solicitação.)
  */
-public class VencimentoEmDiaUtilSpec extends RegraNegocio<SolicitacaoBoleto> {
+public class VencimentoEmDiaUtilSpec extends RegraNegocio<EmissaoBoleto> {
 
     @Override
-    public boolean isSatisfiedBy(SolicitacaoBoleto s) {
-        return switch (s.dados().dataVencimento().getDayOfWeek()) {
+    public boolean isSatisfiedBy(EmissaoBoleto s) {
+        return switch (s.dataVencimento().getDayOfWeek()) {
             case SATURDAY, SUNDAY -> false;
             default -> true;
         };
     }
 
     @Override
-    protected VencimentoEmDiaNaoUtilException violacao(SolicitacaoBoleto s) {
-        return new VencimentoEmDiaNaoUtilException(s.dados().dataVencimento());
+    protected VencimentoEmDiaNaoUtilException violacao(EmissaoBoleto s) {
+        return new VencimentoEmDiaNaoUtilException(s.dataVencimento());
     }
 }

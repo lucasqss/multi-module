@@ -1,6 +1,6 @@
 package com.example.boleto.domain.exception;
 
-/** Nome ou e-mail do pagador inválido. */
+/** Nome do pagador inválido. */
 public class PagadorInvalidoException extends DadoInvalidoException {
 
     public static final String CODIGO = "PAGADOR_INVALIDO";

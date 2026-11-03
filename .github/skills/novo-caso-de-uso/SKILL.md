@@ -5,6 +5,18 @@ description: Cria uma nova ação de ponta a ponta no projeto (método de negóc
 
 # Novo caso de uso (de ponta a ponta)
 
+## 0. Isto é UM caso de uso? (decida antes de codificar)
+
+Siga a seção **"O que é um caso de uso"** de `.github/copilot-instructions.md`. Em resumo:
+
+- Um caso de uso = uma **intenção** do usuário/sistema ("o <ator> quer <verbo> <algo>"), um `executar`,
+  uma transação. **Nunca** acrescente um segundo método público a um UC existente.
+- Mexe numa **parte** do boleto (itens, destinatários)? Não crie UC por item nem por entidade:
+  é um UC por **seção** (`SalvarItensBoletoUC`), que substitui a seção inteira e passa pelo `Boleto`.
+- A ação **finaliza** algo e exige completude? É um UC de finalização (`EmitirBoletoUC`), com as regras de
+  finalização no catálogo.
+- Separe quando a regra, a permissão, a transição ou o ator mudam; junte quando sempre andam juntos.
+
 Construa **de dentro para fora**: domínio → application → entrypoint → testes. Cada camada só conhece
 a de dentro.
 
@@ -21,7 +33,8 @@ a de dentro.
 ## 2. Application
 
 `src/main/java/com/example/boleto/application/boleto/<Verbo>BoletoUC.java`. Modelos:
-`ReceberPagamentoBoletoUC` (com entrada), `CancelarBoletoUC` (simples), `NotificarBoletoUC` (com integração externa).
+`ReceberPagamentoBoletoUC` (com entrada), `CancelarBoletoUC` (simples), `NotificarBoletoUC` (com integração externa),
+`SalvarItensBoletoUC` (seção do agregado), `EmitirBoletoUC` (finalização com completude).
 
 ```java
 @ApplicationScoped

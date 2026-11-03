@@ -16,11 +16,16 @@ import com.example.boleto.domain.exception.TransicaoEstadoInvalidaException;
  * <p>{@code sealed}: o compilador conhece todos os estados, e o {@code switch} em {@link #de}
  * falha a compilação se um novo status for criado sem estado correspondente.
  */
-public abstract sealed class EstadoBoleto permits EstadoEmitido, EstadoNotificado, EstadoPago, EstadoCancelado {
+public abstract sealed class EstadoBoleto permits EstadoEmEdicao, EstadoEmitido, EstadoNotificado, EstadoPago, EstadoCancelado {
 
     public abstract StatusBoleto status();
 
     // ---------- transições ----------
+
+    /** Finaliza a edição: o boleto fica completo, ganha linha digitável e passa a valer. */
+    public EstadoBoleto emitir() {
+        throw acaoNaoPermitida("emitir");
+    }
 
     public EstadoBoleto notificar() {
         throw acaoNaoPermitida("notificar");
@@ -36,8 +41,9 @@ public abstract sealed class EstadoBoleto permits EstadoEmitido, EstadoNotificad
 
     // ---------- ações que não mudam de estado, mas dependem dele ----------
 
-    public void validarAlteracao() {
-        throw acaoNaoPermitida("alterar");
+    /** Salvar qualquer seção (vencimento, itens, destinatários). */
+    public void validarEdicao() {
+        throw acaoNaoPermitida("editar");
     }
 
     public void validarExclusao() {
@@ -58,6 +64,7 @@ public abstract sealed class EstadoBoleto permits EstadoEmitido, EstadoNotificad
     /** Status persistido -> objeto de estado (usado ao reconstituir do banco). */
     public static EstadoBoleto de(StatusBoleto status) {
         return switch (status) {
+            case EM_EDICAO -> EstadoEmEdicao.INSTANCIA;
             case EMITIDO -> EstadoEmitido.INSTANCIA;
             case NOTIFICADO -> EstadoNotificado.INSTANCIA;
             case PAGO -> EstadoPago.INSTANCIA;
@@ -66,7 +73,7 @@ public abstract sealed class EstadoBoleto permits EstadoEmitido, EstadoNotificad
     }
 
     public static EstadoBoleto inicial() {
-        return EstadoEmitido.INSTANCIA;
+        return EstadoEmEdicao.INSTANCIA;
     }
 
     @Override

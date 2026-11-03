@@ -57,11 +57,33 @@ public class Contrato {
     }
 
     public void alterar(SolicitacaoContrato s) {
-        estado.validarAlteracao();            // 409
+        estado.validarEdicao();               // 409
         RegrasContrato.ALTERACAO.validar(s);  // 422
         this.dados = s.dados();
     }
     // getters de leitura; nenhum setter
+}
+```
+
+## Quantos casos de uso?
+
+Um por **intenção** (critério completo na skill `layered-novo-caso-de-uso`, passo 0). Se o agregado
+tem partes (parcelas, beneficiários, documentos) e pode ficar incompleto enquanto é preenchido:
+`CriarContratoUC` (nasce `EM_EDICAO`) → um `Salvar<Secao>ContratoUC` por seção (`PUT` substitui a seção)
+→ `FinalizarEdicaoContratoUC`, que exige completude (conjunto `FINALIZACAO` no catálogo) e muda o estado.
+Partes não ganham repositório nem UC por entidade; o `@Version` fica no agregado.
+
+```java
+public void salvarParcelas(Parcelas novas) {
+    estado.validarEdicao();                     // 409 fora de EM_EDICAO
+    RegrasContrato.PARCELAS.validar(novas);     // 422: regras da SEÇÃO
+    this.parcelas = novas;                      // o contrato pode continuar incompleto
+}
+
+public void finalizarEdicao(CondicoesFinalizacao condicoes) {
+    var proximo = estado.finalizarEdicao();     // 409
+    RegrasContrato.FINALIZACAO.validar(new FinalizacaoContrato(this.parcelas, this.beneficiarios, condicoes)); // 422: COMPLETUDE
+    estado = proximo;
 }
 ```
 

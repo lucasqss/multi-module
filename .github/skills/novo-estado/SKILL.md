@@ -13,7 +13,7 @@ use case. Ele mora nas classes de `src/main/java/com/example/boleto/domain/state
 - `EstadoBoleto` (base `abstract sealed`): toda ação lança `TransicaoEstadoInvalidaException` (409)
   por padrão. Cada estado concreto é `final`, singleton `INSTANCIA`, e sobrescreve **só** o permitido.
 - Transições **retornam** o próximo estado; a entidade faz `estado = estado.acao()`.
-- Ações que não mudam o estado mas dependem dele: `validarAlteracao()`, `validarExclusao()`.
+- Ações que não mudam o estado mas dependem dele: `validarEdicao()`, `validarExclusao()` (só `EM_EDICAO` permite).
 - Consultas: `emAberto()`. O adapter deriva queries delas (não duplique a lista de status).
 - Auto-transição é válida: `EstadoNotificado.notificar()` retorna `this` (reenvio).
 
@@ -47,7 +47,7 @@ use case. Ele mora nas classes de `src/main/java/com/example/boleto/domain/state
 
 - `EstadoBoletoTest`: atualize a tabela `PERMITIDAS` (e `ACOES`, se houver ação nova). Ela testa
   **todas** as combinações (estado × ação), inclusive as proibidas.
-- Atualize `somenteEmitidoPermiteAlterarEExcluir` / `emAberto` se a semântica mudou.
+- Atualize `somenteEmEdicaoPermiteEditarEExcluir` / `emAbertoSoDepoisDeEmitido` se a semântica mudou.
 - `BoletoTest`: o ciclo que passa pelo novo estado e a ordem 409 antes de 422.
 - `BoletoResourceTest`: transição via HTTP e `409` com `TRANSICAO_ESTADO_INVALIDA` quando proibida.
 

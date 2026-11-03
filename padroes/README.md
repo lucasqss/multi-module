@@ -22,7 +22,7 @@ específicas dele ficam em `.github/skills/`; as genéricas, aqui.
 |---|---|
 | `layered-iniciar-projeto` | Criar a base genérica num projeto novo/existente e o "Mapa do projeto" |
 | `layered-novo-agregado-crud` | Novo cadastro/entidade com CRUD completo |
-| `layered-novo-caso-de-uso` | Nova ação de ponta a ponta (REST ou mensageria) |
+| `layered-novo-caso-de-uso` | Decidir se é um caso de uso (critério acima) e criar a ação de ponta a ponta |
 | `layered-nova-regra-de-negocio` | Nova validação de negócio (Specification) |
 | `layered-novo-estado` | Novo status/transição (State) ou primeira máquina de estados |
 | `layered-nova-integracao-externa` | Integração com sistema externo (classe em `adapter/`) |
@@ -54,7 +54,7 @@ específicas dele ficam em `.github/skills/`; as genéricas, aqui.
 
 | Pasta | Para onde vai o conteúdo |
 |---|---|
-| `domain/factory` | Criação = método estático da entidade (`Boleto.emitir`) ou do candidato (`SolicitacaoBoleto.paraEmissao`) |
+| `domain/factory` | Criação = método estático da entidade (`Contrato.criar`) ou de um record de contexto (`CondicoesFinalizacao.de(clock, ...)`) |
 | `domain/model` | Candidato das regras → `specification/<agregado>`; DTO → `application/.../dto` ou `adapter/<sistema>` |
 | `domain/enums` | Status → `state`; enum de valor → `valueobject`; enum usado por um só VO → método do VO |
 | `domain/repository`, `domain/gateway` | Repositório/integração concretos em `adapter/` (sem ports) |
@@ -75,6 +75,41 @@ Resource/Consumer ─▶ UC ─┬─▶ Repository / integração (adapter) ─
 - Entidade nunca chama repositório; spec só lê o candidato; estado só conhece estados.
 - Lógica reaproveitada entre UCs mora na entidade, num VO ou numa spec, nunca num UC compartilhado
   nem numa classe `*Service`/`*Utils` genérica.
+
+## O que é um caso de uso (critério)
+
+**Um caso de uso = uma intenção do usuário (ou de outro sistema) com significado de negócio**,
+executada numa transação. Teste rápido: dá para dizer "o <ator> quer <verbo> <algo>" e a tela ou o
+sistema dispara isso como **uma** ação? Então é um caso de uso.
+
+- **Uma classe, um `executar`, uma transação.** Nunca um UC com vários métodos públicos: isso é um
+  `*Service` disfarçado (vários motivos para mudar, dependências acumuladas, transações misturadas).
+- **Não é um por entidade.** Partes de um agregado (itens, destinatários, parcelas, documentos) não têm
+  UC nem repositório próprios: o UC carrega o agregado, chama o método dele e salva o agregado inteiro.
+- **Não é um por operação técnica** (incluir/alterar/remover item). Seção que a tela edita como um
+  bloco → **um UC por seção**, com `PUT` substituindo a seção inteira.
+- **Separe** em UCs diferentes quando muda: a regra, a permissão, a transição de estado ou o ator/gatilho
+  (usuário × banco × job). **Junte** quando sempre acontecem juntos, com a mesma regra e o mesmo gatilho.
+
+| Situação | Quantos casos de uso | Exemplo |
+|---|---|---|
+| Criar o agregado | 1 — nasce em `EM_EDICAO` se pode ficar incompleto | `CriarContratoUC` |
+| Editar uma seção/parte editada como bloco | 1 por seção (`PUT` substitui a seção) | `SalvarParcelasContratoUC`, `SalvarBeneficiariosContratoUC` |
+| Incluir/remover uma parte que é ação de negócio própria (regras, permissão ou evento próprios) | 1 por ação | `AnexarDocumentoUC` |
+| Finalizar a edição (exige completude) | 1 | `FinalizarEdicaoContratoUC` |
+| Transição de estado / evento de negócio | 1 por transição | `AprovarContratoUC`, `CancelarContratoUC` |
+| Consultar | 1 por consulta | `ConsultarContratoUC`, `ListarContratosUC` |
+| Entidade com vida própria, usada por vários agregados | CRUD próprio; aqui só o id | `Pagador` cadastrado à parte |
+
+### Agregado editado por partes (padrão `EM_EDICAO`)
+
+1. `CriarContratoUC` cria o rascunho em `EM_EDICAO` só com o mínimo.
+2. Um `Salvar<Secao>ContratoUC` por seção; cada um valida **só a seção** (regras de seção no catálogo).
+   O agregado pode continuar incompleto.
+3. `FinalizarEdicaoContratoUC` exige a **completude** (conjunto de regras de finalização no catálogo, sobre o agregado
+   inteiro) e muda o estado. Só a partir daí o agregado "vale" (é cobrável, visível, enviado...).
+4. O estado `EM_EDICAO` permite editar/excluir; os seguintes não (`validarEdicao()` → 409).
+5. `@Version` no agregado: duas edições concorrentes, mesmo de seções diferentes, não se sobrescrevem.
 
 ## Como as skills se adaptam a cada projeto
 

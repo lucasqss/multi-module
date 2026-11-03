@@ -1,13 +1,15 @@
 # pagamento-boleto — CRUD de referência
 
-Simulação do ciclo de vida de um **boleto**: **emissão** (gera a linha digitável), **notificação**
-ao pagador e **recebimento do pagamento** informado pelo banco. Organizado em camadas, com:
+Simulação do ciclo de vida de um **boleto**: **edição por partes** (rascunho que pode ficar incompleto),
+**emissão** (exige completude e gera a linha digitável), **notificação** ao pagador e **recebimento do
+pagamento** informado pelo banco. Organizado em camadas, com:
 
 - **domínio rico** (sem setters, sem anotações de framework);
 - **Specification pattern** para regras de negócio (as regras são fake/hipotéticas);
 - **State pattern** para a máquina de estados do boleto;
 - **exceções específicas** por situação, agrupadas em famílias;
-- **use cases finos**, um por ação, que só orquestram.
+- **use cases finos**, um por intenção do usuário, que só orquestram (critério em
+  ["O que é um caso de uso"](.github/copilot-instructions.md)).
 
 ## Camadas
 
@@ -27,7 +29,7 @@ sem nenhuma dependência de framework nem das outras camadas.
 | `application.boleto` | Um `*UC` por ação: busca fatos, chama o domínio, persiste, devolve DTO. `@Transactional` aqui | domain, adapter |
 | `domain.entity` | `Boleto` (aggregate root) | — |
 | `domain.specification` | Infra genérica: `Specification`, `RegraNegocio`, `ValidadorRegras` | — |
-| `domain.specification.boleto` | Regras concretas, catálogo `RegrasBoleto` e candidatos `SolicitacaoBoleto` (com `paraEmissao`/`paraAlteracao`) e `RecebimentoPagamento` | — |
+| `domain.specification.boleto` | Regras concretas, catálogo `RegrasBoleto` e candidatos por momento: `ItensBoleto`/`DestinatariosDoBoleto` (seções), `EmissaoBoleto` + `CondicoesEmissao` (emissão), `RecebimentoPagamento` | — |
 | `domain.state` | Um estado por classe (`EstadoEmitido`, `EstadoNotificado`...) + enum `StatusBoleto` | — |
 | `domain.valueobject` | `Dinheiro`, `Documento`, `Pagador`, `LinhaDigitavel`, `Pagamento`... (auto-validados) | — |
 | `domain.exception` | Exceções específicas, em quatro famílias | — |
@@ -86,12 +88,12 @@ DomainException (codigo + mensagem)
 
 ```java
 // bloco de construção: só diz sim/não
-record ValorAteSpec(Dinheiro maximo) implements Specification<SolicitacaoBoleto>
+record ValorAteSpec(Dinheiro maximo) implements Specification<EmissaoBoleto>
 
 // regra em classe própria: sim/não + qual exceção lançar
-class VencimentoEmDiaUtilSpec extends RegraNegocio<SolicitacaoBoleto> {
-    public boolean isSatisfiedBy(SolicitacaoBoleto s) { ... }
-    protected VencimentoEmDiaNaoUtilException violacao(SolicitacaoBoleto s) { ... }
+class VencimentoEmDiaUtilSpec extends RegraNegocio<EmissaoBoleto> {
+    public boolean isSatisfiedBy(EmissaoBoleto s) { ... }
+    protected VencimentoEmDiaNaoUtilException violacao(EmissaoBoleto s) { ... }
 }
 
 // regra composta no catálogo
@@ -99,12 +101,17 @@ RegraNegocio.de(
         quando(new PagadorPessoaFisicaSpec()).entao(new ValorAteSpec(LIMITE_PESSOA_FISICA)),
         s -> new LimitePessoaFisicaExcedidoException(LIMITE_PESSOA_FISICA));
 
-// conjuntos (cada um sobre um tipo de candidato)
-EMISSAO     = COMUNS.mais(new LimiteBoletosEmAbertoSpec());   // SolicitacaoBoleto
-ALTERACAO   = COMUNS;                                         // SolicitacaoBoleto
-RECEBIMENTO = ValidadorRegras.de(...);                        // RecebimentoPagamento
+// conjuntos POR MOMENTO (cada um sobre o seu candidato)
+ITENS         = ValidadorRegras.de(...);   // ao salvar a seção de itens      -> ItensBoleto
+DESTINATARIOS = ValidadorRegras.de(...);   // ao salvar a seção de destinat.  -> DestinatariosDoBoleto
+EMISSAO       = ValidadorRegras.de(        // ao finalizar: COMPLETUDE        -> EmissaoBoleto
+        new BoletoComItensSpec(), VALOR_ACIMA_DO_MINIMO, ..., new LimiteBoletosEmAbertoSpec());
+RECEBIMENTO   = ValidadorRegras.de(...);   // pagamento informado pelo banco  -> RecebimentoPagamento
 ```
 
+- **Regra de seção × regra de completude:** salvar uma seção só valida a própria seção; o boleto pode
+  continuar incompleto em `EM_EDICAO`. A completude (ter itens, valor total dentro dos limites,
+  vencimento válido no dia) só é exigida na emissão.
 - Specs são **funções puras** sobre um candidato. Fatos que exigem I/O
   (ex.: "quantos boletos em aberto o pagador tem?") são consultados pelo use case e **entregues** no candidato.
 - `ValidadorRegras` avalia na ordem do catálogo e **para na primeira regra violada** (fail-fast).
@@ -124,16 +131,16 @@ não injete dependência na spec: o use case consulta o dado e o entrega no cand
 ## State pattern
 
 ```
-           notificar             receber pagamento
-  EMITIDO ───────────▶ NOTIFICADO ─────────────────▶ PAGO
-     │  ╰──────────── receber pagamento ─────────────▲
-     │                     │  ↺ notificar (reenvio)
-     └──── cancelar ───────┴──── cancelar ────▶ CANCELADO
+  EM_EDICAO ──emitir──▶ EMITIDO ──notificar──▶ NOTIFICADO ──receber pagamento──▶ PAGO
+  (rascunho:              │  ╰───────── receber pagamento ─────────────────────────▲
+   seções editáveis,      │                    │ ↺ notificar (reenvio)
+   pode estar incompleto) └──── cancelar ──────┴──── cancelar ────▶ CANCELADO
 ```
 
-| Estado | Ações permitidas | Alterar/Excluir | Em aberto |
+| Estado | Ações permitidas | Editar seções/Excluir | Em aberto |
 |---|---|---|---|
-| EMITIDO | notificar, receber pagamento, cancelar | sim | sim |
+| EM_EDICAO | emitir | sim | não (não é cobrável) |
+| EMITIDO | notificar, receber pagamento, cancelar | não | sim |
 | NOTIFICADO | notificar (reenvio), receber pagamento, cancelar | não | sim |
 | PAGO | — | não | não |
 | CANCELADO | — | não | não |
@@ -149,45 +156,75 @@ não injete dependência na spec: o use case consulta o dado e o entrega no cand
 inclua-a no `permits` e no `switch` de `de()`, sobrescreva as transições que levam a ele
 e atualize a tabela em `EstadoBoletoTest`.
 
+## Edição por partes (um caso de uso por intenção)
+
+O boleto tem **partes** (itens e destinatários extras da notificação) que podem ser preenchidas em
+qualquer ordem, em requisições separadas, enquanto ele está em `EM_EDICAO`:
+
+| Intenção do usuário | Caso de uso | Endpoint | Regras |
+|---|---|---|---|
+| Começar um boleto | `CriarBoletoUC` | `POST /boletos` | só formato (pagador, vencimento) |
+| Mudar o vencimento | `AlterarBoletoUC` | `PUT /boletos/{id}` | — |
+| Salvar os itens | `SalvarItensBoletoUC` | `PUT /boletos/{id}/itens` | seção `ITENS` |
+| Salvar quem mais recebe o aviso | `SalvarDestinatariosBoletoUC` | `PUT /boletos/{id}/destinatarios` | seção `DESTINATARIOS` |
+| Finalizar e emitir | `EmitirBoletoUC` | `POST /boletos/{id}/emissao` | `EMISSAO` (completude) |
+
+- **Não** há um UC por item, nem por operação (incluir/alterar/remover item), nem um UC com vários
+  métodos: cada **seção** é salva inteira (`PUT`), porque é assim que o usuário a edita.
+- Itens e destinatários são **partes do agregado**: sem repositório nem UC próprios. O UC carrega o
+  `Boleto`, chama `boleto.salvarItens(...)` e salva o boleto inteiro (`@ElementCollection` no adapter).
+- O `@Version` está no boleto: duas edições concorrentes, mesmo de seções diferentes, não se sobrescrevem.
+- O valor do boleto é a **soma dos itens**; a linha digitável só existe depois da emissão.
+
 ## Notificação
 
 `NotificarBoletoUC` (1) valida a transição no domínio, (2) salva, o que detecta concorrência antes de
 qualquer efeito externo, e (3) só então chama o `NotificadorBoleto` (injetado direto do adapter),
-que só escreve no log e guarda o que "enviou".
+que avisa o pagador e os destinatários extras: só escreve no log e guarda o que "enviou".
 Em produção, a janela "enviou, mas o commit falhou" se resolve com o padrão **Outbox**.
 
 ## API
 
 | Método | Caminho | Ação |
 |---|---|---|
-| POST | `/api/v1/boletos` | emitir |
+| POST | `/api/v1/boletos` | cria o rascunho (`EM_EDICAO`): `{"pagador": {...}, "dataVencimento": "..."}` |
 | GET | `/api/v1/boletos?documentoPagador=&status=&pagina=0&tamanho=20` | listar |
 | GET | `/api/v1/boletos/{id}` | consultar |
-| PUT | `/api/v1/boletos/{id}` | alterar valor/vencimento (só EMITIDO; regera a linha digitável) |
-| DELETE | `/api/v1/boletos/{id}` | excluir (só EMITIDO; depois disso, cancele) |
-| POST | `/api/v1/boletos/{id}/notificacao` | simula o envio (ou reenvio) da notificação ao pagador |
+| PUT | `/api/v1/boletos/{id}` | alterar o vencimento (só `EM_EDICAO`) |
+| PUT | `/api/v1/boletos/{id}/itens` | salvar a seção de itens: `{"itens": [{"descricao": "...", "valor": 500.00}]}` (só `EM_EDICAO`) |
+| PUT | `/api/v1/boletos/{id}/destinatarios` | salvar destinatários extras: `{"emails": ["..."]}` (só `EM_EDICAO`) |
+| DELETE | `/api/v1/boletos/{id}` | excluir o rascunho (só `EM_EDICAO`; depois de emitido, cancele) |
+| POST | `/api/v1/boletos/{id}/emissao` | finaliza a edição: exige completude e gera a linha digitável |
+| POST | `/api/v1/boletos/{id}/notificacao` | simula o envio (ou reenvio) da notificação ao pagador e destinatários |
 | POST | `/api/v1/boletos/{id}/pagamento` | simula o banco avisando o pagamento: `{"valorPago": 500.00, "dataPagamento": "2026-11-10"}` |
 | POST | `/api/v1/boletos/{id}/cancelamento` | cancela: `{"motivo": "..."}` |
 
 ```bash
 mvn quarkus:dev   # http://localhost:8081
 
-curl -X POST localhost:8081/api/v1/boletos -H 'Content-Type: application/json' -d '{
-  "pagador": {"nome": "Maria Silva", "documento": "12345678901", "email": "maria@example.com"},
-  "valor": 500.00, "dataVencimento": "2026-11-10"}'
+B=localhost:8081/api/v1/boletos; J='Content-Type: application/json'
+ID=$(curl -s -X POST $B -H "$J" -d '{"pagador": {"nome": "Maria Silva", "documento": "12345678901",
+  "email": "maria@example.com"}, "dataVencimento": "2026-11-10"}' | jq -r .id)
+curl -X PUT  $B/$ID/itens -H "$J" -d '{"itens": [{"descricao": "Mensalidade", "valor": 500.00}]}'
+curl -X POST $B/$ID/emissao
 ```
 
 ## Regras fake implementadas
 
 | Código (exceção `<Nome>Exception`) | Quando | Regra |
 |---|---|---|
-| `VALOR_ABAIXO_DO_MINIMO` | emissão/alteração | valor ≥ R$ 5,00 |
-| `VALOR_ACIMA_DO_MAXIMO` | emissão/alteração | valor ≤ R$ 100.000,00 |
-| `LIMITE_PESSOA_FISICA_EXCEDIDO` | emissão/alteração | pagador com CPF: valor ≤ R$ 10.000,00 |
-| `VENCIMENTO_NO_PASSADO` | emissão/alteração | vencimento ≥ hoje |
-| `VENCIMENTO_ALEM_DO_PRAZO` | emissão/alteração | vencimento ≤ hoje + N dias (`boleto.prazo-maximo-vencimento-dias`) |
-| `VENCIMENTO_EM_DIA_NAO_UTIL` | emissão/alteração | vencimento não cai no fim de semana |
-| `LIMITE_BOLETOS_EM_ABERTO_EXCEDIDO` | emissão | no máximo 3 boletos em aberto por pagador |
+| `QUANTIDADE_MAXIMA_ITENS_EXCEDIDA` | seção itens | no máximo 20 itens |
+| `ITEM_COM_VALOR_ZERADO` | seção itens | todo item com valor > 0 |
+| `QUANTIDADE_MAXIMA_DESTINATARIOS_EXCEDIDA` | seção destinatários | no máximo 5 e-mails extras |
+| `DESTINATARIO_REPETIDO` | seção destinatários | sem repetidos nem o e-mail do pagador |
+| `BOLETO_SEM_ITENS` | emissão (completude) | ao menos um item |
+| `VALOR_ABAIXO_DO_MINIMO` | emissão | valor total ≥ R$ 5,00 |
+| `VALOR_ACIMA_DO_MAXIMO` | emissão | valor total ≤ R$ 100.000,00 |
+| `LIMITE_PESSOA_FISICA_EXCEDIDO` | emissão | pagador com CPF: valor total ≤ R$ 10.000,00 |
+| `VENCIMENTO_NO_PASSADO` | emissão | vencimento ≥ hoje |
+| `VENCIMENTO_ALEM_DO_PRAZO` | emissão | vencimento ≤ hoje + N dias (`boleto.prazo-maximo-vencimento-dias`) |
+| `VENCIMENTO_EM_DIA_NAO_UTIL` | emissão | vencimento não cai no fim de semana |
+| `LIMITE_BOLETOS_EM_ABERTO_EXCEDIDO` | emissão | no máximo 3 boletos em aberto (emitidos/notificados) por pagador; rascunhos não contam |
 | `DATA_PAGAMENTO_FUTURA` | recebimento | data do pagamento ≤ hoje |
 | `BOLETO_VENCIDO` | recebimento | data do pagamento ≤ vencimento (sem juros/multa) |
 | `VALOR_PAGO_DIVERGENTE` | recebimento | valor pago = valor do boleto |
@@ -201,10 +238,10 @@ A linha digitável também é fake (47 dígitos, não segue o padrão FEBRABAN) 
 | `SpecificationTest` | and/or/not, `quando().entao()`, fail-fast do validador | não |
 | `RegrasBoletoTest` | cada regra lança sua exceção, a partir de um cenário válido (`Cenarios`) | não |
 | `EstadoBoletoTest` | a máquina de estados inteira como tabela | não |
-| `BoletoTest` | a entidade aplica estado (409) antes das regras (422); linha digitável | não |
-| `SolicitacaoBoletoTest` | "hoje" no fuso do negócio, não no do servidor | não |
-| `ConcorrenciaTest` | lock otimista vira `AlteracaoConcorrenteException` | sim |
-| `BoletoResourceTest` | CRUD + ciclo emitir/notificar/pagar + códigos HTTP + formato único de erro | sim |
+| `BoletoTest` | edição por partes, completude na emissão, estado (409) antes das regras (422), linha digitável | não |
+| `CondicoesEmissaoTest` | "hoje" no fuso do negócio, não no do servidor | não |
+| `ConcorrenciaTest` | edições concorrentes de seções diferentes: lock otimista vira `AlteracaoConcorrenteException` | sim |
+| `BoletoResourceTest` | edição por partes até a emissão, ciclo notificar/pagar, códigos HTTP, formato único de erro | sim |
 
 ## Assistentes de código (GitHub Copilot)
 

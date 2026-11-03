@@ -55,7 +55,7 @@ com.example.boleto
 
 | Pasta | Para onde vai o conteúdo |
 |---|---|
-| `domain/factory` | Criação = método estático da entidade (`Boleto.emitir`) ou do candidato (`SolicitacaoBoleto.paraEmissao`) |
+| `domain/factory` | Criação = método estático da entidade (`Boleto.criar`) ou de um record de contexto (`CondicoesEmissao.de(clock, ...)`) |
 | `domain/model` | Candidato das regras → `specification/<agregado>`; DTO → `application/.../dto` ou `adapter/<sistema>` |
 | `domain/enums` | Status → `state`; enum de valor → `valueobject`; enum usado por um só VO → método do VO |
 | `domain/repository`, `domain/gateway` | Repositório/integração concretos em `adapter/` (sem ports) |
@@ -82,11 +82,11 @@ Resource/Consumer ─▶ UC ─┬─▶ Repository / integração (adapter) ─
 1. **Domínio rico, nunca anêmico.** Entidades não têm setters públicos nem construtor público.
    Estado muda só por métodos com nome de negócio (`emitir`, `cancelar`, `receberPagamento`).
    Criação por fábrica estática que valida (`Boleto.emitir`); reconstrução do banco por `reconstituir`.
-2. **Use case orquestra, não decide.** Um `*UC` por ação: busca fatos nos repositórios/integrações, delega a decisão
+2. **Use case orquestra, não decide.** Um `*UC` por intenção do usuário (ver "O que é um caso de uso"): busca fatos nos repositórios/integrações, delega a decisão
    ao domínio, persiste, devolve DTO. **Nenhum `if` de regra de negócio em use case.**
 3. **Regras de negócio = Specification pattern.** Cada regra é uma `RegraNegocio<T>` (ou composição
    de `Specification<T>`) registrada no catálogo `RegrasBoleto`. Specs são **puras**: fatos que exigem
-   I/O são consultados pelo use case e entregues no candidato (`SolicitacaoBoleto`, `RecebimentoPagamento`).
+   I/O são consultados pelo use case e entregues no candidato (ex.: `CondicoesEmissao` dentro de `EmissaoBoleto`).
 4. **Máquina de estados = State pattern.** Uma classe por estado em `domain.state`, `sealed`,
    que **proíbe tudo por padrão**. Transições retornam o próximo estado. Nunca use `if (status == X)`.
 5. **Exceções específicas.** Uma classe por situação, estendendo uma das famílias:
@@ -102,6 +102,41 @@ Resource/Consumer ─▶ UC ─┬─▶ Repository / integração (adapter) ─
    (application), entidade de domínio, `*JpaEntity` (adapter). A entidade de domínio nunca sai da application.
 9. **Tempo injetado.** Nunca `LocalDate.now()`/`Instant.now()` sem `Clock`. O `Clock` usa o fuso do negócio.
 10. **Ordem dentro da entidade:** 1º o estado valida a ação (409) → 2º as specs validam os dados (422) → 3º muda o estado.
+
+## O que é um caso de uso (critério)
+
+**Um caso de uso = uma intenção do usuário (ou de outro sistema) com significado de negócio**,
+executada numa transação. Teste rápido: dá para dizer "o <ator> quer <verbo> <algo>" e a tela ou o
+sistema dispara isso como **uma** ação? Então é um caso de uso.
+
+- **Uma classe, um `executar`, uma transação.** Nunca um UC com vários métodos públicos: isso é um
+  `*Service` disfarçado (vários motivos para mudar, dependências acumuladas, transações misturadas).
+- **Não é um por entidade.** Partes de um agregado (itens, destinatários, parcelas, documentos) não têm
+  UC nem repositório próprios: o UC carrega o agregado, chama o método dele e salva o agregado inteiro.
+- **Não é um por operação técnica** (incluir/alterar/remover item). Seção que a tela edita como um
+  bloco → **um UC por seção**, com `PUT` substituindo a seção inteira.
+- **Separe** em UCs diferentes quando muda: a regra, a permissão, a transição de estado ou o ator/gatilho
+  (usuário × banco × job). **Junte** quando sempre acontecem juntos, com a mesma regra e o mesmo gatilho.
+
+| Situação | Quantos casos de uso | Exemplo |
+|---|---|---|
+| Criar o agregado | 1 — nasce em `EM_EDICAO` se pode ficar incompleto | `CriarBoletoUC` |
+| Editar uma seção/parte editada como bloco | 1 por seção (`PUT` substitui a seção) | `SalvarItensBoletoUC`, `SalvarDestinatariosBoletoUC`, `AlterarBoletoUC` (vencimento) |
+| Incluir/remover uma parte que é ação de negócio própria (regras, permissão ou evento próprios) | 1 por ação | `AnexarDocumentoUC` |
+| Finalizar a edição (exige completude) | 1 | `EmitirBoletoUC` |
+| Transição de estado / evento de negócio | 1 por transição | `NotificarBoletoUC`, `ReceberPagamentoBoletoUC`, `CancelarBoletoUC` |
+| Consultar | 1 por consulta | `ConsultarBoletoUC`, `ListarBoletosUC` |
+| Entidade com vida própria, usada por vários agregados | CRUD próprio; aqui só o id | `Pagador` cadastrado à parte |
+
+### Agregado editado por partes (padrão `EM_EDICAO`)
+
+1. `CriarBoletoUC` cria o rascunho em `EM_EDICAO` só com o mínimo.
+2. Um `Salvar<Secao>BoletoUC` por seção; cada um valida **só a seção** (regras de seção no catálogo).
+   O agregado pode continuar incompleto.
+3. `EmitirBoletoUC` exige a **completude** (conjunto de regras de finalização no catálogo, sobre o agregado
+   inteiro) e muda o estado. Só a partir daí o agregado "vale" (é cobrável, visível, enviado...).
+4. O estado `EM_EDICAO` permite editar/excluir; os seguintes não (`validarEdicao()` → 409).
+5. `@Version` no agregado: duas edições concorrentes, mesmo de seções diferentes, não se sobrescrevem.
 
 ## Comandos
 
@@ -135,8 +170,9 @@ acima, que apontam as classes-modelo concretas.
 | Entrypoints | `entrypoint/api/v1` (REST) |
 | Agregados | `Boleto` (`domain/entity/Boleto`) |
 | Base de specs | `domain/specification/Specification`, `RegraNegocio`, `ValidadorRegras` |
-| Catálogo de regras | `RegrasBoleto` — conjuntos `COMUNS`, `EMISSAO`, `ALTERACAO`, `RECEBIMENTO` |
-| Candidatos das regras | `specification/boleto/SolicitacaoBoleto` (`paraEmissao`/`paraAlteracao`), `RecebimentoPagamento` (montado pela entidade) |
+| Catálogo de regras | `RegrasBoleto` — por momento: seções `ITENS`, `DESTINATARIOS`; finalização `EMISSAO`; `RECEBIMENTO` |
+| Candidatos das regras | `ItensBoleto`, `DestinatariosDoBoleto` (seções); `EmissaoBoleto` + `CondicoesEmissao.de(clock, ...)` (emissão); `RecebimentoPagamento` — montados pela entidade |
+| Agregado editado por partes | `Boleto`: `EM_EDICAO` → seções (`SalvarItensBoletoUC`, `SalvarDestinatariosBoletoUC`) → `EmitirBoletoUC` |
 | Máquina de estados | `domain/state`: `EstadoBoleto`, estados concretos e enum `StatusBoleto` |
 | Repositórios (injetados nos UCs) | `adapter/database/BoletoRepository` (Panache, fala domínio) |
 | Integrações externas (injetadas nos UCs) | `adapter/notificacao/NotificadorBoleto` |

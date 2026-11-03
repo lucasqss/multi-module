@@ -13,7 +13,7 @@ Regra de negócio **nunca** vai em use case, resource ou adapter. Siga os passos
 |---|---|
 | É só formato do dado (tamanho, dígitos, casas decimais)? | Não é spec: valide no **value object** com exceção da família `DadoInvalidoException` (400). |
 | Depende do status do boleto ("não pode X se já pago")? | Não é spec: é **State** → skill `novo-estado`. |
-| Sobre que dados ela decide? | Emissão/alteração → candidato `SolicitacaoBoleto`. Recebimento → `RecebimentoPagamento`. Outro momento → crie um candidato novo (`record`) em `domain/specification/boleto`. |
+| Em que MOMENTO ela vale? | Ao salvar uma seção → candidato da seção (`ItensBoleto`, `DestinatariosDoBoleto`), conjunto `ITENS`/`DESTINATARIOS`. É completude ou depende do boleto inteiro/do dia → `EmissaoBoleto`, conjunto `EMISSAO`. Pagamento → `RecebimentoPagamento`. Outro momento → crie um candidato (`record`) em `domain/specification/boleto`. |
 | Precisa de dado externo (banco, outro sistema, feriados)? | O **use case** consulta e o dado entra como campo do candidato. A spec continua pura. |
 
 ## 2. Crie a exceção específica
@@ -39,18 +39,18 @@ public class ValorAcimaDoLimiteDiarioException extends RegraNegocioException {
 Modelo: `VencimentoEmDiaUtilSpec`, `LimiteBoletosEmAbertoSpec`.
 
 ```java
-// Exemplo HIPOTÉTICO: usa um fato novo (totalEmitidoHojeDoPagador, ver passo 5)
+// Exemplo HIPOTÉTICO: usa um fato novo em CondicoesEmissao (totalEmitidoHojeDoPagador, ver passo 5)
 // e um método somar(...) que ainda não existe em Dinheiro.
 /** <Regra em uma frase.> */
-public class LimiteDiarioSpec extends RegraNegocio<SolicitacaoBoleto> {
+public class LimiteDiarioSpec extends RegraNegocio<EmissaoBoleto> {
 
     @Override
-    public boolean isSatisfiedBy(SolicitacaoBoleto s) {
-        return !s.totalEmitidoHojeDoPagador().somar(s.dados().valor()).maiorQue(LIMITE);
+    public boolean isSatisfiedBy(EmissaoBoleto s) {
+        return !s.condicoes().totalEmitidoHojeDoPagador().somar(s.valor()).maiorQue(LIMITE);
     }
 
     @Override
-    protected ValorAcimaDoLimiteDiarioException violacao(SolicitacaoBoleto s) {
+    protected ValorAcimaDoLimiteDiarioException violacao(EmissaoBoleto s) {
         return new ValorAcimaDoLimiteDiarioException(LIMITE);
     }
 }
@@ -60,7 +60,7 @@ public class LimiteDiarioSpec extends RegraNegocio<SolicitacaoBoleto> {
 (`ValorAteSpec`, `ValorMinimoSpec`, `PagadorPessoaFisicaSpec`). Crie blocos novos se preciso.
 
 ```java
-public static final RegraNegocio<SolicitacaoBoleto> LIMITE_PESSOA_FISICA_RESPEITADO = RegraNegocio.de(
+public static final RegraNegocio<EmissaoBoleto> LIMITE_PESSOA_FISICA_RESPEITADO = RegraNegocio.de(
         quando(new PagadorPessoaFisicaSpec()).entao(new ValorAteSpec(LIMITE_PESSOA_FISICA)),
         s -> new LimitePessoaFisicaExcedidoException(LIMITE_PESSOA_FISICA));
 ```
@@ -70,15 +70,15 @@ Regras da spec: **pura** (sem I/O, `Clock`, injeção, `now()`); só lê o candi
 ## 4. Registre no catálogo
 
 Em `domain/specification/boleto/RegrasBoleto.java`, adicione ao conjunto certo:
-`COMUNS` (emissão e alteração), `EMISSAO` (só emissão), `ALTERACAO`, `RECEBIMENTO`.
+`ITENS` e `DESTINATARIOS` (a cada salvamento de seção), `EMISSAO` (completude, ao finalizar), `RECEBIMENTO`.
 **A posição importa**: é fail-fast, a primeira regra violada é a que o cliente recebe. Regras mais
 fundamentais (limites de valor) vêm antes das de detalhe.
 
 ## 5. Se a regra precisa de um fato novo
 
-1. Adicione o campo ao candidato (`SolicitacaoBoleto`) e aos métodos `paraEmissao`/`paraAlteracao`.
+1. Adicione o campo a `CondicoesEmissao` (e ao `CondicoesEmissao.de(...)`).
 2. Adicione a consulta em `adapter/database/BoletoRepository` (devolvendo tipo de domínio ou primitivo).
-3. No use case, consulte e passe para `SolicitacaoBoleto.para<Momento>(...)` (modelo: `contarEmAbertoPorPagador` em `EmitirBoletoUC`).
+3. No use case, consulte e passe para `CondicoesEmissao.de(...)` (modelo: `contarEmAbertoPorPagador` em `EmitirBoletoUC`).
 4. Atualize o builder de teste `Cenarios`.
 
 ## 6. Testes

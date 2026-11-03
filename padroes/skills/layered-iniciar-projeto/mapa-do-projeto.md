@@ -8,8 +8,9 @@
 | Entrypoints | `entrypoint/api/v1` (REST), `entrypoint/iib/v1` (mensageria) |
 | Agregados | `Contrato` (`domain/entity/Contrato`) |
 | Base de specs | `domain/specification/Specification`, `RegraNegocio`, `ValidadorRegras` |
-| Catálogo de regras | `RegrasContrato` — conjuntos `COMUNS`, `CRIACAO`, `ALTERACAO` |
-| Candidatos das regras | `domain/specification/contrato/SolicitacaoContrato` (`paraCriacao`/`paraAlteracao`) |
+| Catálogo de regras | `RegrasContrato` — por momento: seções `PARCELAS`, `BENEFICIARIOS`; finalização `FINALIZACAO` |
+| Candidatos das regras | `domain/specification/contrato/`: `Parcelas` (seção), `FinalizacaoContrato` + `CondicoesFinalizacao.de(clock, ...)` |
+| Agregado editado por partes | `Contrato`: `EM_EDICAO` → `Salvar<Secao>ContratoUC` → `FinalizarEdicaoContratoUC` |
 | Máquina de estados | `domain/state`: `EstadoContrato`, estados concretos e enum `StatusContrato` |
 | Repositórios (injetados nos UCs) | `adapter/database/ContratoRepository` (Panache, fala domínio) |
 | Integrações externas (injetadas nos UCs) | `adapter/<sigla-do-sistema>/<Nome>` |

@@ -1,10 +1,15 @@
 package com.example.boleto.domain.specification;
 
 import com.example.boleto.domain.Cenarios;
+import com.example.boleto.domain.exception.BoletoSemItensException;
 import com.example.boleto.domain.exception.BoletoVencidoException;
 import com.example.boleto.domain.exception.DataPagamentoFuturaException;
+import com.example.boleto.domain.exception.DestinatarioRepetidoException;
+import com.example.boleto.domain.exception.ItemComValorZeradoException;
 import com.example.boleto.domain.exception.LimiteBoletosEmAbertoExcedidoException;
 import com.example.boleto.domain.exception.LimitePessoaFisicaExcedidoException;
+import com.example.boleto.domain.exception.QuantidadeMaximaDestinatariosExcedidaException;
+import com.example.boleto.domain.exception.QuantidadeMaximaItensExcedidaException;
 import com.example.boleto.domain.exception.RegraNegocioException;
 import com.example.boleto.domain.exception.ValorAbaixoDoMinimoException;
 import com.example.boleto.domain.exception.ValorAcimaDoMaximoException;
@@ -12,87 +17,155 @@ import com.example.boleto.domain.exception.ValorPagoDivergenteException;
 import com.example.boleto.domain.exception.VencimentoAlemDoPrazoException;
 import com.example.boleto.domain.exception.VencimentoEmDiaNaoUtilException;
 import com.example.boleto.domain.exception.VencimentoNoPassadoException;
+import com.example.boleto.domain.specification.boleto.DestinatariosDoBoleto;
 import com.example.boleto.domain.specification.boleto.RecebimentoPagamento;
 import com.example.boleto.domain.specification.boleto.RegrasBoleto;
+import com.example.boleto.domain.valueobject.Destinatarios;
 import com.example.boleto.domain.valueobject.Dinheiro;
+import com.example.boleto.domain.valueobject.Email;
+import com.example.boleto.domain.valueobject.ItemBoleto;
+import com.example.boleto.domain.valueobject.ItensBoleto;
 import com.example.boleto.domain.valueobject.Pagamento;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.IntStream;
 
 import static com.example.boleto.domain.Cenarios.CNPJ;
+import static com.example.boleto.domain.Cenarios.EMAIL_PAGADOR;
 import static com.example.boleto.domain.Cenarios.HOJE;
-import static com.example.boleto.domain.Cenarios.solicitacao;
+import static com.example.boleto.domain.Cenarios.boleto;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Cada regra testada isoladamente: parte-se de um cenário válido, quebra-se exatamente uma coisa
- * e verifica-se a exceção ESPECÍFICA esperada.
+ * e verifica-se a exceção ESPECÍFICA esperada. Um @Nested por momento do catálogo.
  */
 class RegrasBoletoTest {
+
+    @Nested
+    class SecaoItens {
+
+        private ItensBoleto itens(int quantidade, String valor) {
+            return new ItensBoleto(IntStream.range(0, quantidade)
+                    .mapToObj(i -> new ItemBoleto("Item " + i, Dinheiro.de(valor))).toList());
+        }
+
+        @Test
+        void validos() {
+            assertDoesNotThrow(() -> RegrasBoleto.ITENS.validar(itens(20, "10.00")));
+        }
+
+        @Test
+        void secaoVaziaEhPermitidaDuranteAEdicao() {
+            assertDoesNotThrow(() -> RegrasBoleto.ITENS.validar(ItensBoleto.VAZIO));
+        }
+
+        @Test
+        void quantidadeMaxima() {
+            assertThrows(QuantidadeMaximaItensExcedidaException.class, () -> RegrasBoleto.ITENS.validar(itens(21, "10.00")));
+        }
+
+        @Test
+        void itemComValorZerado() {
+            assertThrows(ItemComValorZeradoException.class, () -> RegrasBoleto.ITENS.validar(itens(1, "0")));
+        }
+    }
+
+    @Nested
+    class SecaoDestinatarios {
+
+        private DestinatariosDoBoleto destinatarios(String... emails) {
+            return new DestinatariosDoBoleto(boleto().pagador(),
+                    new Destinatarios(List.of(emails).stream().map(Email::new).toList()));
+        }
+
+        @Test
+        void validos() {
+            assertDoesNotThrow(() -> RegrasBoleto.DESTINATARIOS.validar(destinatarios("a@x.com", "b@x.com")));
+        }
+
+        @Test
+        void quantidadeMaxima() {
+            assertThrows(QuantidadeMaximaDestinatariosExcedidaException.class, () -> RegrasBoleto.DESTINATARIOS
+                    .validar(destinatarios("a@x.com", "b@x.com", "c@x.com", "d@x.com", "e@x.com", "f@x.com")));
+        }
+
+        @Test
+        void repetidoOuIgualAoPagador() {
+            assertThrows(DestinatarioRepetidoException.class,
+                    () -> RegrasBoleto.DESTINATARIOS.validar(destinatarios("a@x.com", "A@x.com")));
+            assertThrows(DestinatarioRepetidoException.class,
+                    () -> RegrasBoleto.DESTINATARIOS.validar(destinatarios(EMAIL_PAGADOR)));
+        }
+    }
 
     @Nested
     class Emissao {
 
         private void assertViola(Class<? extends RegraNegocioException> esperada, Cenarios cenario) {
-            assertThrows(esperada, () -> RegrasBoleto.EMISSAO.validar(cenario.build()));
+            assertThrows(esperada, () -> RegrasBoleto.EMISSAO.validar(cenario.emissao()));
         }
 
         private void assertValido(Cenarios cenario) {
-            assertDoesNotThrow(() -> RegrasBoleto.EMISSAO.validar(cenario.build()));
+            assertDoesNotThrow(() -> RegrasBoleto.EMISSAO.validar(cenario.emissao()));
         }
 
         @Test
         void cenarioPadraoEhValido() {
-            assertValido(solicitacao());
+            assertValido(boleto());
+        }
+
+        @Test
+        void completudeExigeAoMenosUmItem() {
+            assertViola(BoletoSemItensException.class, boleto().semItens());
         }
 
         @Test
         void valorMinimo() {
-            assertViola(ValorAbaixoDoMinimoException.class, solicitacao().valor("4.99"));
-            assertValido(solicitacao().valor("5.00"));
+            assertViola(ValorAbaixoDoMinimoException.class, boleto().valor("4.99"));
+            assertValido(boleto().valor("5.00"));
         }
 
         @Test
         void valorMaximo() {
-            assertViola(ValorAcimaDoMaximoException.class, solicitacao().documento(CNPJ).valor("100000.01"));
+            assertViola(ValorAcimaDoMaximoException.class, boleto().documento(CNPJ).valor("100000.01"));
         }
 
         @Test
         void limiteDePessoaFisicaSoValeParaCpf() {
-            assertViola(LimitePessoaFisicaExcedidoException.class, solicitacao().valor("10000.01"));
-            assertValido(solicitacao().documento(CNPJ).valor("10000.01"));
+            assertViola(LimitePessoaFisicaExcedidoException.class, boleto().valor("10000.01"));
+            assertValido(boleto().documento(CNPJ).valor("10000.01"));
         }
 
         @Test
         void vencimentoNoPassado() {
-            assertViola(VencimentoNoPassadoException.class, solicitacao().vencimento(HOJE.minusDays(1)));
+            assertViola(VencimentoNoPassadoException.class, boleto().vencimento(HOJE.minusDays(1)));
         }
 
         @Test
         void vencimentoAlemDoPrazo() {
-            assertViola(VencimentoAlemDoPrazoException.class, solicitacao().vencimento(HOJE.plusDays(62))); // segunda
+            assertViola(VencimentoAlemDoPrazoException.class, boleto().vencimento(HOJE.plusDays(62))); // segunda
         }
 
         @Test
         void vencimentoNoFimDeSemana() {
-            assertViola(VencimentoEmDiaNaoUtilException.class, solicitacao().vencimento(HOJE.plusDays(4))); // sábado
+            assertViola(VencimentoEmDiaNaoUtilException.class, boleto().vencimento(HOJE.plusDays(4))); // sábado
         }
 
         @Test
-        void limiteDeBoletosEmAbertoSoBloqueiaEmissao() {
-            var cenario = solicitacao().boletosEmAberto(3);
-            assertViola(LimiteBoletosEmAbertoExcedidoException.class, cenario);
-            assertDoesNotThrow(() -> RegrasBoleto.ALTERACAO.validar(cenario.build()));
-            assertValido(solicitacao().boletosEmAberto(2));
+        void limiteDeBoletosEmAberto() {
+            assertViola(LimiteBoletosEmAbertoExcedidoException.class, boleto().boletosEmAberto(3));
+            assertValido(boleto().boletosEmAberto(2));
         }
 
         @Test
         void ordemDoCatalogoDefineQualViolacaoAparece() {
-            // valor abaixo do mínimo E vencimento no passado: a regra de valor vem antes no catálogo
-            assertViola(ValorAbaixoDoMinimoException.class, solicitacao().valor("1.00").vencimento(HOJE.minusDays(1)));
+            // sem itens E vencimento no passado: completude vem antes no catálogo
+            assertViola(BoletoSemItensException.class, boleto().semItens().vencimento(HOJE.minusDays(1)));
         }
     }
 

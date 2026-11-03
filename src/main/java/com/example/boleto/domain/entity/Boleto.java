@@ -1,13 +1,16 @@
 package com.example.boleto.domain.entity;
 
+import com.example.boleto.domain.specification.boleto.CondicoesEmissao;
+import com.example.boleto.domain.specification.boleto.DestinatariosDoBoleto;
+import com.example.boleto.domain.specification.boleto.EmissaoBoleto;
 import com.example.boleto.domain.specification.boleto.RecebimentoPagamento;
 import com.example.boleto.domain.specification.boleto.RegrasBoleto;
-import com.example.boleto.domain.specification.boleto.SolicitacaoBoleto;
 import com.example.boleto.domain.state.EstadoBoleto;
 import com.example.boleto.domain.state.StatusBoleto;
 import com.example.boleto.domain.valueobject.BoletoId;
-import com.example.boleto.domain.valueobject.DadosBoleto;
+import com.example.boleto.domain.valueobject.Destinatarios;
 import com.example.boleto.domain.valueobject.Dinheiro;
+import com.example.boleto.domain.valueobject.ItensBoleto;
 import com.example.boleto.domain.valueobject.LinhaDigitavel;
 import com.example.boleto.domain.valueobject.Motivo;
 import com.example.boleto.domain.valueobject.Pagador;
@@ -19,7 +22,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Aggregate root do boleto.
+ * Aggregate root do boleto. Itens e destinatários são PARTES dele: não têm repositório nem
+ * caso de uso próprios; toda mudança passa por aqui, que é quem garante as regras do conjunto.
  *
  * <p>Domínio RICO:
  * <ul>
@@ -27,8 +31,9 @@ import java.util.Optional;
  *   <li>Regras de negócio: delegadas às specifications ({@link RegrasBoleto}).</li>
  *   <li>Máquina de estados: delegada ao State pattern ({@link EstadoBoleto}).</li>
  * </ul>
- * A entidade é o ponto que GARANTE que ambas sejam aplicadas: não há como emitir, alterar ou
- * receber pagamento sem validar, nem mudar de status sem passar pelo estado atual.
+ *
+ * <p>Ciclo: nasce em EM_EDICAO (rascunho, pode estar incompleto) → as seções são salvas por partes
+ * → {@link #emitir} exige completude, gera a linha digitável e o boleto passa a valer.
  *
  * <p>Padrão das operações: 1º o ESTADO diz se a ação é permitida (409);
  * 2º as SPECIFICATIONS dizem se os dados são válidos (422); 3º só então o estado muda.
@@ -36,21 +41,30 @@ import java.util.Optional;
 public class Boleto {
 
     private final BoletoId id;
-    private final Instant emitidoEm;
-    private DadosBoleto dados;
-    private LinhaDigitavel linhaDigitavel;
+    private final Pagador pagador;
+    private final Instant criadoEm;
+    private LocalDate dataVencimento;
+    private ItensBoleto itens;
+    private Destinatarios destinatarios;
     private EstadoBoleto estado;
+    private LinhaDigitavel linhaDigitavel;
+    private Instant emitidoEm;
     private Instant notificadoEm;
     private Pagamento pagamento;
     private Motivo motivoCancelamento;
 
-    private Boleto(BoletoId id, Instant emitidoEm, DadosBoleto dados, LinhaDigitavel linhaDigitavel,
-                   EstadoBoleto estado, Instant notificadoEm, Pagamento pagamento, Motivo motivoCancelamento) {
+    private Boleto(BoletoId id, Pagador pagador, Instant criadoEm, LocalDate dataVencimento, ItensBoleto itens,
+                   Destinatarios destinatarios, EstadoBoleto estado, LinhaDigitavel linhaDigitavel, Instant emitidoEm,
+                   Instant notificadoEm, Pagamento pagamento, Motivo motivoCancelamento) {
         this.id = Objects.requireNonNull(id);
-        this.emitidoEm = Objects.requireNonNull(emitidoEm);
-        this.dados = Objects.requireNonNull(dados);
-        this.linhaDigitavel = Objects.requireNonNull(linhaDigitavel);
+        this.pagador = Objects.requireNonNull(pagador);
+        this.criadoEm = Objects.requireNonNull(criadoEm);
+        this.dataVencimento = Objects.requireNonNull(dataVencimento);
+        this.itens = Objects.requireNonNull(itens);
+        this.destinatarios = Objects.requireNonNull(destinatarios);
         this.estado = Objects.requireNonNull(estado);
+        this.linhaDigitavel = linhaDigitavel;
+        this.emitidoEm = emitidoEm;
         this.notificadoEm = notificadoEm;
         this.pagamento = pagamento;
         this.motivoCancelamento = motivoCancelamento;
@@ -58,34 +72,41 @@ public class Boleto {
 
     // =============================== criação ===============================
 
-    /** Emite (cria) um boleto. Lança a exceção específica da primeira regra violada. */
-    public static Boleto emitir(SolicitacaoBoleto solicitacao) {
-        RegrasBoleto.EMISSAO.validar(solicitacao);
-        var id = BoletoId.novo();
-        var dados = solicitacao.dados();
-        return new Boleto(id, solicitacao.momento(), dados, gerarLinha(id, dados),
-                EstadoBoleto.inicial(), null, null, null);
+    /** Cria o rascunho (EM_EDICAO) só com o mínimo. Completude é exigida na emissão, não aqui. */
+    public static Boleto criar(Pagador pagador, LocalDate dataVencimento, Instant agora) {
+        return new Boleto(BoletoId.novo(), pagador, agora, dataVencimento, ItensBoleto.VAZIO,
+                Destinatarios.NENHUM, EstadoBoleto.inicial(), null, null, null, null, null);
     }
 
     /** Reconstrói a partir da persistência, sem reaplicar regras (o dado já foi validado). */
-    public static Boleto reconstituir(BoletoId id, Instant emitidoEm, DadosBoleto dados, LinhaDigitavel linhaDigitavel,
-                                      StatusBoleto status, Instant notificadoEm, Pagamento pagamento,
-                                      Motivo motivoCancelamento) {
-        return new Boleto(id, emitidoEm, dados, linhaDigitavel, EstadoBoleto.de(status),
-                notificadoEm, pagamento, motivoCancelamento);
+    public static Boleto reconstituir(BoletoId id, Pagador pagador, Instant criadoEm, LocalDate dataVencimento,
+                                      ItensBoleto itens, Destinatarios destinatarios, StatusBoleto status,
+                                      LinhaDigitavel linhaDigitavel, Instant emitidoEm, Instant notificadoEm,
+                                      Pagamento pagamento, Motivo motivoCancelamento) {
+        return new Boleto(id, pagador, criadoEm, dataVencimento, itens, destinatarios, EstadoBoleto.de(status),
+                linhaDigitavel, emitidoEm, notificadoEm, pagamento, motivoCancelamento);
     }
 
-    // =============================== update / delete ===============================
+    // =============================== seções (só em EM_EDICAO) ===============================
 
-    public void alterar(SolicitacaoBoleto solicitacao) {
-        estado.validarAlteracao();
-        if (!solicitacao.dados().pagador().equals(dados.pagador())) {
-            // erro de PROGRAMAÇÃO (o use case montou a solicitação errada), não de negócio
-            throw new IllegalArgumentException("O pagador de um boleto não pode ser alterado");
-        }
-        RegrasBoleto.ALTERACAO.validar(solicitacao);
-        this.dados = solicitacao.dados();
-        this.linhaDigitavel = gerarLinha(id, dados); // valor/vencimento mudaram: a linha muda junto
+    /** Seção "dados gerais". As regras de vencimento dependem do dia da emissão: valem em {@link #emitir}. */
+    public void alterarVencimento(LocalDate novoVencimento) {
+        estado.validarEdicao();
+        this.dataVencimento = Objects.requireNonNull(novoVencimento);
+    }
+
+    /** Seção "itens": substitui a seção inteira. Regras da seção agora; completude só na emissão. */
+    public void salvarItens(ItensBoleto novosItens) {
+        estado.validarEdicao();
+        RegrasBoleto.ITENS.validar(novosItens);
+        this.itens = novosItens;
+    }
+
+    /** Seção "destinatários" (opcional): substitui a seção inteira. */
+    public void salvarDestinatarios(Destinatarios novos) {
+        estado.validarEdicao();
+        RegrasBoleto.DESTINATARIOS.validar(new DestinatariosDoBoleto(pagador, novos));
+        this.destinatarios = novos;
     }
 
     /** Só verifica: quem remove de fato é o repositório. */
@@ -94,6 +115,15 @@ public class Boleto {
     }
 
     // =============================== transições (State pattern) ===============================
+
+    /** Finaliza a edição: exige completude, gera a linha digitável. EM_EDICAO -> EMITIDO. */
+    public void emitir(CondicoesEmissao condicoes) {
+        var proximo = estado.emitir();
+        RegrasBoleto.EMISSAO.validar(new EmissaoBoleto(pagador, itens, dataVencimento, condicoes));
+        estado = proximo;
+        linhaDigitavel = LinhaDigitavel.gerar(id, getValor(), dataVencimento);
+        emitidoEm = condicoes.momento();
+    }
 
     /** Registra que o pagador foi avisado. Em NOTIFICADO, é um reenvio (mesmo estado, novo horário). */
     public void registrarNotificacao(Instant momento) {
@@ -104,7 +134,7 @@ public class Boleto {
     public void receberPagamento(Pagamento pagamentoInformado, LocalDate hoje) {
         var proximo = estado.receberPagamento();
         RegrasBoleto.RECEBIMENTO.validar(
-                new RecebimentoPagamento(dados.valor(), dados.dataVencimento(), pagamentoInformado, hoje));
+                new RecebimentoPagamento(getValor(), dataVencimento, pagamentoInformado, hoje));
         estado = proximo;
         pagamento = pagamentoInformado;
     }
@@ -115,22 +145,21 @@ public class Boleto {
         motivoCancelamento = motivo;
     }
 
-    private static LinhaDigitavel gerarLinha(BoletoId id, DadosBoleto dados) {
-        return LinhaDigitavel.gerar(id, dados.valor(), dados.dataVencimento());
-    }
-
     // =============================== leitura ===============================
 
     public boolean emAberto() { return estado.emAberto(); }
 
     public BoletoId getId() { return id; }
-    public Instant getEmitidoEm() { return emitidoEm; }
-    public DadosBoleto getDados() { return dados; }
-    public Pagador getPagador() { return dados.pagador(); }
-    public Dinheiro getValor() { return dados.valor(); }
-    public LocalDate getDataVencimento() { return dados.dataVencimento(); }
-    public LinhaDigitavel getLinhaDigitavel() { return linhaDigitavel; }
+    public Pagador getPagador() { return pagador; }
+    public Instant getCriadoEm() { return criadoEm; }
+    public LocalDate getDataVencimento() { return dataVencimento; }
+    public ItensBoleto getItens() { return itens; }
+    public Destinatarios getDestinatarios() { return destinatarios; }
+    /** Valor do boleto = soma dos itens. */
+    public Dinheiro getValor() { return itens.total(); }
     public StatusBoleto getStatus() { return estado.status(); }
+    public Optional<LinhaDigitavel> getLinhaDigitavel() { return Optional.ofNullable(linhaDigitavel); }
+    public Optional<Instant> getEmitidoEm() { return Optional.ofNullable(emitidoEm); }
     public Optional<Instant> getNotificadoEm() { return Optional.ofNullable(notificadoEm); }
     public Optional<Pagamento> getPagamento() { return Optional.ofNullable(pagamento); }
     public Optional<Motivo> getMotivoCancelamento() { return Optional.ofNullable(motivoCancelamento); }

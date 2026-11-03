@@ -80,7 +80,8 @@ A spec é **pura**: nada de I/O, `Clock`, `now()` ou injeção.
 
 ## 4. Registre no catálogo
 
-Adicione ao conjunto certo (ex.: `COMUNS`, `CRIACAO`, `ALTERACAO`, `<ACAO>`). **A posição importa**:
+Adicione ao conjunto do **momento** certo: `<SECAO>` (ao salvar uma seção; o agregado pode estar
+incompleto), `FINALIZACAO` (completude, ao finalizar a edição), `<ACAO>` (outras ações). **A posição importa**:
 o validador é fail-fast e o cliente recebe a primeira regra violada. Fundamentais antes das de detalhe.
 
 ## 5. Se precisar de um fato novo

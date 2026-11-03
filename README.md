@@ -143,7 +143,7 @@ e atualize a tabela em `EstadoProcessoPagamentoTest`.
 Massa fake de cotas (grupo `1234`): `1..49` ativas, `90` inadimplente, `91` cancelada, `92` encerrada.
 
 ```bash
-mvn -pl consorcio-pagamento quarkus:dev   # http://localhost:8081
+mvn quarkus:dev   # http://localhost:8081
 ```
 
 ## Regras fake implementadas

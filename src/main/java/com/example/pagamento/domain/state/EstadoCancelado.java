@@ -1,7 +1,7 @@
 package com.example.pagamento.domain.state;
 
-/** Estado final. Novos cancelamentos do emissor são ignorados (já está cancelado). */
-public final class EstadoCancelado extends EstadoProcesso {
+/** Estado final. Nenhuma ação permitida. */
+public final class EstadoCancelado extends EstadoPagamento {
 
     static final EstadoCancelado INSTANCIA = new EstadoCancelado();
 
@@ -9,12 +9,7 @@ public final class EstadoCancelado extends EstadoProcesso {
     }
 
     @Override
-    public StatusProcesso status() {
-        return StatusProcesso.CANCELADO;
-    }
-
-    @Override
-    public EstadoProcesso boletoCanceladoNoEmissor() {
-        return this;
+    public StatusPagamento status() {
+        return StatusPagamento.CANCELADO;
     }
 }

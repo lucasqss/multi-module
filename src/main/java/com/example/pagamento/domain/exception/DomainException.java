@@ -10,11 +10,11 @@ package com.example.pagamento.domain.exception;
  * ├── RecursoNaoEncontradoException      não existe                                → 404
  * ├── ConflitoException                  conflita com o estado atual               → 409
  * │   ├── TransicaoEstadoInvalidaException   ação proibida no status (State)
- * │   └── AlteracaoConcorrenteException      outra requisição alterou antes (lock otimista)
+ * │   └── RecursoBloqueadoException          outra operação está alterando (lock pessimista)
  * └── RegraNegocioException              regra de negócio violada (Specification)  → 422
  * </pre>
  *
- * Cada caso concreto é uma classe própria (ex.: {@code ProcessoSemBoletosException}), o que permite
+ * Cada caso concreto é uma classe própria (ex.: {@code PagamentoSemBoletosException}), o que permite
  * {@code catch}/{@code assertThrows} por tipo e deixa o código de erro fixo junto da exceção.
  */
 public abstract class DomainException extends RuntimeException {

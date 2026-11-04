@@ -54,6 +54,18 @@ class SpecificationTest {
         assertInstanceOf(NaoPositivoException.class, validador.primeiraViolacao(-3).orElseThrow());
     }
 
+    @Test
+    void cadeiaAplicaSoOsElosDoCandidatoNaOrdemDeclarada() {
+        var cadeia = CadeiaValidacao.comecandoPor(ValidadorRegras.<Integer>de(
+                        RegraNegocio.de(positivo, n -> new NaoPositivoException())))
+                .depois(n -> n > 100, ValidadorRegras.de(RegraNegocio.de(par, n -> new ImparException())));
+
+        assertDoesNotThrow(() -> cadeia.validar(3));     // elo "> 100" não se aplica a 3
+        assertDoesNotThrow(() -> cadeia.validar(102));
+        assertThrows(ImparException.class, () -> cadeia.validar(101));
+        assertThrows(NaoPositivoException.class, () -> cadeia.validar(-1)); // 1º elo barra antes
+    }
+
     static class NaoPositivoException extends RegraNegocioException {
         NaoPositivoException() {
             super("NAO_POSITIVO", "não é positivo");

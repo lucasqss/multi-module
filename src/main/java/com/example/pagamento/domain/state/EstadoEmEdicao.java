@@ -1,7 +1,7 @@
 package com.example.pagamento.domain.state;
 
-/** Rascunho: seções (boletos, conta, data) salvas por partes; pode estar incompleto e pode ser excluído. */
-public final class EstadoEmEdicao extends EstadoProcesso {
+/** Rascunho: seções salvas por partes, pode estar incompleto e pode ser excluído. */
+public final class EstadoEmEdicao extends EstadoPagamento {
 
     static final EstadoEmEdicao INSTANCIA = new EstadoEmEdicao();
 
@@ -9,13 +9,18 @@ public final class EstadoEmEdicao extends EstadoProcesso {
     }
 
     @Override
-    public StatusProcesso status() {
-        return StatusProcesso.EM_EDICAO;
+    public StatusPagamento status() {
+        return StatusPagamento.EM_EDICAO;
     }
 
     @Override
-    public EstadoProcesso submeter() {
-        return EstadoAguardandoAprovacao.INSTANCIA;
+    public EstadoPagamento submeter() {
+        return EstadoAgendado.INSTANCIA;
+    }
+
+    @Override
+    public EstadoPagamento cancelar() {
+        return EstadoCancelado.INSTANCIA;
     }
 
     @Override
@@ -26,16 +31,5 @@ public final class EstadoEmEdicao extends EstadoProcesso {
     @Override
     public void validarExclusao() {
         // permitido
-    }
-
-    @Override
-    public EstadoProcesso cancelar() {
-        return EstadoCancelado.INSTANCIA;
-    }
-
-    /** Ainda não foi ao banco: sem o boleto, o processo perde o sentido. */
-    @Override
-    public EstadoProcesso boletoCanceladoNoEmissor() {
-        return EstadoCancelado.INSTANCIA;
     }
 }

@@ -8,6 +8,6 @@ public class ValorLiquidadoDivergenteException extends RegraNegocioException {
     public static final String CODIGO = "VALOR_LIQUIDADO_DIVERGENTE";
 
     public ValorLiquidadoDivergenteException(Dinheiro liquidado, Dinheiro esperado) {
-        super(CODIGO, "Banco liquidou %s, mas o processo soma %s".formatted(liquidado, esperado));
+        super(CODIGO, "Banco liquidou %s, mas o pagamento soma %s".formatted(liquidado, esperado));
     }
 }

@@ -21,7 +21,7 @@ import java.util.Comparator;
  * Traduz TODA exceção para HTTP + {@link ErroResponse}. O domínio nunca sabe o que é um status code.
  *
  * <p>Exceções de domínio são traduzidas pela FAMÍLIA, não pelo caso concreto: uma exceção nova
- * (ex.: {@code ProcessoSemBoletosException}) já sai com o status certo sem mexer aqui.
+ * (ex.: {@code PagamentoSemBoletosException}) já sai com o status certo sem mexer aqui.
  */
 public class ApiExceptionHandler {
 

@@ -1,7 +1,6 @@
 package com.example.pagamento.adapter.banco;
 
-import com.example.pagamento.domain.entity.ProcessoPagamento;
-import com.example.pagamento.domain.entity.TentativaPagamento;
+import com.example.pagamento.domain.entity.Pagamento;
 import com.example.pagamento.domain.valueobject.Dinheiro;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
@@ -10,8 +9,8 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Integração de SAÍDA com o BANCO: envia uma tentativa de pagamento (os boletos do processo, debitando a
- * conta informada). O resultado volta depois, pela ENTRADA {@code entrypoint.webhook.v1.BancoWebhookResource}.
+ * Integração de SAÍDA com o BANCO: envia o pagamento (os boletos, debitando a conta informada).
+ * O resultado volta depois pela ENTRADA {@code entrypoint.webhook.v1.BancoWebhookResource}.
  *
  * <p>SIMULAÇÃO: na vida real seria um REST client/arquivo de remessa. Aqui só registra o envio.
  */
@@ -22,13 +21,12 @@ public class BancoPagamentos {
 
     private final List<EnvioRegistrado> envios = new CopyOnWriteArrayList<>();
 
-    public void enviar(ProcessoPagamento processo, TentativaPagamento tentativa) {
-        var conta = processo.getContaDebito()
-                .orElseThrow(() -> new IllegalStateException("Processo sem conta para débito: " + processo.getId()));
-        envios.add(new EnvioRegistrado(tentativa.getIdTransacao(), processo.getValorTotal(), processo.getBoletos().quantidade()));
-        LOG.infof("[SIMULAÇÃO] Banco: transação %s, %d boleto(s), total %s, débito ag %s cc %s",
-                tentativa.getIdTransacao(), processo.getBoletos().quantidade(), processo.getValorTotal(),
-                conta.agencia(), conta.conta());
+    public void enviar(Pagamento pagamento) {
+        var idTransacao = pagamento.getIdTransacao()
+                .orElseThrow(() -> new IllegalStateException("Pagamento sem transação: " + pagamento.getId()));
+        envios.add(new EnvioRegistrado(idTransacao, pagamento.getValorTotal(), pagamento.getBoletos().quantidade()));
+        LOG.infof("[SIMULAÇÃO] Banco: transação %s, %d boleto(s), total %s",
+                idTransacao, pagamento.getBoletos().quantidade(), pagamento.getValorTotal());
     }
 
     public List<EnvioRegistrado> envios() {

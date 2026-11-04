@@ -1,6 +1,6 @@
 package com.example.pagamento.entrypoint.webhook.v1;
 
-import com.example.pagamento.application.processo.dto.RetornoBancoInput;
+import com.example.pagamento.application.pagamento.dto.RetornoBancoInput;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;

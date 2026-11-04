@@ -1,6 +1,6 @@
 package com.example.pagamento.entrypoint.api.v1.request;
 
-import com.example.pagamento.application.processo.dto.SalvarBoletosInput;
+import com.example.pagamento.application.pagamento.dto.SalvarBoletosInput;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 

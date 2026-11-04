@@ -1,10 +1,10 @@
 package com.example.pagamento.domain.state;
 
 /**
- * Um fato externo fugiu do esperado (valor liquidado divergente, boleto cancelado após o envio). Aguarda
- * decisão humana; nesta versão do exemplo, só sai por cancelamento (o estorno é tratado fora).
+ * O banco liquidou um valor diferente do total (um fato que não se recusa). Aguarda decisão humana;
+ * neste exemplo, só sai por cancelamento (o acerto com o fornecedor é tratado fora).
  */
-public final class EstadoEmAnalise extends EstadoProcesso {
+public final class EstadoEmAnalise extends EstadoPagamento {
 
     static final EstadoEmAnalise INSTANCIA = new EstadoEmAnalise();
 
@@ -12,28 +12,12 @@ public final class EstadoEmAnalise extends EstadoProcesso {
     }
 
     @Override
-    public StatusProcesso status() {
-        return StatusProcesso.EM_ANALISE;
-    }
-
-    /** Novos fatos são registrados, mas o processo continua aguardando a análise. */
-    @Override
-    public EstadoProcesso receberRetornoBanco(boolean liquidado, boolean conforme) {
-        return this;
+    public StatusPagamento status() {
+        return StatusPagamento.EM_ANALISE;
     }
 
     @Override
-    public EstadoProcesso boletoCanceladoNoEmissor() {
-        return this;
-    }
-
-    @Override
-    public boolean emAnalise() {
-        return true;
-    }
-
-    @Override
-    public EstadoProcesso cancelar() {
+    public EstadoPagamento cancelar() {
         return EstadoCancelado.INSTANCIA;
     }
 }

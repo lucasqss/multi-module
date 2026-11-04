@@ -1,7 +1,7 @@
 package com.example.pagamento.domain.state;
 
-/** Estado final de sucesso. Se o emissor cancelar o boleto depois, o fato vai para análise. */
-public final class EstadoPago extends EstadoProcesso {
+/** Estado final de sucesso. Nenhuma ação permitida. */
+public final class EstadoPago extends EstadoPagamento {
 
     static final EstadoPago INSTANCIA = new EstadoPago();
 
@@ -9,12 +9,7 @@ public final class EstadoPago extends EstadoProcesso {
     }
 
     @Override
-    public StatusProcesso status() {
-        return StatusProcesso.PAGO;
-    }
-
-    @Override
-    public EstadoProcesso boletoCanceladoNoEmissor() {
-        return EstadoEmAnalise.INSTANCIA;
+    public StatusPagamento status() {
+        return StatusPagamento.PAGO;
     }
 }

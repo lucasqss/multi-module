@@ -1,10 +1,10 @@
 ---
-applyTo: "src/main/java/**/application/**/*.java"
+applyTo: "**/src/main/java/**/application/**/*.java"
 ---
 
 # Camada de aplicação (use cases)
 
-- **Um use case por intenção do usuário** (não por entidade, não por operação técnica), nome `<Verbo><Agregado>UC` (`EmitirBoletoUC`), método único `executar`.
+- **Um use case por intenção do usuário** (não por entidade, não por operação técnica), nome `<Verbo><Agregado>UC` (ilustração: `CriarBoletoUC`, `EmitirBoletoUC`), método único `executar`.
 - `@ApplicationScoped`; dependências por **construtor** (sem `@Inject` em campo).
 - `@Transactional` em toda operação que escreve.
 - Roteiro fixo, sem regra de negócio:
@@ -20,8 +20,10 @@ applyTo: "src/main/java/**/application/**/*.java"
   devolver entidade de domínio, `LocalDate.now()` sem `Clock` injetado.
 - DTOs em `application.<agregado>.dto`: `record`s `*Input` (com métodos que montam VOs) e `*Output`
   (com `static de(Entidade)`).
-- Se precisar de uma decisão nova: crie a regra no domínio (skill `nova-regra-de-negocio`),
+- Se precisar de uma decisão nova: crie a regra no domínio (skill `layered-nova-regra-de-negocio`),
   não aqui.
-- Critério completo e tabela de decisão: seção **"O que é um caso de uso"** de `.github/copilot-instructions.md`.
+- **Um UC não chama outro UC**, nem spec, nem estado diretamente. Lógica compartilhada entre UCs vai
+  para a entidade, um VO ou uma spec (nunca para um `*Service`/`*Utils` genérico).
+- Critério completo e tabela de decisão: skill `layered-novo-caso-de-uso`, passo 0.
   Resumo: uma classe, um `executar`, uma transação; partes de um agregado passam pelo agregado; seção
   editada como bloco = um UC `Salvar<Secao>` com `PUT`; completude só no UC de finalização.

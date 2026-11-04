@@ -1,5 +1,5 @@
 ---
-applyTo: "src/main/java/**/adapter/**/*.java"
+applyTo: "**/src/main/java/**/adapter/**/*.java"
 ---
 
 # Camada de adapters
@@ -14,6 +14,8 @@ applyTo: "src/main/java/**/adapter/**/*.java"
 - `salvar` faz `flush()` e traduz `OptimisticLockException` para `AlteracaoConcorrenteException`.
   Exceções de framework **não vazam** do adapter: traduza para exceções de domínio.
 - Não duplique regra: se a query depende de um conceito do domínio (ex.: "em aberto"), derive-o do
-  domínio (`EstadoBoleto.de(status).emAberto()`), como em `BoletoRepository.STATUS_EM_ABERTO`.
-- Integração simulada deixa isso explícito no Javadoc (ex.: `NotificadorBoleto`).
+  domínio (ilustração no repositório de referência: `EstadoBoleto.de(status).emAberto()` em
+  `BoletoRepository.STATUS_EM_ABERTO`), em vez de repetir a lista de status na query.
+- Um subpacote por sistema externo (`adapter/<sigla-do-sistema>`); DTOs do sistema externo ficam nele.
+- Integração simulada deixa isso explícito no Javadoc.
 - Interface só quando houver **mais de uma implementação real** em produção.

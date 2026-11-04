@@ -1,32 +1,33 @@
 # Padrões reutilizáveis — skills e instruções para o GitHub Copilot
 
-Versão **genérica** das skills e instruções deste repositório, para usar em **qualquer** projeto
-Java organizado em camadas (`domain` / `application` / `adapter` / `entrypoint` / `shared`) com
-domínio rico, Specification, State e exceções específicas. As camadas se ligam por **injeção de
-dependência de classes concretas** (sem ports and adapters): use cases injetam repositórios e
-integrações de `adapter/`; o domínio não depende de nenhuma outra camada nem de framework.
+As skills e instruções deste repositório são **genéricas**: servem a **qualquer** projeto Java organizado
+em camadas (`domain` / `application` / `adapter` / `entrypoint` / `shared`) com domínio rico,
+Specification, State e exceções específicas. As camadas se ligam por **injeção de dependência de classes
+concretas** (sem ports and adapters): use cases injetam repositórios e integrações de `adapter/`; o domínio
+não depende de nenhuma outra camada nem de framework.
 
-O projeto `pagamento-boleto` (este repositório) é a **implementação de referência**: as skills
-específicas dele ficam em `.github/skills/`; as genéricas, aqui.
+O sistema de boletos deste repositório (`pagamento-boleto`) é só a **ilustração do "to be"**: os exemplos
+das skills vêm dele, marcados como "Ilustração", mas as instruções não dependem dele.
 
 ## Conteúdo
 
-| Pasta | O que é |
+| Caminho | O que é |
 |---|---|
-| `skills/layered-*` | Skills genéricas (prefixo `layered-` para não colidir com skills de projeto) |
-| `skills/layered-iniciar-projeto/templates/` | Base genérica em Java (`*.java.tmpl`, pacote `__PACOTE__`) |
-| `skills/layered-iniciar-projeto/mapa-do-projeto.md` | Modelo da seção "Mapa do projeto" |
-| `instructions/*.instructions.md` | Regras por camada (`applyTo` por caminho), para copiar em cada projeto |
+| `.github/skills/layered-*` | Skills genéricas (prefixo `layered-` para não colidir com skills de outros projetos) |
+| `.github/skills/layered-iniciar-projeto/templates/` | Base genérica em Java (`*.java.tmpl`, pacote `__PACOTE__`) |
+| `.github/skills/layered-iniciar-projeto/mapa-do-projeto.md` | Modelo da seção "Mapa do projeto" (a única parte específica de cada projeto) |
+| `.github/instructions/*.instructions.md` | Regras por camada (`applyTo` por caminho), genéricas |
+| `.github/copilot-instructions.md` | Regras + "Mapa do projeto" **deste** repositório (exemplo de mapa preenchido) |
 
 | Skill | Use para |
 |---|---|
 | `layered-iniciar-projeto` | Criar a base genérica num projeto novo/existente e o "Mapa do projeto" |
+| `layered-enxugar-estrutura` | Eliminar pastas desnecessárias (`factory`, `model`, `enums`, `repository`, `service`, `shared/*`) e corrigir quem chama quem |
 | `layered-novo-agregado-crud` | Novo cadastro/entidade com CRUD completo |
-| `layered-novo-caso-de-uso` | Decidir se é um caso de uso (critério acima) e criar a ação de ponta a ponta |
+| `layered-novo-caso-de-uso` | Decidir se é um caso de uso (critério abaixo) e criar a ação de ponta a ponta |
 | `layered-nova-regra-de-negocio` | Nova validação de negócio (Specification) |
 | `layered-novo-estado` | Novo status/transição (State) ou primeira máquina de estados |
 | `layered-nova-integracao-externa` | Integração com sistema externo: saída (classe em `adapter/`) e entrada (webhook/fila, fato classificado, idempotência) |
-| `layered-enxugar-estrutura` | Eliminar pastas desnecessárias (`factory`, `model`, `enums`, `repository`, `service`, `shared/*`) e corrigir quem chama quem |
 | `layered-revisao-arquitetura` | Revisão de camadas, domínio anêmico, SOLID, GRASP + script `verificar-camadas.sh` |
 
 ## Estrutura de pastas que as skills seguem (por tipo, enxuta)
@@ -141,7 +142,7 @@ Por isso, o **mapa é o único trecho que muda de projeto para projeto**. Exempl
 ```bash
 # Linux/macOS (Git Bash no Windows)
 mkdir -p ~/.copilot/skills
-cp -r padroes/skills/layered-* ~/.copilot/skills/
+cp -r .github/skills/layered-* ~/.copilot/skills/
 ```
 
 `~/.agents/skills` também é aceito. Para versionar junto com um projeto específico, copie para
@@ -151,7 +152,7 @@ cp -r padroes/skills/layered-* ~/.copilot/skills/
 
 ```bash
 mkdir -p <projeto>/.github/instructions
-cp padroes/instructions/*.instructions.md <projeto>/.github/instructions/
+cp .github/instructions/*.instructions.md <projeto>/.github/instructions/
 ```
 
 Depois, no projeto, peça ao Copilot (modo agente): **"use a skill layered-iniciar-projeto"**.
@@ -176,7 +177,9 @@ e revisão de PR.
 
 ## Manutenção
 
-Ao evoluir o padrão no projeto de referência, replique aqui:
-- mudou uma classe base (`Specification`, exceções, `Dinheiro`, handler...)? Regere o template
-  correspondente trocando o pacote por `__PACOTE__`;
-- mudou uma regra de arquitetura? Atualize a skill `layered-*` e a instrução genérica equivalentes.
+Há **uma fonte só**: `.github/skills` e `.github/instructions`. Não mantenha cópias em outro lugar.
+- Mudou uma classe base (`Specification`, exceções, `Dinheiro`, handler...)? Regere o template
+  correspondente em `layered-iniciar-projeto/templates/`, trocando o pacote por `__PACOTE__`.
+- Mudou o boleto (o "to be")? Atualize os trechos **Ilustração** das skills que o citam.
+- Mudou uma regra de arquitetura? Atualize a skill e a instrução genérica equivalentes, sem
+  amarrá-las a nomes do boleto (use papéis e `<marcadores>`).

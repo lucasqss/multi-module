@@ -5,6 +5,12 @@ description: Enxuga a estrutura de pastas de um projeto Java layered organizado 
 
 # Enxugar a estrutura (por tipo) e deixar a interação coesa
 
+> **Sobre os exemplos.** As instruções desta skill são genéricas: falam de **papéis** (catálogo de regras,
+> base de estados, candidato das regras...) e valem para qualquer projeto no padrão. Os trechos marcados
+> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`), que mostra
+> o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
+> os nomes do **"Mapa do projeto"** (`.github/copilot-instructions.md`) e copie a forma das classes de lá.
+
 Objetivo: manter a organização **por tipo de classe**, mas só com pastas que têm papel próprio.
 Pastas que existem por causa de abstrações desnecessárias são **eliminadas**: o conteúdo vai para
 onde o papel dele já mora (ou some, se a abstração não precisava existir).
@@ -45,7 +51,7 @@ Classes cujo destino seja ambíguo: pergunte.
 
 | Pasta | Pergunta para cada classe | Destino |
 |---|---|---|
-| `domain/factory` | A factory só monta objetos (sem dependências injetadas)? | **Some**: vira método estático da entidade (`Contrato.criar(...)`) ou do candidato (`SolicitacaoContrato.paraCriacao(..., clock, ...)`). |
+| `domain/factory` | A factory só monta objetos (sem dependências injetadas)? | **Some**: vira método estático da entidade (ilustração: `Boleto.criar(...)`) ou de um record de contexto (`CondicoesEmissao.de(clock, ...)`). |
 | | Ela injeta repositórios/serviços para montar algo? | É orquestração: vira parte do **use case**. |
 | `domain/model` | Tem identidade e ciclo de vida? | `entity` |
 | | É imutável e definido pelos valores? | `valueobject` (como `record` que valida) |
@@ -91,6 +97,12 @@ Procure e corrija:
    `layered-revisao-arquitetura`; faça um commit por pasta (fácil de revisar e de reverter).
 6. **Não** misture com mudança de regra de negócio, renomeação de endpoints ou contratos de API.
 7. Ao final, atualize o **"Mapa do projeto"** e a documentação de estrutura.
+
+## Ilustração do "to be"
+
+O repositório de referência **pagamento-boleto** já está na estrutura alvo: `domain` só com `entity`,
+`valueobject`, `exception`, `specification` (+ `specification/boleto`) e `state`; `shared` sem subpastas;
+`adapter/database`, `adapter/notificacao`, `adapter/pagamentos`; `entrypoint/api/v1` e `entrypoint/webhook/v1`.
 
 ## Resultado esperado
 

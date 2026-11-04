@@ -301,10 +301,12 @@ As regras deste README também estão em `.github/`, para o Copilot segui-las au
 | `.github/instructions/<camada>.instructions.md` | Ao mexer em arquivos da camada (`applyTo` por caminho) |
 | `.github/skills/<skill>/SKILL.md` | Quando a tarefa combina com a skill (ou ao pedir pelo nome) |
 
-Skills: `nova-regra-de-negocio`, `novo-estado`, `novo-caso-de-uso`, `novo-agregado-crud`,
-`nova-integracao-externa` e `revisao-arquitetura`. Esta última inclui
-`.github/skills/revisao-arquitetura/verificar-camadas.sh`, que falha se alguma camada importar o que
-não deve ou se a entidade ganhar setter, construtor público, `now()` sem `Clock` ou `if` em status.
+As skills (`layered-*`) e as instruções por camada são **genéricas**: servem a qualquer projeto no
+padrão e usam este repositório apenas como **ilustração do "to be"**. O único trecho específico deste
+projeto é o "Mapa do projeto", no fim do `copilot-instructions.md`.
 
-Versões **genéricas** dessas skills e instruções, para usar em outros projetos (com o modelo de
-"Mapa do projeto" e os templates da base genérica), estão em [`padroes/`](padroes/README.md).
+`layered-revisao-arquitetura` inclui `verificar-camadas.sh`, que falha se alguma camada importar o que
+não deve, se um use case chamar outro, ou se a entidade ganhar setter, construtor público, `now()` sem
+`Clock` ou `if` em status.
+
+Como levar essas skills e instruções para outros projetos: [`docs/padroes.md`](docs/padroes.md).

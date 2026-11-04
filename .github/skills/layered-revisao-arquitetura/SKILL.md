@@ -5,6 +5,12 @@ description: Revisa código Java organizado em camadas (domain, application, ada
 
 # Revisão de arquitetura (projetos layered)
 
+> **Sobre os exemplos.** As instruções desta skill são genéricas: falam de **papéis** (catálogo de regras,
+> base de estados, candidato das regras...) e valem para qualquer projeto no padrão. Os trechos marcados
+> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`), que mostra
+> o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
+> os nomes do **"Mapa do projeto"** (`.github/copilot-instructions.md`) e copie a forma das classes de lá.
+
 ## 0. Contexto do projeto
 
 Se o `copilot-instructions.md` (ou `AGENTS.md`) do repositório tiver a seção **"Mapa do projeto"**,
@@ -94,6 +100,12 @@ Para cada violação: `arquivo:linha`, princípio violado e correção concreta.
 ### Testes
 - [ ] Domínio com JUnit puro (sem subir framework) e builder de cenário válido.
 - [ ] Exceção verificada pelo **tipo**; teste de API verifica status **e** `codigo`.
+
+## Ilustração do "to be"
+
+No repositório de referência **pagamento-boleto**, o script passa sem nenhum ✗ nem ⚠. Use-o para
+comparar "como deveria estar": `Boleto` (entidade rica), `RegrasBoleto` (catálogo por momento),
+`EstadoBoleto` (State), `BoletoRepository` (repositório concreto falando domínio), `*UC` (um por intenção).
 
 ## 3. Formato da resposta
 

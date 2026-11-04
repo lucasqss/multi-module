@@ -5,6 +5,12 @@ description: Adiciona integração com sistema externo (e-mail, SMS, fila, pagam
 
 # Nova integração externa
 
+> **Sobre os exemplos.** As instruções desta skill são genéricas: falam de **papéis** (catálogo de regras,
+> base de estados, candidato das regras...) e valem para qualquer projeto no padrão. Os trechos marcados
+> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`), que mostra
+> o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
+> os nomes do **"Mapa do projeto"** (`.github/copilot-instructions.md`) e copie a forma das classes de lá.
+
 Primeiro descubra o **sentido**:
 
 | Sentido | Quem chama | Onde fica | Exemplo |
@@ -26,7 +32,7 @@ entrypoints existentes estão organizados (normalmente um subpacote por sistema 
 
 `adapter/<sistema>/<Nome>.java` (`@ApplicationScoped` ou equivalente):
 
-- Nome pelo que o negócio precisa (`NotificadorContrato`, `SistemaPagamentos`), não pela tecnologia
+- Nome pelo que o negócio precisa (ilustração: `NotificadorBoleto`, `SistemaPagamentos`), não pela tecnologia
   (`SmtpClient`, `MciRestClient`).
 - **Fala a língua do domínio**: métodos públicos recebem/devolvem entidades e VOs de domínio.
   DTOs do sistema externo e a conversão ficam **dentro** do adapter.
@@ -61,6 +67,14 @@ entrypoints existentes estão organizados (normalmente um subpacote por sistema 
 6. **Identificação** pelo que o sistema externo conhece (código de barras, protocolo): o repositório ganha
    `obterPor<Chave>(...)` que lança a exceção `*NaoEncontrado` (404).
 7. Decisões humanas sobre o fato (aceitar, devolver, reprocessar) são **casos de uso próprios** na nossa API.
+
+## Ilustração (boleto)
+
+| Sentido | Entrypoint / adapter | Use case |
+|---|---|---|
+| Saída | `adapter/notificacao/NotificadorBoleto` | `NotificarBoletoUC` |
+| Saída | `adapter/pagamentos/SistemaPagamentos` (devolução) | `DevolverPagamentoBoletoUC` |
+| Entrada | `entrypoint/webhook/v1/PagamentoWebhookResource` + `AvisoPagamentoRequest` (centavos, data/hora com fuso, `X-Webhook-Token`) | `ReceberPagamentoBoletoUC` → `Boleto.registrarPagamento` (classifica com `CONFORMIDADE_PAGAMENTO.primeiraViolacao`, idempotente por `idTransacao`) |
 
 ## Testes
 

@@ -1,5 +1,5 @@
 ---
-applyTo: "src/main/java/**/entrypoint/**/*.java"
+applyTo: "**/src/main/java/**/entrypoint/**/*.java"
 ---
 
 # Camada de entrypoint (HTTP)
@@ -11,6 +11,7 @@ applyTo: "src/main/java/**/entrypoint/**/*.java"
   `paraInput(...)`. Regra de negócio é do domínio (422), não daqui.
 - `*Response`: contrato próprio, com `static de(Output)`; enums viram `String`. Não reutilize o Output.
 - CRUD nos verbos HTTP; eventos de negócio/transições como `POST /{id}/<substantivo>`
-  (`/notificacao`, `/pagamento`, `/cancelamento`).
-- Erros: **não** crie `ExceptionMapper` novo. `ApiExceptionHandler` já mapeia por família
+  (`/aprovacao`, `/cancelamento`).
+- Outros entrypoints (mensageria/IIB, filas, jobs) seguem a mesma regra: chamam os **mesmos** use cases.
+- Erros: **não** crie `ExceptionMapper` novo. O handler do projeto (ex.: `ApiExceptionHandler`) já mapeia por família
   (400/404/409/422) e garante o formato único `ErroResponse`. Exceção nova de domínio já sai certa.

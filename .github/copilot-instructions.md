@@ -28,7 +28,7 @@ Pacote base `com.example.boleto`:
 | `adapter` | `domain`, `shared`, frameworks | `application`, `entrypoint` |
 | `entrypoint` | `application`, `domain` (só enums de status/valor e exceções), `shared` | `adapter` |
 
-Verifique com `./.github/skills/revisao-arquitetura/verificar-camadas.sh`.
+Verifique com `bash .github/skills/layered-revisao-arquitetura/verificar-camadas.sh`.
 
 ## Estrutura de pastas (por tipo, enxuta)
 
@@ -161,19 +161,21 @@ o builder `Cenarios`. Só testes de API/adapter usam `@QuarkusTest`.
 
 ## Skills disponíveis (`.github/skills/`)
 
-- `nova-regra-de-negocio` — adicionar validação de negócio (spec + exceção + catálogo + teste)
-- `novo-estado` — adicionar/alterar estado ou transição
-- `novo-caso-de-uso` — nova ação de ponta a ponta (UC + endpoint + DTOs + testes)
-- `novo-agregado-crud` — criar outro CRUD completo seguindo este modelo
-- `nova-integracao-externa` — nova integração com sistema externo (classe em `adapter/`)
-- `revisao-arquitetura` — checklist de SOLID/GRASP/camadas/domínio anêmico para revisar mudanças
+As skills são **genéricas** (valem para qualquer projeto no padrão) e usam este repositório só como
+**ilustração do "to be"**. Elas encontram as classes deste projeto pelo "Mapa do projeto" abaixo.
 
-Versões genéricas (para outros projetos) ficam em `padroes/`. Neste repositório, prefira as skills
-acima, que apontam as classes-modelo concretas.
+- `layered-novo-caso-de-uso` — decidir se é um caso de uso e criar a ação de ponta a ponta
+- `layered-nova-regra-de-negocio` — validação de negócio (spec + exceção + catálogo + teste)
+- `layered-novo-estado` — estado/transição (State pattern)
+- `layered-novo-agregado-crud` — novo agregado com CRUD completo
+- `layered-nova-integracao-externa` — integração de saída (adapter) e de entrada (webhook/fila)
+- `layered-revisao-arquitetura` — revisão de camadas, domínio anêmico, SOLID/GRASP (+ `verificar-camadas.sh`)
+- `layered-enxugar-estrutura` — eliminar pastas desnecessárias e corrigir quem chama quem
+- `layered-iniciar-projeto` — criar a base genérica e o "Mapa do projeto" num projeto novo
 
 ## Mapa do projeto
 
-<!-- Lido pelas skills genéricas layered-* (padroes/skills). Mantenha os nomes em dia. -->
+<!-- Lido pelas skills genéricas layered-* (.github/skills). Mantenha os nomes em dia. -->
 
 | Papel | Neste projeto |
 |---|---|

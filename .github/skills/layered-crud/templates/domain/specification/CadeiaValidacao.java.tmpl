@@ -4,10 +4,10 @@ import java.util.function.Predicate;
 
 /**
  * Chain of Responsibility para validação: uma sequência de ELOS. Cada elo decide se SE APLICA ao
- * candidato (ex.: só para uma modalidade); se sim, valida com o seu {@link ValidadorRegras};
+ * candidato (ex.: só para um tipo de produto); se sim, valida com o seu {@link ValidadorRegras};
  * depois passa adiante para o próximo elo.
  *
- * <p>Serve para regras que VARIAM por tipo/modalidade sem {@code if}/{@code switch} no agregado:
+ * <p>Serve para regras que VARIAM por tipo de produto sem {@code if}/{@code switch} no agregado:
  * para um tipo novo, acrescente um elo.
  *
  * <pre>

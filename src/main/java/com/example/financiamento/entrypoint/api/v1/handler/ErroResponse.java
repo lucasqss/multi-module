@@ -1,0 +1,20 @@
+package com.example.financiamento.entrypoint.api.v1.handler;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+import java.util.List;
+
+/**
+ * Formato ÚNICO de erro da API, para qualquer origem (domínio, Bean Validation, JSON inválido,
+ * rota inexistente, erro inesperado). O cliente trata um só formato.
+ */
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
+public record ErroResponse(String codigo, String mensagem, List<CampoInvalido> campos) {
+
+    public ErroResponse(String codigo, String mensagem) {
+        this(codigo, mensagem, List.of());
+    }
+
+    public record CampoInvalido(String campo, String mensagem) {
+    }
+}

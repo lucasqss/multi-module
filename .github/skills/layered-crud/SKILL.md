@@ -6,7 +6,7 @@ description: Padrão para projetos Java (Quarkus) em camadas (domain, applicatio
 # CRUD layered com domínio rico
 
 > **Sobre os exemplos.** As regras abaixo são genéricas. Os trechos **Ilustração** vêm do repositório de
-> referência **pagamento-boleto** (`lucasqss/multi-module`) e só mostram o "to be": em outro projeto esses
+> referência **financiamento** (`lucasqss/multi-module`: financiamento de imóvel e veículo) e só mostram o "to be": em outro projeto esses
 > arquivos não existem. Use os nomes do **Mapa do projeto** (fim de `.github/copilot-instructions.md`);
 > se ele não existir, siga a seção 10 antes de tudo.
 
@@ -62,21 +62,22 @@ no repositório); nada de HTTP, JSON, config ou transação.
   Tempo sempre via `Clock` injetado (nunca `now()` sem clock).
 - Agregado editado por partes nasce `EM_EDICAO` e pode ficar incompleto; **só a finalização exige completude**.
 
-Ilustração: `domain/entity/Pagamento`:
+Ilustração: `domain/entity/Financiamento`:
 
 ```java
-@Entity @Table(name = "pagamento")
-public class Pagamento {
+@Entity @Table(name = "financiamento")
+public class Financiamento {
     @Id private UUID id;
-    @Enumerated(EnumType.STRING) private StatusPagamento status;          // State (enum)
-    @ElementCollection @BatchSize(size = 100) private List<BoletoAPagar> boletos = new ArrayList<>();
-    @Embedded private ContaDebito contaDebito;                            // @Embeddable record
-    protected Pagamento() { }                                             // só JPA
+    @Enumerated(EnumType.STRING) private TipoFinanciamento tipo;           // IMOVEL | VEICULO
+    @Enumerated(EnumType.STRING) private StatusFinanciamento status;       // State (enum)
+    @Embedded private Bem bem;                                             // @Embeddable record (a garantia)
+    @ElementCollection @BatchSize(size = 100) private List<Documento> documentos = new ArrayList<>();
+    protected Financiamento() { }                                          // só JPA
 
     public void submeter(LocalDate hoje) {
-        var proximo = status.submeter();                                  // 409 se não pode
-        RegrasPagamento.SUBMISSAO.validar(new SubmissaoPagamento(...));   // 422 se viola
-        status = proximo;                                                 // só então muda
+        var proximo = status.submeter();                                          // 409 se não pode
+        RegrasFinanciamento.SUBMISSAO.validar(new SubmissaoFinanciamento(...));   // 422 se viola
+        status = proximo;                                                         // só então muda
     }
 }
 ```
@@ -101,21 +102,22 @@ de regra no UC. Proibido UC com vários métodos públicos e UC por entidade-par
 efeito externo), crie um **invocador único** e um comando por transição. O comando só orquestra; a regra
 continua na entidade. Use quando houver 3+ transições parecidas; com 1–2, UCs simples bastam.
 
-Ilustração: `application/pagamento/comando/ComandoPagamento` (sealed: `SubmeterPagamento`, `EnviarAoBanco`,
-`ReenviarAoBanco`, `CancelarPagamento`), `ContextoComando`, invocador `ExecutarComandoPagamentoUC`:
+Ilustração: `application/financiamento/comando/ComandoFinanciamento` (sealed: `SubmeterFinanciamento`,
+`ContratarFinanciamento`, `ReenviarRegistro`, `CancelarFinanciamento`), `ContextoComando`, invocador
+`ExecutarComandoFinanciamentoUC`:
 
 ```java
 @Transactional
-public PagamentoOutput executar(UUID id, ComandoPagamento comando) {
-    var pagamento = repository.obterParaAlteracao(id);   // lock
-    comando.executar(pagamento, contexto);
-    repository.salvar(pagamento);
-    aposCommit(comando, pagamento);   // registra comando.depoisDoCommit: EnviarAoBanco só chama o banco se confirmou
-    return PagamentoOutput.de(pagamento);
+public FinanciamentoOutput executar(UUID id, ComandoFinanciamento comando) {
+    var financiamento = repository.obterParaAlteracao(id);   // lock
+    comando.executar(financiamento, contexto);
+    repository.salvar(financiamento);
+    aposCommit(comando, financiamento);   // ContratarFinanciamento só envia a garantia ao órgão se confirmou
+    return FinanciamentoOutput.de(financiamento);
 }
 ```
 
-O Resource monta o comando: `POST /{id}/cancelamento` → `executar.executar(id, new CancelarPagamento(motivo))`.
+O Resource monta o comando: `POST /{id}/cancelamento` → `executar.executar(id, new CancelarFinanciamento(motivo))`.
 
 ## 4. Regras de negócio: Specification + Chain of Responsibility
 
@@ -127,29 +129,37 @@ para fatos), `CadeiaValidacao<T>` (elos condicionais).
    externos já buscados); não acessa banco, relógio nem rede. Regra simples = **uma linha no catálogo**
    (`RegraNegocio.de(condição, candidato -> new <Situacao>Exception(...))`); classe própria só se for
    parametrizada, tiver lógica não trivial ou mensagem com dados (estende `RegraNegocio<Candidato>`:
-   `isSatisfiedBy` + `violacao`; ex.: `QuantidadeDeBoletosSpec(min, max)`).
+   `isSatisfiedBy` + `violacao`; ex.: `PrazoSpec(min, max)`, `DocumentosExigidosSpec(...)`).
 2. As regras ficam num **catálogo** por agregado (`Regras<Agregado>`), agrupadas por **momento**:
    salvar seção, finalização, conformidade de fato externo. A entidade só chama o catálogo.
-3. Regras que **variam por tipo/modalidade** viram elos de `CadeiaValidacao`: um elo comum + um elo por
+3. Regras que **variam por tipo de produto** viram elos de `CadeiaValidacao`: um elo comum + um elo por
    tipo, cada um com seu predicado de aplicação. Tipo novo = elo novo; nada de `if`/`switch` por tipo.
 
-Ilustração: `domain/specification/pagamento/RegrasPagamento` — o catálogo é a "tabela de regras":
+Ilustração: `domain/specification/financiamento/RegrasFinanciamento` — o catálogo é a "tabela de regras":
 
 ```java
-private static final ValidadorRegras<SubmissaoPagamento> COMUNS = ValidadorRegras.<SubmissaoPagamento>de(
-        de(s -> !s.boletos().vazio(), s -> new PagamentoSemBoletosException()),
-        de(s -> s.dataPagamento() != null, s -> new DataPagamentoNaoInformadaException()),
-        de(s -> !s.dataPagamento().isBefore(s.hoje()), s -> new DataPagamentoNoPassadoException(...)),  // fail-fast: data já existe
-        new BoletosVencemAposPagamentoSpec());                                // lógica + mensagem: classe
+private static final ValidadorRegras<SubmissaoFinanciamento> COMUNS = ValidadorRegras.<SubmissaoFinanciamento>de(
+        de(s -> s.proponente() != null, s -> new ProponenteNaoInformadoException()),
+        de(s -> s.bem() != null, s -> new GarantiaNaoInformadaException()),
+        new DocumentosExigidosSpec(IDENTIDADE, COMPROVANTE_RENDA),             // parametrizada: classe
+        de(s -> !s.parcela().maiorQue(s.proponente().rendaMensal().percentual(30)),  // fail-fast: já existem
+                s -> new ParcelaAcimaDaRendaException(...)));
 
-public static final CadeiaValidacao<SubmissaoPagamento> SUBMISSAO = CadeiaValidacao
-        .comecandoPor(COMUNS)                                                 // sempre
-        .depois(s -> s.modalidade() == Modalidade.INDIVIDUAL, ValidadorRegras.de(new QuantidadeDeBoletosSpec(1, 1)))
-        .depois(s -> s.modalidade() == Modalidade.PROCESSO, ValidadorRegras.<SubmissaoPagamento>de(
-                new QuantidadeDeBoletosSpec(1, 20),
-                de(s -> s.boletos().mesmoBeneficiario(), s -> new BeneficiariosDiferentesException())))
-        .depois(s -> s.modalidade() == Modalidade.LOTE, ...);
+public static final CadeiaValidacao<SubmissaoFinanciamento> SUBMISSAO = CadeiaValidacao
+        .comecandoPor(COMUNS)                                                   // sempre
+        .depois(s -> s.tipo() == IMOVEL, ValidadorRegras.<SubmissaoFinanciamento>de(
+                new PrazoSpec(60, 420), new PercentualFinanciadoSpec(80), new DocumentosExigidosSpec(MATRICULA_IMOVEL)))
+        .depois(s -> s.tipo() == VEICULO, ValidadorRegras.<SubmissaoFinanciamento>de(
+                new PrazoSpec(12, 60), new PercentualFinanciadoSpec(90), new DocumentosExigidosSpec(CRLV),
+                de(s -> s.hoje().getYear() - s.bem().anoModelo() <= 10, s -> new VeiculoMuitoAntigoException(...))));
 ```
+
+**Um componente ou um por tipo de produto?** Um só, com um agregado e um campo `tipo`, enquanto o **fluxo**
+(a máquina de estados) for o mesmo: etapas "específicas" quase sempre são a mesma etapa com regras ou
+integração diferentes (avaliar a garantia: laudo × tabela; registrar: cartório × trânsito) → elo da cadeia,
+comportamento no enum do tipo ou tradução no adapter. Separe em agregados/componentes quando metade dos
+estados só existir para um tipo, quando times ou ritmos de entrega forem diferentes, ou quando as integrações
+de um tipo dominarem o componente. Nunca crie uma "lib comum" entre componentes para dividir regras.
 
 ## 5. Estados: State pattern em enum
 
@@ -160,19 +170,19 @@ public static final CadeiaValidacao<SubmissaoPagamento> SUBMISSAO = CadeiaValida
 - Validações "pode editar/excluir?" também são do status (`validarEdicao`, `validarExclusao`).
 - Proibido `if (status == ...)`/`switch (status)` fora do enum.
 
-Ilustração: `domain/state/StatusPagamento`:
+Ilustração: `domain/state/StatusFinanciamento` (a mesma máquina para imóvel e veículo):
 
 ```java
-public enum StatusPagamento {
+public enum StatusFinanciamento {
     EM_EDICAO {
-        @Override public StatusPagamento submeter() { return AGENDADO; }
-        @Override public StatusPagamento cancelar() { return CANCELADO; }
+        @Override public StatusFinanciamento submeter() { return APROVADO; }
+        @Override public StatusFinanciamento cancelar() { return CANCELADO; }
         @Override public void validarEdicao() { }                 // só o rascunho edita
     },
-    AGENDADO { @Override public StatusPagamento enviarAoBanco() { return EM_PROCESSAMENTO; } ... },
-    PAGO, CANCELADO;                                              // finais: nada sobrescrito
+    APROVADO { @Override public StatusFinanciamento contratar() { return EM_REGISTRO; } ... },
+    CONTRATADO, CANCELADO;                                        // finais: nada sobrescrito
 
-    public StatusPagamento submeter() { throw acaoNaoPermitida("submeter"); }
+    public StatusFinanciamento submeter() { throw acaoNaoPermitida("submeter"); }
     ...
 }
 ```
@@ -196,28 +206,28 @@ Proibido `RuntimeException`/`IllegalStateException` genérica para regra de neg�
 
 - **Saída** (nós chamamos): classe em `adapter/<sistema>/` que traduz o contrato externo para VO/entidade
   do domínio e erros externos para exceções do domínio. O UC injeta direto.
-  Ilustração: `adapter/emissor/EmissorBoletos.consultar(linha)` → `BoletoAPagar`; `adapter/banco/BancoPagamentos.enviar(pagamento)`.
+  Ilustração: `adapter/avaliacao/AvaliadorDeBens.avaliar(tipo, identificacao)` → `Bem`; `adapter/registro/RegistroDeGarantias.enviar(financiamento)`.
 - **Entrada** (eles nos chamam): entrypoint próprio (`entrypoint/webhook/v1`), com autenticação própria
   (token comparado em tempo constante), request no formato **deles** traduzido na borda para Input.
-  Ilustração: `BancoWebhookResource` + `AutenticacaoWebhook` + `RetornoBancoRequest.paraInput()`.
+  Ilustração: `RegistroWebhookResource` + `AutenticacaoWebhook` + `RetornoRegistroRequest.paraInput()`.
 - **Comando × fato.** Comando (usuário pede) pode ser **recusado** (422). Fato (algo já aconteceu lá fora)
   **não se recusa**: as mesmas specs **classificam** (`primeiraViolacao`) e o agregado vai para um estado
-  de análise guardando o motivo. Ilustração: valor liquidado ≠ total → `EM_ANALISE` com `VALOR_LIQUIDADO_DIVERGENTE`.
+  de pendência guardando o motivo. Ilustração: órgão registrou outro bem → `EM_PENDENCIA` com `IDENTIFICACAO_REGISTRADA_DIVERGENTE`.
 - **Idempotência:** identifique o fato por um id que **nós** geramos e enviamos e que **carrega a chave do
   agregado** (VO com `de(String)`). Assim todo aviso — repetido ou de um envio antigo — chega ao agregado,
   que o ignora e responde 200; só agregado inexistente dá 404 (o sistema externo não reenvia para sempre).
-  Ilustração: `IdTransacao(pagamento, envio)` → `"<uuid>-2"`; `ReceberRetornoBancoUC` faz `obterParaAlteracao(id.pagamento())`.
+  Ilustração: `IdProtocolo(financiamento, envio)` → `"<uuid>-2"`; `ReceberRetornoRegistroUC` faz `obterParaAlteracao(protocolo.financiamento())`.
 - **Efeito externo só depois do commit**, nunca dentro da transação: senão um commit que falha deixa o
   sistema externo com algo que não gravamos, e a resposta dele pode chegar antes de gravarmos. Registre um
   `Synchronization` no `TransactionSynchronizationRegistry` e aja em `afterCompletion(STATUS_COMMITTED)`.
-  Ilustração: `ExecutarComandoPagamentoUC.aposCommit` + `ComandoPagamento.depoisDoCommit`. Falha depois do
+  Ilustração: `ExecutarComandoFinanciamentoUC.aposCommit` + `ComandoFinanciamento.depoisDoCommit`. Falha depois do
   commit não desfaz nada: em produção, **Outbox** (gravar a intenção na mesma transação; um job envia e reenvia).
 
 ## 8. Repositório e concorrência (lock pessimista)
 
 - `domain/repository/<Agregado>Repository implements PanacheRepositoryBase<<Agregado>, UUID>`, injetado direto
   no UC. Métodos são **intenções de negócio** que já tratam a consulta (filtros opcionais, ordenação, lock,
-  "não encontrado"): `obter`, `obterParaAlteracao`, `listar(modalidade, status, pagina, tamanho)`, `remover`.
+  "não encontrado"): `obter`, `obterParaAlteracao`, `listar(tipo, status, pagina, tamanho)`, `remover`.
   Recebe parâmetros simples/VOs e devolve entidade ou `Pagina`; o UC não monta query nem filtro.
 - `salvar` só faz `persist` da entidade nova (a carregada já é gerenciada).
 - Quem vai **alterar** carrega com `SELECT ... FOR UPDATE`: `obterParaAlteracao(id)` com
@@ -229,19 +239,19 @@ Proibido `RuntimeException`/`IllegalStateException` genérica para regra de neg�
 - Sem `@Version` junto (um mecanismo só). O hint de espera vira SQL do dialeto (no Oracle, `FOR UPDATE WAIT n`):
   teste o lock **no banco real** (Dev Services), nunca só em banco em memória.
 
-Ilustração: `domain/repository/PagamentoRepository` (`listar` com filtros nulos = todos); `Pagamento.boletos`.
+Ilustração: `domain/repository/FinanciamentoRepository` (`listar` com filtros nulos = todos); `Financiamento.documentos`.
 
 ## 9. Testes
 
 | Teste | O quê | Ilustração |
 |---|---|---|
 | Builder de cenários | dados **válidos** por padrão; cada teste muda só o que interessa | `domain/Cenarios` |
-| Specs/catálogo | uma classe `@Nested` por elo/momento; o limite exato de cada regra | `RegrasPagamentoTest` |
-| Estados | **tabela** ação → (origem → destino); o resto deve dar 409 | `StatusPagamentoTest` |
-| Entidade | ordem 409 → 422 → muda; fatos e idempotência | `PagamentoTest` |
-| Repositório e transação | 2ª transação no mesmo registro → 409; nº de consultas da listagem; efeito externo só com commit | `PagamentoRepositoryTest` |
-| Ponta a ponta | fluxo HTTP feliz + um erro por família + webhook (**caixa-preta**: só HTTP) | `PagamentoResourceTest` |
-| Integração | o app **empacotado** + banco real; herda o ponta a ponta + cenários com requisições paralelas | `PagamentoResourceIT` |
+| Specs/catálogo | uma classe `@Nested` por elo/momento; o limite exato de cada regra | `RegrasFinanciamentoTest` |
+| Estados | **tabela** ação → (origem → destino); o resto deve dar 409 | `StatusFinanciamentoTest` |
+| Entidade | ordem 409 → 422 → muda; fatos e idempotência | `FinanciamentoTest` |
+| Repositório e transação | 2ª transação no mesmo registro → 409; nº de consultas da listagem; efeito externo só com commit | `FinanciamentoRepositoryTest` |
+| Ponta a ponta | fluxo HTTP feliz + um erro por família + webhook (**caixa-preta**: só HTTP) | `FinanciamentoResourceTest` |
+| Integração | o app **empacotado** + banco real; herda o ponta a ponta + cenários com requisições paralelas | `FinanciamentoResourceIT` |
 
 Entidade, regras e estados: JUnit puro (anotação JPA não exige runtime). `@QuarkusTest`: repositório, adapter, entrypoint.
 Banco de teste = o de produção, via **Dev Services** (container; sem URL no profile test). `@QuarkusIntegrationTest`:

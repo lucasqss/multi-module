@@ -10,7 +10,7 @@
         O domínio não depende de framework nenhum (sem JPA, sem CDI, sem REST).
     -->
     <groupId>com.example</groupId>
-    <artifactId>pagamento-boleto</artifactId>
+    <artifactId>financiamento</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 
     <properties>

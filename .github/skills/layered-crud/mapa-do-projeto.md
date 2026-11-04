@@ -1,7 +1,7 @@
 ## Mapa do projeto
 
 <!-- Lido pela skill layered-crud. Troque os <marcadores> pelos nomes REAIS deste projeto e apague
-     linhas que não se aplicam. Exemplo preenchido: copilot-instructions.md do repositório pagamento-boleto. -->
+     linhas que não se aplicam. Exemplo preenchido: copilot-instructions.md do repositório de referência (financiamento). -->
 
 | Papel | Neste projeto |
 |---|---|

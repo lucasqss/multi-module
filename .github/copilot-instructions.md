@@ -4,8 +4,9 @@ Este projeto é um **CRUD de referência** (Quarkus 3, Java 25, Maven, projeto �
 Ele serve de modelo para outros projetos, então **consistência com os padrões existentes vale mais
 que a solução mais curta**. Na dúvida, copie a forma de uma classe existente equivalente.
 
-Domínio: ciclo de vida de um boleto — emissão (gera linha digitável), notificação ao pagador e
-recebimento do pagamento. Código, nomes e mensagens em **português**; termos técnicos consagrados
+Domínio: **processo de pagamento de boletos**. O boleto pertence a um sistema externo (o **emissor**);
+o que é nosso é o processo: escolher os boletos, aprovar (com alçada), enviar ao **banco** (outro
+sistema externo) e acompanhar o retorno. Código, nomes e mensagens em **português**; termos técnicos consagrados
 (Repository, Factory, Spec, UC) ficam em inglês.
 
 ## Arquitetura em camadas (regra de dependência)
@@ -19,7 +20,7 @@ entrypoint ──▶ application ──▶ domain
 Sem ports and adapters: as camadas se ligam por **injeção de dependência de classes concretas**.
 O use case injeta o repositório/integração de `adapter` diretamente; não crie interfaces "de porta".
 
-Pacote base `com.example.boleto`:
+Pacote base `com.example.pagamento`:
 
 | Camada | Pode importar | NUNCA importa |
 |---|---|---|
@@ -33,7 +34,7 @@ Verifique com `bash .github/skills/layered-revisao-arquitetura/verificar-camadas
 ## Estrutura de pastas (por tipo, enxuta)
 
 ```
-com.example.boleto
+com.example.pagamento
 ├── domain
 │   ├── entity          entidades (aggregate roots)
 │   ├── valueobject     value objects (records) e enums de valor
@@ -56,7 +57,7 @@ com.example.boleto
 
 | Pasta | Para onde vai o conteúdo |
 |---|---|
-| `domain/factory` | Criação = método estático da entidade (`Boleto.criar`) ou de um record de contexto (`CondicoesEmissao.de(clock, ...)`) |
+| `domain/factory` | Criação = método estático da entidade (`ProcessoPagamento.criar`) |
 | `domain/model` | Candidato das regras → `specification/<agregado>`; DTO → `application/.../dto` ou `adapter/<sistema>` |
 | `domain/enums` | Status → `state`; enum de valor → `valueobject`; enum usado por um só VO → método do VO |
 | `domain/repository`, `domain/gateway` | Repositório/integração concretos em `adapter/` (sem ports) |
@@ -82,12 +83,12 @@ Resource/Consumer ─▶ UC ─┬─▶ Repository / integração (adapter) ─
 
 1. **Domínio rico, nunca anêmico.** Entidades não têm setters públicos nem construtor público.
    Estado muda só por métodos com nome de negócio (`emitir`, `cancelar`, `receberPagamento`).
-   Criação por fábrica estática que valida (`Boleto.emitir`); reconstrução do banco por `reconstituir`.
+   Criação por fábrica estática (`ProcessoPagamento.criar`); reconstrução do banco por `reconstituir`.
 2. **Use case orquestra, não decide.** Um `*UC` por intenção do usuário (ver "O que é um caso de uso"): busca fatos nos repositórios/integrações, delega a decisão
    ao domínio, persiste, devolve DTO. **Nenhum `if` de regra de negócio em use case.**
 3. **Regras de negócio = Specification pattern.** Cada regra é uma `RegraNegocio<T>` (ou composição
-   de `Specification<T>`) registrada no catálogo `RegrasBoleto`. Specs são **puras**: fatos que exigem
-   I/O são consultados pelo use case e entregues no candidato (ex.: `CondicoesEmissao` dentro de `EmissaoBoleto`).
+   de `Specification<T>`) registrada no catálogo `RegrasProcessoPagamento`. Specs são **puras**: fatos que exigem
+   I/O são consultados pelo use case e entregues no candidato (ex.: "hoje" em `SubmissaoProcesso`, dados do emissor em `BoletoAPagar`).
 4. **Máquina de estados = State pattern.** Uma classe por estado em `domain.state`, `sealed`,
    que **proíbe tudo por padrão**. Transições retornam o próximo estado. Nunca use `if (status == X)`.
 5. **Exceções específicas.** Uma classe por situação, estendendo uma das famílias:
@@ -121,14 +122,14 @@ sistema dispara isso como **uma** ação? Então é um caso de uso.
 
 | Situação | Quantos casos de uso | Exemplo |
 |---|---|---|
-| Criar o agregado | 1 — nasce em `EM_EDICAO` se pode ficar incompleto | `CriarBoletoUC` |
-| Editar uma seção/parte editada como bloco | 1 por seção (`PUT` substitui a seção) | `SalvarItensBoletoUC`, `SalvarDestinatariosBoletoUC`, `AlterarBoletoUC` (vencimento) |
-| Incluir/remover uma parte que é ação de negócio própria (regras, permissão ou evento próprios) | 1 por ação | `AnexarDocumentoUC` |
-| Finalizar a edição (exige completude) | 1 | `EmitirBoletoUC` |
-| Aviso de **sistema externo** (fato: pagamento, retorno de processamento) | 1, chamado por um entrypoint de integração (webhook/fila) | `ReceberPagamentoBoletoUC` (webhook) |
-| Transição de estado / evento de negócio | 1 por transição | `NotificarBoletoUC`, `ReceberPagamentoBoletoUC`, `CancelarBoletoUC` |
-| Consultar | 1 por consulta | `ConsultarBoletoUC`, `ListarBoletosUC` |
-| Entidade com vida própria, usada por vários agregados | CRUD próprio; aqui só o id | `Pagador` cadastrado à parte |
+| Criar o agregado | 1 — nasce em `EM_EDICAO` se pode ficar incompleto | `CriarProcessoPagamentoUC` |
+| Editar uma seção/parte editada como bloco | 1 por seção (`PUT` substitui a seção) | `SalvarBoletosDoProcessoUC`, `AlterarProcessoPagamentoUC` (conta e data) |
+| Incluir/remover uma parte que é ação de negócio própria (regras, permissão ou evento próprios) | 1 por ação | (não há no exemplo; ex.: `AnexarComprovanteUC`) |
+| Finalizar a edição (exige completude) | 1 | `SubmeterProcessoPagamentoUC` |
+| Aviso de **sistema externo** (fato: pagamento, retorno de processamento) | 1, chamado por um entrypoint de integração (webhook/fila) | `ReceberRetornoBancoUC`, `ReceberCancelamentoBoletoUC` (webhooks) |
+| Transição de estado / evento de negócio | 1 por transição | `AprovarProcessoPagamentoUC`, `RejeitarProcessoPagamentoUC`, `EnviarProcessoParaPagamentoUC`, `RetentarPagamentoUC`, `CancelarProcessoPagamentoUC` |
+| Consultar | 1 por consulta | `ConsultarProcessoPagamentoUC`, `ListarProcessosPagamentoUC` |
+| Entidade com vida própria, usada por vários agregados | CRUD próprio; aqui só o id | o **boleto**: é do emissor; aqui só a cópia `BoletoAPagar` e o id dele |
 
 ### Comando × fato
 
@@ -141,10 +142,10 @@ sistema dispara isso como **uma** ação? Então é um caso de uso.
 
 ### Agregado editado por partes (padrão `EM_EDICAO`)
 
-1. `CriarBoletoUC` cria o rascunho em `EM_EDICAO` só com o mínimo.
-2. Um `Salvar<Secao>BoletoUC` por seção; cada um valida **só a seção** (regras de seção no catálogo).
+1. `CriarProcessoPagamentoUC` cria o rascunho em `EM_EDICAO` só com o mínimo.
+2. Um caso de uso por seção (`SalvarBoletosDoProcessoUC`, `AlterarProcessoPagamentoUC`); cada um valida **só a seção** (regras de seção no catálogo).
    O agregado pode continuar incompleto.
-3. `EmitirBoletoUC` exige a **completude** (conjunto de regras de finalização no catálogo, sobre o agregado
+3. `SubmeterProcessoPagamentoUC` exige a **completude** (conjunto de regras de finalização no catálogo, sobre o agregado
    inteiro) e muda o estado. Só a partir daí o agregado "vale" (é cobrável, visível, enviado...).
 4. O estado `EM_EDICAO` permite editar/excluir; os seguintes não (`validarEdicao()` → 409).
 5. `@Version` no agregado: duas edições concorrentes, mesmo de seções diferentes, não se sobrescrevem.
@@ -179,18 +180,20 @@ As skills são **genéricas** (valem para qualquer projeto no padrão) e usam es
 
 | Papel | Neste projeto |
 |---|---|
-| Pacote base | `com.example.boleto` (`src/main/java/com/example/boleto`) |
-| Entrypoints | `entrypoint/api/v1` (REST, nossa API), `entrypoint/webhook/v1` (aviso de pagamento do sistema externo) |
-| Agregados | `Boleto` (`domain/entity/Boleto`) |
+| Pacote base | `com.example.pagamento` (`src/main/java/com/example/pagamento`) |
+| Entrypoints | `entrypoint/api/v1` (nossa API), `entrypoint/webhook/v1` (`BancoWebhookResource`: retorno do banco; `EmissorWebhookResource`: boleto cancelado) |
+| Agregados | `ProcessoPagamento` (`domain/entity/ProcessoPagamento`) |
+| Entidades internas do agregado | `Aprovacao`, `TentativaPagamento` (sem repositório nem UC próprios) |
+| Partes substituídas inteiras | `BoletosDoProcesso` (cópias `BoletoAPagar` do emissor), `ContaDebito` |
 | Base de specs | `domain/specification/Specification`, `RegraNegocio`, `ValidadorRegras` |
-| Catálogo de regras | `RegrasBoleto` — por momento: seções `ITENS`, `DESTINATARIOS`; finalização `EMISSAO`; `CONFORMIDADE_PAGAMENTO` (classifica fato) |
-| Candidatos das regras | `ItensBoleto`, `DestinatariosDoBoleto` (seções); `EmissaoBoleto` + `CondicoesEmissao.de(clock, ...)` (emissão); `RecebimentoPagamento` — montados pela entidade |
-| Agregado editado por partes | `Boleto`: `EM_EDICAO` → seções (`SalvarItensBoletoUC`, `SalvarDestinatariosBoletoUC`) → `EmitirBoletoUC` |
-| Máquina de estados | `domain/state`: `EstadoBoleto`, estados concretos e enum `StatusBoleto` |
-| Repositórios (injetados nos UCs) | `adapter/database/BoletoRepository` (Panache, fala domínio) |
-| Integrações externas (injetadas nos UCs) | `adapter/notificacao/NotificadorBoleto`, `adapter/pagamentos/SistemaPagamentos` (saída: devolução) |
+| Catálogo de regras | `RegrasProcessoPagamento` — por momento: seção `BOLETOS`; finalização `SUBMISSAO`; `APROVACAO` + `ALCADA_ATINGIDA` (decisão); `CONFORMIDADE_RETORNO` (classifica fato) |
+| Candidatos das regras | `domain/specification/processo/`: `SubmissaoProcesso`, `AprovacaoProcesso`, `RetornoPagamento` — montados pela raiz |
+| Agregado editado por partes | `ProcessoPagamento`: `EM_EDICAO` → seções (`SalvarBoletosDoProcessoUC`, `AlterarProcessoPagamentoUC`) → `SubmeterProcessoPagamentoUC` |
+| Máquina de estados | `domain/state`: `EstadoProcesso`, estados concretos e enum `StatusProcesso` |
+| Repositórios (injetados nos UCs) | `adapter/database/ProcessoPagamentoRepository` (Panache, fala domínio) |
+| Integrações externas (injetadas nos UCs) | `adapter/emissor/EmissorBoletos` (consulta boleto), `adapter/banco/BancoPagamentos` (envia pagamento) |
 | Handler de erros HTTP | `entrypoint/api/v1/handler/ApiExceptionHandler` |
 | `Clock` no fuso do negócio | `shared/ClockProducer` |
-| Builder de cenários de teste | `src/test/java/com/example/boleto/domain/Cenarios` |
-| Teste de tabela de estados | `EstadoBoletoTest` (mapa `PERMITIDAS`) |
+| Builder de cenários de teste | `src/test/java/com/example/pagamento/domain/Cenarios` |
+| Teste de tabela de estados | `EstadoProcessoTest` (mapa `PERMITIDAS`) |
 | Comandos | `mvn test`, `mvn quarkus:dev` |

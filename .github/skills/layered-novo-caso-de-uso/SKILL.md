@@ -7,8 +7,8 @@ description: Decide se algo é um caso de uso (uma intenção do usuário, um ex
 
 > **Sobre os exemplos.** As instruções desta skill são genéricas: falam de **papéis** (catálogo de regras,
 > base de estados, candidato das regras...) e valem para qualquer projeto no padrão. Os trechos marcados
-> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`), que mostra
-> o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
+> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`): um
+> processo de pagamento de boletos, que mostra o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
 > os nomes do **"Mapa do projeto"** (`.github/copilot-instructions.md`) e copie a forma das classes de lá.
 
 Construa **de dentro para fora**: domínio → application → entrypoint → testes.
@@ -28,16 +28,16 @@ sistema dispara isso como **uma** ação? Então é um caso de uso.
 - **Separe** em UCs diferentes quando muda: a regra, a permissão, a transição de estado ou o ator/gatilho
   (usuário × banco × job). **Junte** quando sempre acontecem juntos, com a mesma regra e o mesmo gatilho.
 
-| Situação | Quantos casos de uso | Ilustração (boleto) |
+| Situação | Quantos casos de uso | Ilustração (processo de pagamento) |
 |---|---|---|
-| Criar o agregado | 1 — nasce em `EM_EDICAO` se pode ficar incompleto | `CriarBoletoUC` |
-| Editar uma seção/parte editada como bloco | 1 por seção (`PUT` substitui a seção) | `SalvarItensBoletoUC`, `SalvarDestinatariosBoletoUC` |
-| Incluir/remover uma parte que é ação de negócio própria (regras, permissão ou evento próprios) | 1 por ação | (não há no boleto; ex.: `AnexarComprovanteUC`) |
-| Finalizar a edição (exige completude) | 1 | `EmitirBoletoUC` |
-| Aviso de **sistema externo** (fato: pagamento, retorno de processamento) | 1, chamado por um entrypoint de integração (webhook/fila) | `ReceberPagamentoBoletoUC` (webhook) |
-| Transição de estado / evento de negócio | 1 por transição | `NotificarBoletoUC`, `CancelarBoletoUC`, `AceitarPagamentoBoletoUC` |
-| Consultar | 1 por consulta | `ConsultarBoletoUC`, `ListarBoletosUC` |
-| Entidade com vida própria, usada por vários agregados | CRUD próprio; aqui só o id | (no boleto o pagador é VO; num cadastro de clientes, seria agregado próprio) |
+| Criar o agregado | 1 — nasce em `EM_EDICAO` se pode ficar incompleto | `CriarProcessoPagamentoUC` |
+| Editar uma seção/parte editada como bloco | 1 por seção (`PUT` substitui a seção) | `SalvarBoletosDoProcessoUC`, `AlterarProcessoPagamentoUC` (dados gerais) |
+| Incluir/remover uma parte que é ação de negócio própria (regras, permissão ou evento próprios) | 1 por ação | (não há no exemplo; ex.: `AnexarComprovanteUC`) |
+| Finalizar a edição (exige completude) | 1 | `SubmeterProcessoPagamentoUC` |
+| Aviso de **sistema externo** (fato: pagamento, retorno de processamento) | 1, chamado por um entrypoint de integração (webhook/fila) | `ReceberRetornoBancoUC`, `ReceberCancelamentoBoletoUC` (webhooks) |
+| Transição de estado / evento de negócio | 1 por transição | `AprovarProcessoPagamentoUC`, `RejeitarProcessoPagamentoUC`, `EnviarProcessoParaPagamentoUC`, `CancelarProcessoPagamentoUC` |
+| Consultar | 1 por consulta | `ConsultarProcessoPagamentoUC`, `ListarProcessosPagamentoUC` |
+| Entidade com vida própria, usada por vários agregados | CRUD próprio; aqui só o id | o BOLETO: é do sistema emissor; aqui só a cópia (`BoletoAPagar`) e o id dele |
 
 #### Comando × fato
 
@@ -58,7 +58,9 @@ sistema dispara isso como **uma** ação? Então é um caso de uso.
 4. O estado `EM_EDICAO` permite editar/excluir; os seguintes não (`validarEdicao()` → 409).
 5. `@Version` no agregado: duas edições concorrentes, mesmo de seções diferentes, não se sobrescrevem.
 
-Ilustração: `CriarBoletoUC` → `SalvarItensBoletoUC` / `SalvarDestinatariosBoletoUC` / `AlterarBoletoUC` → `EmitirBoletoUC`.
+Ilustração: `CriarProcessoPagamentoUC` → `SalvarBoletosDoProcessoUC` / `AlterarProcessoPagamentoUC` → `SubmeterProcessoPagamentoUC`.
+Partes com identidade (`Aprovacao`, `TentativaPagamento`) também não ganham UC próprio: `AprovarProcessoPagamentoUC`
+e `EnviarProcessoParaPagamentoUC` passam pelo `ProcessoPagamento`.
 
 Nunca acrescente um segundo método público a um UC existente: crie outro UC.
 
@@ -83,30 +85,30 @@ Pelo **"Mapa do projeto"** do `copilot-instructions.md`/`AGENTS.md`, ou buscando
 
 `application/<agregado>/<Verbo><Agregado>UC.java`.
 
-**Ilustração** (`CancelarBoletoUC`):
+**Ilustração** (`CancelarProcessoPagamentoUC`):
 
 ```java
 @ApplicationScoped
-public class CancelarBoletoUC {
+public class CancelarProcessoPagamentoUC {
 
-    private final BoletoRepository repository;            // classe concreta de adapter/database
+    private final ProcessoPagamentoRepository repository;   // classe concreta de adapter/database
 
-    public CancelarBoletoUC(BoletoRepository repository) {  // injeção por construtor
+    public CancelarProcessoPagamentoUC(ProcessoPagamentoRepository repository) {  // injeção por construtor
         this.repository = repository;
     }
 
     @Transactional
-    public BoletoOutput executar(UUID id, String motivo) {
-        var boleto = repository.obter(new BoletoId(id));   // 404 automático
-        boleto.cancelar(new Motivo(motivo));               // domínio decide (estado: 409)
-        repository.salvar(boleto);                         // detecta concorrência
-        return BoletoOutput.de(boleto);                    // nunca a entidade
+    public ProcessoPagamentoOutput executar(UUID id, String motivo) {
+        var processo = repository.obter(new ProcessoPagamentoId(id));  // 404 automático
+        processo.cancelar(new Motivo(motivo));                         // domínio decide (estado: 409)
+        repository.salvar(processo);                                   // detecta concorrência
+        return ProcessoPagamentoOutput.de(processo);                   // nunca a entidade
     }
 }
 ```
 
-Com fato vindo de fora e relógio, veja `ReceberPagamentoBoletoUC`; com integração de saída depois de
-salvar, `DevolverPagamentoBoletoUC`.
+Com fato vindo de fora, veja `ReceberRetornoBancoUC`; com consulta a sistema externo antes de decidir,
+`SalvarBoletosDoProcessoUC`; com integração de saída depois de salvar, `EnviarProcessoParaPagamentoUC`.
 
 - Entrada com vários campos → `record *Input` em `application/<agregado>/dto`, com métodos que
   montam VOs. Saída → `*Output` com `static de(Entidade)`.
@@ -116,9 +118,9 @@ salvar, `DevolverPagamentoBoletoUC`.
 ## 3. Entrypoint(s)
 
 - **REST**: CRUD nos verbos (`GET`, `PUT /{id}`, `DELETE /{id}`); evento de negócio/transição como
-  `POST /{id}/<substantivo>` (ilustração: `/emissao`, `/cancelamento`, `/devolucao`).
+  `POST /{id}/<substantivo>` (ilustração: `/submissao`, `/aprovacoes`, `/envio`).
 - **Mensageria/IIB/fila/webhook**: entrypoint próprio (`iib.v1`, `webhook.v1`...), chamando um use case.
-  Nunca duplique lógica entre entrypoints (ilustração: `PagamentoWebhookResource`).
+  Nunca duplique lógica entre entrypoints (ilustração: `BancoWebhookResource`, `EmissorWebhookResource`).
 - `*Request`: `record` com Bean Validation **só sintática** (`@NotNull`, `@NotBlank`) e `paraInput(...)`.
 - `*Response`: contrato próprio com `static de(Output)`; enums viram `String`.
 - **Não** crie mapper de exceção: o handler do projeto mapeia por família.

@@ -7,8 +7,8 @@ description: Prepara um projeto Java (Quarkus) para o padrão layered com domín
 
 > **Sobre os exemplos.** As instruções desta skill são genéricas: falam de **papéis** (catálogo de regras,
 > base de estados, candidato das regras...) e valem para qualquer projeto no padrão. Os trechos marcados
-> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`), que mostra
-> o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
+> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`): um
+> processo de pagamento de boletos, que mostra o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
 > os nomes do **"Mapa do projeto"** (`.github/copilot-instructions.md`) e copie a forma das classes de lá.
 
 ## 1. Descubra o que já existe (não duplique)

@@ -4,7 +4,7 @@ applyTo: "**/src/main/java/**/application/**/*.java"
 
 # Camada de aplicação (use cases)
 
-- **Um use case por intenção do usuário** (não por entidade, não por operação técnica), nome `<Verbo><Agregado>UC` (ilustração: `CriarBoletoUC`, `EmitirBoletoUC`), método único `executar`.
+- **Um use case por intenção do usuário** (não por entidade, não por operação técnica), nome `<Verbo><Agregado>UC` (ilustração: `CriarProcessoPagamentoUC`, `SubmeterProcessoPagamentoUC`), método único `executar`.
 - `@ApplicationScoped`; dependências por **construtor** (sem `@Inject` em campo).
 - `@Transactional` em toda operação que escreve.
 - Roteiro fixo, sem regra de negócio:

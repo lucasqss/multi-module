@@ -6,7 +6,7 @@ Specification, State e exceções específicas. As camadas se ligam por **injeç
 concretas** (sem ports and adapters): use cases injetam repositórios e integrações de `adapter/`; o domínio
 não depende de nenhuma outra camada nem de framework.
 
-O sistema de boletos deste repositório (`pagamento-boleto`) é só a **ilustração do "to be"**: os exemplos
+O processo de pagamento de boletos deste repositório (`pagamento-boleto`) é só a **ilustração do "to be"**: os exemplos
 das skills vêm dele, marcados como "Ilustração", mas as instruções não dependem dele.
 
 ## Conteúdo
@@ -125,7 +125,7 @@ sistema dispara isso como **uma** ação? Então é um caso de uso.
 ## Como as skills se adaptam a cada projeto
 
 As skills falam de **papéis** (catálogo de regras, base de estados, candidato das regras, builder de
-testes...), não de classes do boleto. Para saber quem cumpre cada papel, elas:
+testes...), não de classes do repositório de referência. Para saber quem cumpre cada papel, elas:
 
 1. leem a seção **"Mapa do projeto"** do `.github/copilot-instructions.md` (ou `AGENTS.md`);
 2. se não houver mapa, procuram no código (`extends RegraNegocio<`, `abstract sealed class Estado`...)

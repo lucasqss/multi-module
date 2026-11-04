@@ -7,8 +7,8 @@ description: Cria ou altera a máquina de estados de uma entidade em projeto Jav
 
 > **Sobre os exemplos.** As instruções desta skill são genéricas: falam de **papéis** (catálogo de regras,
 > base de estados, candidato das regras...) e valem para qualquer projeto no padrão. Os trechos marcados
-> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`), que mostra
-> o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
+> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`): um
+> processo de pagamento de boletos, que mostra o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
 > os nomes do **"Mapa do projeto"** (`.github/copilot-instructions.md`) e copie a forma das classes de lá.
 
 Comportamento que depende do status **nunca** vira `if (status == ...)` ou `switch` em entidade ou
@@ -30,7 +30,8 @@ Se a entidade ainda não tem estados, vá ao passo C.
 - Ações que dependem do status sem mudá-lo: `validarEdicao()`, `validarExclusao()`.
 - Consultas (`emAberto()`) moram nos estados; o repositório deriva queries delas.
 - Auto-transição é válida (`return this`), ex.: reenviar algo sem mudar de estado.
-- Transição pode depender de um dado do fato: `receberPagamento(boolean conforme)` escolhe o destino.
+- Transição pode depender de uma avaliação: `registrarAprovacao(boolean alcadaAtingida)`,
+  `receberRetornoBanco(boolean liquidado, boolean conforme)` (ilustração) escolhem o destino.
 
 ## A) Nova transição entre estados existentes
 
@@ -39,25 +40,28 @@ Se a entidade ainda não tem estados, vá ao passo C.
 3. Entidade: método de negócio na ordem fixa: estado autoriza (409) → specs, se houver (422) → muda.
 4. Use case + entrypoint: skill `layered-novo-caso-de-uso` (`POST /{id}/<substantivo>`).
 
-**Ilustração** (`EstadoBoleto`, `EstadoEmAnalise`, `Boleto`):
+**Ilustração** (aprovação com alçada, no processo de pagamento: `EstadoProcesso`,
+`EstadoAguardandoAprovacao`, `ProcessoPagamento`). Repare na auto-transição quando ainda falta aprovação:
 
 ```java
 // base: proibido por padrão
-public EstadoBoleto devolverPagamento() {
-    throw acaoNaoPermitida("devolver pagamento de");
+public EstadoProcesso registrarAprovacao(boolean alcadaAtingida) {
+    throw acaoNaoPermitida("aprovar");
 }
 
-// EstadoEmAnalise: o único que permite
+// EstadoAguardandoAprovacao: o único que permite; o resultado da alçada escolhe o destino
 @Override
-public EstadoBoleto devolverPagamento() {
-    return EstadoDevolvido.INSTANCIA;
+public EstadoProcesso registrarAprovacao(boolean alcadaAtingida) {
+    return alcadaAtingida ? EstadoAprovado.INSTANCIA : this;
 }
 
-// Boleto: o estado decide; a entidade só guarda o resultado
-public void devolverPagamento(Motivo motivo) {
-    Objects.requireNonNull(motivo, "motivo é obrigatório");
-    estado = estado.devolverPagamento();
-    motivoDevolucao = motivo;
+// ProcessoPagamento: estado (409) -> regras (422) -> muda
+public void aprovar(Matricula aprovador, Instant agora) {
+    var candidato = new AprovacaoProcesso(solicitante, aprovadores(), aprovador, getValorTotal());
+    var proximo = estado.registrarAprovacao(RegrasProcessoPagamento.ALCADA_ATINGIDA.isSatisfiedBy(candidato));
+    RegrasProcessoPagamento.APROVACAO.validar(candidato);
+    aprovacoes.add(Aprovacao.de(aprovador, agora));
+    estado = proximo;
 }
 ```
 
@@ -76,43 +80,43 @@ Crie, para o seu agregado: o enum `Status<Agregado>`, a `TransicaoEstadoInvalida
 `private Estado<Agregado> estado`, iniciado com `inicial()`, reconstruído com `de(status)` em
 `reconstituir(...)`, e `getStatus()` devolvendo `estado.status()`.
 
-**Ilustração** (resumo de `domain/state` do boleto):
+**Ilustração** (resumo de `domain/state` do processo de pagamento):
 
 ```java
-public enum StatusBoleto { EM_EDICAO, EMITIDO, NOTIFICADO, PAGO, EM_ANALISE, DEVOLVIDO, CANCELADO }
+public enum StatusProcesso { EM_EDICAO, AGUARDANDO_APROVACAO, REJEITADO, APROVADO,
+                             EM_PROCESSAMENTO, FALHOU, PAGO, EM_ANALISE, CANCELADO }
 
-public abstract sealed class EstadoBoleto
-        permits EstadoEmEdicao, EstadoEmitido, EstadoNotificado, EstadoPago,
-                EstadoEmAnalise, EstadoDevolvido, EstadoCancelado {
+public abstract sealed class EstadoProcesso
+        permits EstadoEmEdicao, EstadoAguardandoAprovacao, EstadoRejeitado, EstadoAprovado,
+                EstadoEmProcessamento, EstadoFalhou, EstadoPago, EstadoEmAnalise, EstadoCancelado {
 
-    public abstract StatusBoleto status();
+    public abstract StatusProcesso status();
 
-    public EstadoBoleto emitir() { throw acaoNaoPermitida("emitir"); }
-    public EstadoBoleto cancelar() { throw acaoNaoPermitida("cancelar"); }
+    public EstadoProcesso submeter() { throw acaoNaoPermitida("submeter"); }
+    public EstadoProcesso cancelar() { throw acaoNaoPermitida("cancelar"); }
     public void validarEdicao() { throw acaoNaoPermitida("editar"); }
-    public boolean emAberto() { return false; }
-    // ... demais ações, todas proibidas por padrão
+    // ... demais ações (inclusive FATOS externos, ex.: receberRetornoBanco), todas proibidas por padrão
 
     protected final TransicaoEstadoInvalidaException acaoNaoPermitida(String acao) {
         return new TransicaoEstadoInvalidaException(status(), acao);
     }
 
-    public static EstadoBoleto de(StatusBoleto status) {
+    public static EstadoProcesso de(StatusProcesso status) {
         return switch (status) {           // não compila se faltar um estado
             case EM_EDICAO -> EstadoEmEdicao.INSTANCIA;
-            case EMITIDO -> EstadoEmitido.INSTANCIA;
+            case AGUARDANDO_APROVACAO -> EstadoAguardandoAprovacao.INSTANCIA;
             // ...
         };
     }
 
-    public static EstadoBoleto inicial() { return EstadoEmEdicao.INSTANCIA; }
+    public static EstadoProcesso inicial() { return EstadoEmEdicao.INSTANCIA; }
 }
 
-public final class EstadoEmEdicao extends EstadoBoleto {
+public final class EstadoEmEdicao extends EstadoProcesso {
     static final EstadoEmEdicao INSTANCIA = new EstadoEmEdicao();
     private EstadoEmEdicao() { }
-    @Override public StatusBoleto status() { return StatusBoleto.EM_EDICAO; }
-    @Override public EstadoBoleto emitir() { return EstadoEmitido.INSTANCIA; }
+    @Override public StatusProcesso status() { return StatusProcesso.EM_EDICAO; }
+    @Override public EstadoProcesso submeter() { return EstadoAguardandoAprovacao.INSTANCIA; }
     @Override public void validarEdicao() { /* permitido */ }
     @Override public void validarExclusao() { /* permitido */ }
 }
@@ -124,18 +128,18 @@ Teste de **tabela**: para cada (status × ação), o destino esperado ou `Transi
 Mais: teste da entidade (ciclo completo e ordem 409 antes de 422) e teste HTTP com `409` +
 `TRANSICAO_ESTADO_INVALIDA`.
 
-**Ilustração** (`EstadoBoletoTest`):
+**Ilustração** (`EstadoProcessoTest`):
 
 ```java
-private static final Map<StatusBoleto, Map<String, StatusBoleto>> PERMITIDAS = Map.of(
-        EM_EDICAO, Map.of("emitir", EMITIDO),
-        EMITIDO, Map.of("notificar", NOTIFICADO, "cancelar", CANCELADO,
-                "pagamentoConforme", PAGO, "pagamentoDivergente", EM_ANALISE),
-        EM_ANALISE, Map.of("aceitarPagamento", PAGO, "devolverPagamento", DEVOLVIDO),
-        PAGO, Map.of(),
+private static final Map<StatusProcesso, Map<String, StatusProcesso>> PERMITIDAS = Map.of(
+        EM_EDICAO, Map.of("submeter", AGUARDANDO_APROVACAO, "cancelar", CANCELADO, ...),
+        AGUARDANDO_APROVACAO, Map.of("aprovarSemAlcada", AGUARDANDO_APROVACAO, "aprovarComAlcada", APROVADO, ...),
+        EM_PROCESSAMENTO, Map.of("retornoLiquidadoConforme", PAGO, "retornoLiquidadoDivergente", EM_ANALISE,
+                "retornoRecusado", FALHOU, "boletoCanceladoNoEmissor", EM_ANALISE),
+        PAGO, Map.of("boletoCanceladoNoEmissor", EM_ANALISE),
         // ...
 );
-// percorre StatusBoleto.values() × ACOES: o que não está em PERMITIDAS tem que lançar
+// percorre StatusProcesso.values() × ACOES: o que não está em PERMITIDAS tem que lançar
 ```
 
 ## Feche

@@ -7,8 +7,8 @@ description: Enxuga a estrutura de pastas de um projeto Java layered organizado 
 
 > **Sobre os exemplos.** As instruções desta skill são genéricas: falam de **papéis** (catálogo de regras,
 > base de estados, candidato das regras...) e valem para qualquer projeto no padrão. Os trechos marcados
-> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`), que mostra
-> o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
+> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`): um
+> processo de pagamento de boletos, que mostra o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
 > os nomes do **"Mapa do projeto"** (`.github/copilot-instructions.md`) e copie a forma das classes de lá.
 
 Objetivo: manter a organização **por tipo de classe**, mas só com pastas que têm papel próprio.
@@ -51,7 +51,7 @@ Classes cujo destino seja ambíguo: pergunte.
 
 | Pasta | Pergunta para cada classe | Destino |
 |---|---|---|
-| `domain/factory` | A factory só monta objetos (sem dependências injetadas)? | **Some**: vira método estático da entidade (ilustração: `Boleto.criar(...)`) ou de um record de contexto (`CondicoesEmissao.de(clock, ...)`). |
+| `domain/factory` | A factory só monta objetos (sem dependências injetadas)? | **Some**: vira método estático da entidade (ilustração: `ProcessoPagamento.criar(...)`) ou do candidato das regras. |
 | | Ela injeta repositórios/serviços para montar algo? | É orquestração: vira parte do **use case**. |
 | `domain/model` | Tem identidade e ciclo de vida? | `entity` |
 | | É imutável e definido pelos valores? | `valueobject` (como `record` que valida) |
@@ -101,8 +101,8 @@ Procure e corrija:
 ## Ilustração do "to be"
 
 O repositório de referência **pagamento-boleto** já está na estrutura alvo: `domain` só com `entity`,
-`valueobject`, `exception`, `specification` (+ `specification/boleto`) e `state`; `shared` sem subpastas;
-`adapter/database`, `adapter/notificacao`, `adapter/pagamentos`; `entrypoint/api/v1` e `entrypoint/webhook/v1`.
+`valueobject`, `exception`, `specification` (+ `specification/processo`) e `state`; `shared` sem subpastas;
+`adapter/database`, `adapter/emissor`, `adapter/banco`; `entrypoint/api/v1` e `entrypoint/webhook/v1`.
 
 ## Resultado esperado
 

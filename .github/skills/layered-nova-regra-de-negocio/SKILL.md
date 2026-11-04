@@ -7,8 +7,8 @@ description: Adiciona ou altera uma validação de negócio em projeto Java laye
 
 > **Sobre os exemplos.** As instruções desta skill são genéricas: falam de **papéis** (catálogo de regras,
 > base de estados, candidato das regras...) e valem para qualquer projeto no padrão. Os trechos marcados
-> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`), que mostra
-> o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
+> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`): um
+> processo de pagamento de boletos, que mostra o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
 > os nomes do **"Mapa do projeto"** (`.github/copilot-instructions.md`) e copie a forma das classes de lá.
 
 Regra de negócio **nunca** vai em use case, entrypoint ou adapter.
@@ -61,40 +61,45 @@ public class LimiteDiarioExcedidoException extends RegraNegocioException {
 ## 3. Spec (escolha UMA forma)
 
 **a) Classe própria** (regra com lógica própria), em `domain/specification/<agregado>/`.
-Ilustração HIPOTÉTICA no boleto (um limite diário que ainda não existe lá; o fato `totalEmitidoHoje` viria em `CondicoesEmissao`):
+Ilustração HIPOTÉTICA no processo de pagamento (um limite por beneficiário que não existe lá):
 
 ```java
 /** <Regra em uma frase.> */
-public class LimiteDiarioSpec extends RegraNegocio<EmissaoBoleto> {
+public class LimitePorBeneficiarioSpec extends RegraNegocio<SubmissaoProcesso> {
 
     @Override
-    public boolean isSatisfiedBy(EmissaoBoleto s) {
-        return !s.condicoes().totalEmitidoHoje().maiorQue(LIMITE);   // só lê o candidato
+    public boolean isSatisfiedBy(SubmissaoProcesso s) {
+        return s.boletos().boletos().stream()              // só lê o candidato
+                .noneMatch(b -> b.valor().maiorQue(LIMITE));
     }
 
     @Override
-    protected LimiteDiarioExcedidoException violacao(EmissaoBoleto s) {
-        return new LimiteDiarioExcedidoException(LIMITE);
+    protected LimitePorBeneficiarioExcedidoException violacao(SubmissaoProcesso s) {
+        return new LimitePorBeneficiarioExcedidoException(LIMITE);
     }
 }
 ```
 
 **b) Composição no catálogo** (regra condicional/combinação) a partir de blocos `Specification<T>`.
-**Ilustração** (real, em `RegrasBoleto`):
+**Ilustração** (real, em `RegrasProcessoPagamento`). Composição também serve para DECISÃO sem erro:
+a alçada é uma `Specification` pura que o estado usa para escolher o destino.
 
 ```java
-/** Se o pagador é pessoa física, então valor <= R$ 10.000 (regra fake). */
-public static final RegraNegocio<EmissaoBoleto> LIMITE_PESSOA_FISICA_RESPEITADO = RegraNegocio.de(
-        quando(new PagadorPessoaFisicaSpec()).entao(new ValorAteSpec(LIMITE_PESSOA_FISICA)),
-        s -> new LimitePessoaFisicaExcedidoException(LIMITE_PESSOA_FISICA));
+public static final RegraNegocio<SubmissaoProcesso> VALOR_TOTAL_DENTRO_DO_LIMITE = RegraNegocio.de(
+        new ValorTotalAteSpec(LIMITE_POR_PROCESSO),
+        s -> new ValorTotalAcimaDoLimiteException(LIMITE_POR_PROCESSO));
+
+/** Alçada: acima de R$ 10.000 exige duas aprovações. É DECISÃO, não erro. */
+public static final Specification<AprovacaoProcesso> ALCADA_ATINGIDA =
+        quando(new ValorAcimaDeSpec(LIMITE_UMA_APROVACAO)).entao(new AprovacoesNoMinimoSpec(2));
 ```
 
 A spec é **pura**: nada de I/O, `Clock`, `now()` ou injeção.
 
 ## 4. Registre no catálogo
 
-Adicione ao conjunto do **momento** certo (ilustração: `RegrasBoleto` tem `ITENS`, `DESTINATARIOS`,
-`EMISSAO` e `CONFORMIDADE_PAGAMENTO`): `<SECAO>` (ao salvar uma seção; o agregado pode estar
+Adicione ao conjunto do **momento** certo (ilustração: `RegrasProcessoPagamento` tem `BOLETOS`,
+`SUBMISSAO`, `APROVACAO`, `ALCADA_ATINGIDA` e `CONFORMIDADE_RETORNO`): `<SECAO>` (ao salvar uma seção; o agregado pode estar
 incompleto), `FINALIZACAO` (completude, ao finalizar a edição), `<ACAO>` (outras ações). **A posição importa**:
 o validador é fail-fast e o cliente recebe a primeira regra violada. Fundamentais antes das de detalhe.
 

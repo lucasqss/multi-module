@@ -7,8 +7,8 @@ description: Adiciona integração com sistema externo (e-mail, SMS, fila, pagam
 
 > **Sobre os exemplos.** As instruções desta skill são genéricas: falam de **papéis** (catálogo de regras,
 > base de estados, candidato das regras...) e valem para qualquer projeto no padrão. Os trechos marcados
-> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`), que mostra
-> o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
+> **Ilustração** vêm do repositório de referência **pagamento-boleto** (`lucasqss/multi-module`): um
+> processo de pagamento de boletos, que mostra o "to be" de um sistema no padrão. Eles só ilustram: em outro projeto esses arquivos não existem, use
 > os nomes do **"Mapa do projeto"** (`.github/copilot-instructions.md`) e copie a forma das classes de lá.
 
 Primeiro descubra o **sentido**:
@@ -32,7 +32,7 @@ entrypoints existentes estão organizados (normalmente um subpacote por sistema 
 
 `adapter/<sistema>/<Nome>.java` (`@ApplicationScoped` ou equivalente):
 
-- Nome pelo que o negócio precisa (ilustração: `NotificadorBoleto`, `SistemaPagamentos`), não pela tecnologia
+- Nome pelo que o negócio precisa (ilustração: `EmissorBoletos`, `BancoPagamentos`), não pela tecnologia
   (`SmtpClient`, `MciRestClient`).
 - **Fala a língua do domínio**: métodos públicos recebem/devolvem entidades e VOs de domínio.
   DTOs do sistema externo e a conversão ficam **dentro** do adapter.
@@ -68,13 +68,16 @@ entrypoints existentes estão organizados (normalmente um subpacote por sistema 
    `obterPor<Chave>(...)` que lança a exceção `*NaoEncontrado` (404).
 7. Decisões humanas sobre o fato (aceitar, devolver, reprocessar) são **casos de uso próprios** na nossa API.
 
-## Ilustração (boleto)
+## Ilustração (processo de pagamento: dois sistemas externos, nos dois sentidos)
 
-| Sentido | Entrypoint / adapter | Use case |
-|---|---|---|
-| Saída | `adapter/notificacao/NotificadorBoleto` | `NotificarBoletoUC` |
-| Saída | `adapter/pagamentos/SistemaPagamentos` (devolução) | `DevolverPagamentoBoletoUC` |
-| Entrada | `entrypoint/webhook/v1/PagamentoWebhookResource` + `AvisoPagamentoRequest` (centavos, data/hora com fuso, `X-Webhook-Token`) | `ReceberPagamentoBoletoUC` → `Boleto.registrarPagamento` (classifica com `CONFORMIDADE_PAGAMENTO.primeiraViolacao`, idempotente por `idTransacao`) |
+| Sistema | Sentido | Entrypoint / adapter | Use case |
+|---|---|---|---|
+| Emissor de boletos | Saída (consulta antes de decidir) | `adapter/emissor/EmissorBoletos` → `BoletoAPagar` | `SalvarBoletosDoProcessoUC` |
+| Emissor de boletos | Entrada (boleto cancelado) | `entrypoint/webhook/v1/EmissorWebhookResource` | `ReceberCancelamentoBoletoUC` → cada processo decide (cancela ou análise) |
+| Banco | Saída (depois de salvar) | `adapter/banco/BancoPagamentos` | `EnviarProcessoParaPagamentoUC`, `RetentarPagamentoUC` |
+| Banco | Entrada (retorno) | `entrypoint/webhook/v1/BancoWebhookResource` + `RetornoBancoRequest` (centavos, data/hora com fuso) | `ReceberRetornoBancoUC` → `ProcessoPagamento.registrarRetornoBanco` (classifica com `CONFORMIDADE_RETORNO.primeiraViolacao`, idempotente pela tentativa) |
+
+O BOLETO é dado de outro sistema: guardamos só uma cópia (`BoletoAPagar`) e o id dele; mudanças chegam como fato.
 
 ## Testes
 

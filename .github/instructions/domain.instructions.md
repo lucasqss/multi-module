@@ -17,15 +17,14 @@ o producer de `Clock` em `shared/` (os use cases recebem o `Clock` injetado).
 
 - Campos `private`; `final` para o que não muda (id, data de criação).
 - **Sem setters.** Construtor `private`. Criação por fábrica estática que **valida**
-  (ilustração: `Boleto.criar(...)`) e `reconstituir(...)` para o adapter, sem revalidar.
+  (ilustração: `ProcessoPagamento.criar(...)`) e `reconstituir(...)` para o adapter, sem revalidar.
 - Métodos com **nome de negócio** e esta ordem fixa:
   ```java
-  // ilustração: Boleto.emitir no repositório de referência
-  public void emitir(CondicoesEmissao condicoes) {
-      var proximo = estado.emitir();                    // 1. estado autoriza (409)
-      RegrasBoleto.EMISSAO.validar(candidato);          // 2. specs validam (422)
-      estado = proximo;                                 // 3. só então muda
-      linhaDigitavel = ...;
+  // ilustração: ProcessoPagamento.submeter no repositório de referência
+  public void submeter(LocalDate hoje) {
+      var proximo = estado.submeter();                     // 1. estado autoriza (409)
+      RegrasProcessoPagamento.SUBMISSAO.validar(candidato); // 2. specs validam (422)
+      estado = proximo;                                    // 3. só então muda
   }
   ```
 - Getters são permitidos (leitura); `Optional` para campos que podem não existir.
@@ -34,12 +33,15 @@ o producer de `Clock` em `shared/` (os use cases recebem o `Clock` injetado).
 
 ## Agregado com partes e fatos externos
 
-- Partes (itens, parcelas, documentos) só mudam por métodos do agregado (ilustração: `salvarItens`),
+- Partes (itens, parcelas, documentos) só mudam por métodos do agregado (ilustração: `salvarBoletos`),
   que chamam `estado.validarEdicao()` e as regras **da seção**. Completude só no método de finalização
-  (ilustração: `emitir`). Partes não têm repositório nem use case próprios.
+  (ilustração: `submeter`). Partes não têm repositório nem use case próprios.
+- **Entidades internas** (têm identidade e ciclo de vida dentro do agregado, ex.: `Aprovacao`,
+  `TentativaPagamento`) são criadas e alteradas só pela raiz (construtores/métodos package-private ou
+  chamados só por ela). A raiz expõe cópias das listas.
 - **Fato vindo de fora** (aviso de pagamento, retorno de processamento) não é recusado por regra:
   classifique com `Regras<Agregado>.<CONJUNTO>.primeiraViolacao(...)` e deixe o estado escolher o destino
-  (ilustração: `Boleto.registrarPagamento` → `estado.receberPagamento(conforme)`). Ignore o mesmo id
+  (ilustração: `ProcessoPagamento.registrarRetornoBanco` → `estado.receberRetornoBanco(liquidado, conforme)`). Ignore o mesmo id
   externo (idempotência).
 
 ## Value objects (`domain.valueobject`)

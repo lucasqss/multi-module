@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Resultado de uma tentativa, informado pelo BANCO (sistema externo). É um FATO.
+ * Resultado de um envio, informado pelo BANCO (sistema externo). É um FATO.
  * {@code liquidado = true}: o dinheiro saiu; {@code false}: o banco recusou (saldo, conta, boleto...).
  */
 public record RetornoBanco(String idTransacao, boolean liquidado, Dinheiro valorLiquidado,

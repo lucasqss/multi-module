@@ -2,7 +2,7 @@ package com.example.pagamento.domain.valueobject;
 
 import com.example.pagamento.domain.exception.MotivoInvalidoException;
 
-/** Justificativa de rejeição/cancelamento. */
+/** Justificativa (ex.: de um cancelamento). */
 public record Motivo(String texto) {
 
     public static final int TAMANHO_MAXIMO = 255;

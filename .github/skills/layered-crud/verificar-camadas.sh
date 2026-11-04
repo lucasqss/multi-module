@@ -36,7 +36,7 @@ estrutura() { # aviso (não falha): pastas fora da estrutura enxuta
     [ -d "$d" ] && extras+=" shared/$(basename "$d")"
   done
   if [ -n "$extras" ]; then
-    echo "⚠ pastas fora da estrutura enxuta:$extras (ver skill layered-enxugar-estrutura)"
+    echo "⚠ pastas fora da estrutura enxuta:$extras (ver skill layered-crud)"
   else
     echo "✓ estrutura enxuta (domain: entity, valueobject, exception, specification, state; shared sem subpastas)"
   fi

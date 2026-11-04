@@ -10,7 +10,7 @@ package __PACOTE__.domain.exception;
  * ├── RecursoNaoEncontradoException      não existe                                → 404
  * ├── ConflitoException                  conflita com o estado atual               → 409
  * │   ├── TransicaoEstadoInvalidaException   ação proibida no status (State)
- * │   └── AlteracaoConcorrenteException      outra requisição alterou antes (lock otimista)
+ * │   └── <Recurso>BloqueadoException        outra operação está alterando (lock pessimista)
  * └── RegraNegocioException              regra de negócio violada (Specification)  → 422
  * </pre>
  *

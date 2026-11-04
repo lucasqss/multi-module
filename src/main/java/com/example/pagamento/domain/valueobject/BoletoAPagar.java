@@ -1,5 +1,8 @@
 package com.example.pagamento.domain.valueobject;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+
 import java.time.LocalDate;
 import java.util.Objects;
 
@@ -8,8 +11,12 @@ import java.util.Objects;
  * emissor. Aqui guardamos uma CÓPIA dos dados que valem para este pagamento (para regras e auditoria),
  * obtida do emissor pelo adapter. Mudanças posteriores no emissor chegam como fato (webhook).
  */
-public record BoletoAPagar(String idNoEmissor, LinhaDigitavel linhaDigitavel, Dinheiro valor,
-                           LocalDate vencimento, String beneficiario) {
+@Embeddable
+public record BoletoAPagar(@Column(name = "id_no_emissor", nullable = false, length = 40) String idNoEmissor,
+                           @Column(name = "linha_digitavel", nullable = false, length = 47) LinhaDigitavel linhaDigitavel,
+                           @Column(nullable = false, precision = 15, scale = 2) Dinheiro valor,
+                           @Column(nullable = false) LocalDate vencimento,
+                           @Column(nullable = false) String beneficiario) {
 
     public BoletoAPagar {
         Objects.requireNonNull(idNoEmissor);

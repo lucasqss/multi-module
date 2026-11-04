@@ -1,15 +1,12 @@
-package com.example.pagamento.adapter;
+package com.example.pagamento.domain.repository;
 
 import com.example.pagamento.adapter.banco.BancoPagamentos;
-import com.example.pagamento.adapter.database.FiltroPagamento;
-import com.example.pagamento.adapter.database.PagamentoRepository;
 import com.example.pagamento.application.pagamento.ExecutarComandoPagamentoUC;
 import com.example.pagamento.application.pagamento.comando.EnviarAoBanco;
 import com.example.pagamento.domain.Cenarios;
 import com.example.pagamento.domain.entity.Pagamento;
 import com.example.pagamento.domain.exception.RecursoBloqueadoException;
 import com.example.pagamento.domain.valueobject.Modalidade;
-import com.example.pagamento.domain.valueobject.PagamentoId;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -17,6 +14,7 @@ import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 import static io.restassured.RestAssured.given;
@@ -54,7 +52,7 @@ class PagamentoRepositoryTest {
     @Inject
     Clock clock;
 
-    private PagamentoId gravar(Supplier<Pagamento> pagamento) {
+    private UUID gravar(Supplier<Pagamento> pagamento) {
         return QuarkusTransaction.requiringNew().call(() -> {
             var p = pagamento.get();
             pagamentos.salvar(p);
@@ -87,7 +85,7 @@ class PagamentoRepositoryTest {
             pagamentos.obterParaAlteracao(id); // outra operação em andamento
 
             given().contentType("application/json").body("{\"motivo\":\"desisti\"}")
-                    .post("/api/v1/pagamentos/" + id.valor() + "/cancelamento")
+                    .post("/api/v1/pagamentos/" + id + "/cancelamento")
                     .then().statusCode(409).body("codigo", equalTo("RECURSO_BLOQUEADO"));
         });
     }
@@ -104,7 +102,7 @@ class PagamentoRepositoryTest {
 
         QuarkusTransaction.requiringNew().run(() -> {
             estatisticas.clear();
-            var pagina = pagamentos.listar(new FiltroPagamento(Modalidade.LOTE, null), 0, 20);
+            var pagina = pagamentos.listar(Modalidade.LOTE, null, 0, 20);
 
             assertEquals(20, pagina.itens().size());
             assertTrue(pagina.itens().stream().allMatch(p -> p.getBoletos().quantidade() == 2));
@@ -122,12 +120,12 @@ class PagamentoRepositoryTest {
         var transacao = id + "-1";
 
         assertThrows(IllegalStateException.class, () -> QuarkusTransaction.requiringNew().run(() -> {
-            executar.executar(id.valor(), new EnviarAoBanco()); // participa desta transação...
+            executar.executar(id, new EnviarAoBanco()); // participa desta transação...
             throw new IllegalStateException("falha depois do comando"); // ...que é desfeita
         }));
         assertFalse(banco.envios().stream().anyMatch(e -> e.idTransacao().equals(transacao)));
 
-        executar.executar(id.valor(), new EnviarAoBanco()); // transação própria: confirma e envia
+        executar.executar(id, new EnviarAoBanco()); // transação própria: confirma e envia
         assertTrue(banco.envios().stream().anyMatch(e -> e.idTransacao().equals(transacao)));
     }
 }

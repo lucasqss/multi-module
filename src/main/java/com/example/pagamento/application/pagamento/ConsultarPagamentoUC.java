@@ -1,8 +1,7 @@
 package com.example.pagamento.application.pagamento;
 
-import com.example.pagamento.adapter.database.PagamentoRepository;
 import com.example.pagamento.application.pagamento.dto.PagamentoOutput;
-import com.example.pagamento.domain.valueobject.PagamentoId;
+import com.example.pagamento.domain.repository.PagamentoRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -20,6 +19,6 @@ public class ConsultarPagamentoUC {
 
     @Transactional
     public PagamentoOutput executar(UUID id) {
-        return PagamentoOutput.de(repository.obter(new PagamentoId(id)));
+        return PagamentoOutput.de(repository.obter(id));
     }
 }

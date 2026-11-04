@@ -39,7 +39,7 @@ public record PagamentoOutput(
 
     public static PagamentoOutput de(Pagamento p) {
         return new PagamentoOutput(
-                p.getId().valor(),
+                p.getId(),
                 p.getModalidade(),
                 p.getStatus(),
                 p.getCriadoEm(),

@@ -23,9 +23,9 @@ entrypoint ──▶ application ──▶ domain          (ligadas por injeçã
 
 | Pacote (`com.example.pagamento`) | Papel |
 |---|---|
-| `domain` | `entity`, `valueobject`, `exception`, `specification`, `state` — só `java.*`, sem framework |
+| `domain` | `entity` (JPA), `repository` (Panache, lock pessimista), `valueobject`, `exception`, `specification`, `state` — framework só de persistência |
 | `application/pagamento` | casos de uso (`*UC`), `comando/` (Command) e `dto/` (Input/Output) |
-| `adapter` | `database/` (Panache + lock pessimista), `emissor/` e `banco/` (simulados) |
+| `adapter` | só sistemas externos: `emissor/` e `banco/` (simulados) |
 | `entrypoint` | `api/v1` (nossa API REST) e `webhook/v1` (entrada do banco) |
 | `shared` | `Pagina`, `ClockProducer` |
 
@@ -54,13 +54,16 @@ a completude só é exigida na submissão.
 
 ## Onde está cada padrão
 
+Critério geral: **menos classes sem custo de entendimento** — DTO/mapper só entre entrypoint e application;
+VO/record só com regra ou comportamento; o repositório já trata os filtros.
+
 | Padrão | Onde |
 |---|---|
-| Domínio rico | `domain/entity/Pagamento`: sem setters; ordem **estado (409) → regras (422) → muda** |
+| Domínio rico | `domain/entity/Pagamento` (a própria entidade JPA): sem setters; ordem **estado (409) → regras (422) → muda** |
 | Value objects | `domain/valueobject`: `Dinheiro`, `LinhaDigitavel`, `ContaDebito`, `BoletosDoPagamento`... |
-| Specification | `domain/specification`: `Specification`, `RegraNegocio`, `ValidadorRegras`; specs em `pagamento/` |
+| Specification | `domain/specification`: base genérica; regras no catálogo `pagamento/RegrasPagamento` (uma linha cada; classe só quando precisa) |
 | Chain of Responsibility | `CadeiaValidacao` + `RegrasPagamento.SUBMISSAO`: um elo comum e um elo por modalidade |
-| State | `domain/state`: `EstadoPagamento` (sealed) e um estado por classe |
+| State | `domain/state/StatusPagamento`: enum com o comportamento de cada status |
 | Command | `application/pagamento/comando`: submeter, enviar, reenviar, cancelar; invocador `ExecutarComandoPagamentoUC` |
 | Exceções por família | `domain/exception`: 400 / 404 / 409 / 422, mapeadas por `ApiExceptionHandler` |
 | Comando × fato | retorno do banco não é recusado: é **classificado** (`EM_ANALISE` se diverge); idempotente via `IdTransacao` (aviso repetido ou antigo = 200) |

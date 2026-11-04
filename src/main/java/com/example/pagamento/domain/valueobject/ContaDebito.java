@@ -1,8 +1,10 @@
 package com.example.pagamento.domain.valueobject;
 
 import com.example.pagamento.domain.exception.ContaDebitoInvalidaException;
+import jakarta.persistence.Embeddable;
 
 /** Conta da empresa de onde sai o dinheiro. */
+@Embeddable
 public record ContaDebito(String agencia, String conta) {
 
     public ContaDebito {

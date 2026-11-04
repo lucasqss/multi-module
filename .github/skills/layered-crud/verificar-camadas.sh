@@ -29,7 +29,7 @@ uc_sem_uc() { # use case não injeta/chama outro use case
 
 estrutura() { # aviso (não falha): pastas fora da estrutura enxuta
   local base="$1" extras="" d
-  for d in factory model enums repository gateway service; do
+  for d in factory model enums gateway service; do
     [ -d "$base/domain/$d" ] && extras+=" domain/$d"
   done
   for d in "$base"/shared/*/; do
@@ -38,7 +38,7 @@ estrutura() { # aviso (não falha): pastas fora da estrutura enxuta
   if [ -n "$extras" ]; then
     echo "⚠ pastas fora da estrutura enxuta:$extras (ver skill layered-crud)"
   else
-    echo "✓ estrutura enxuta (domain: entity, valueobject, exception, specification, state; shared sem subpastas)"
+    echo "✓ estrutura enxuta (domain: entity, valueobject, exception, specification, state, repository; shared sem subpastas)"
   fi
 }
 
@@ -66,8 +66,12 @@ verificar_base() {
 
   echo "######## $pacote"
   echo "== Regra de dependência =="
-  checar "domain não depende de framework" "$base/domain" \
-    '^import (static )?(jakarta|javax|io\.quarkus|org\.hibernate|org\.springframework|com\.fasterxml|org\.eclipse|io\.micronaut)\.'
+  # domain pode usar PERSISTÊNCIA (entidade JPA, repositório Panache); nada de HTTP, JSON, config ou transação
+  checar "domain sem HTTP/JSON/config/transação" "$base/domain" \
+    '^import (static )?((jakarta|javax)\.(ws|transaction|servlet)|com\.fasterxml|org\.eclipse|org\.springframework\.web|io\.quarkus\.(rest|resteasy|narayana))'
+  checar "entidade só com anotações JPA/Hibernate (sem Quarkus/CDI)" "$base/domain/entity" \
+    '^import (static )?(io\.quarkus|jakarta\.enterprise|jakarta\.inject)\.'
+  checar "entidade sem active record (PanacheEntity)" "$base/domain/entity" 'extends\s+PanacheEntity'
   checar "domain não depende de application/adapter/entrypoint" "$base/domain" \
     "^import (static )?$p\\.(application|adapter|entrypoint)\\."
   checar "application não depende de entrypoint" "$base/application" \
@@ -78,9 +82,6 @@ verificar_base() {
     "^import (static )?$p\\.(application|entrypoint)\\."
   checar "entrypoint não depende de adapter" "$base/entrypoint" \
     "^import (static )?$p\\.adapter\\."
-  for camada in domain application entrypoint; do
-    checar "JpaEntity só em adapter/database ($camada)" "$base/$camada" '^import (static )?.*JpaEntity(\.[A-Za-z]+)?;'
-  done
 
   echo "== Domínio rico =="
   checar "entidades sem setters públicos" "$entidades" 'public\s+void\s+set[A-Z]'

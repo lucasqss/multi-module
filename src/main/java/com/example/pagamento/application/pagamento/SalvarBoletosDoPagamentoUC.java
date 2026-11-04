@@ -1,11 +1,10 @@
 package com.example.pagamento.application.pagamento;
 
-import com.example.pagamento.adapter.database.PagamentoRepository;
 import com.example.pagamento.adapter.emissor.EmissorBoletos;
 import com.example.pagamento.application.pagamento.dto.PagamentoOutput;
 import com.example.pagamento.application.pagamento.dto.SalvarBoletosInput;
+import com.example.pagamento.domain.repository.PagamentoRepository;
 import com.example.pagamento.domain.valueobject.BoletosDoPagamento;
-import com.example.pagamento.domain.valueobject.PagamentoId;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -28,7 +27,7 @@ public class SalvarBoletosDoPagamentoUC {
 
     @Transactional
     public PagamentoOutput executar(SalvarBoletosInput input) {
-        var pagamento = repository.obterParaAlteracao(new PagamentoId(input.id()));
+        var pagamento = repository.obterParaAlteracao(input.id());
         var boletos = new BoletosDoPagamento(input.linhas().stream().map(emissor::consultar).toList());
 
         pagamento.salvarBoletos(boletos);

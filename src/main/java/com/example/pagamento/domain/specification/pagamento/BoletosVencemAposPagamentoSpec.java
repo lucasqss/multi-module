@@ -8,8 +8,8 @@ import com.example.pagamento.domain.specification.RegraNegocio;
 public class BoletosVencemAposPagamentoSpec extends RegraNegocio<SubmissaoPagamento> {
 
     private static BoletoAPagar primeiroVencido(SubmissaoPagamento s) {
-        return s.data().flatMap(data -> s.boletos().boletos().stream()
-                .filter(b -> b.vencimento().isBefore(data)).findFirst()).orElse(null);
+        return s.boletos().boletos().stream()
+                .filter(b -> b.vencimento().isBefore(s.dataPagamento())).findFirst().orElse(null);
     }
 
     @Override

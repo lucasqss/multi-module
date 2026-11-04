@@ -1,6 +1,8 @@
 package com.example.pagamento.domain.valueobject;
 
 import com.example.pagamento.domain.exception.MotivoInvalidoException;
+import jakarta.persistence.AttributeConverter;
+import jakarta.persistence.Converter;
 
 /** Justificativa (ex.: de um cancelamento). */
 public record Motivo(String texto) {
@@ -20,5 +22,12 @@ public record Motivo(String texto) {
     @Override
     public String toString() {
         return texto;
+    }
+
+    /** Persistência: coluna texto. {@code autoApply}: vale para todo atributo {@code Motivo}. */
+    @Converter(autoApply = true)
+    public static class Conversor implements AttributeConverter<Motivo, String> {
+        @Override public String convertToDatabaseColumn(Motivo v) { return v == null ? null : v.texto(); }
+        @Override public Motivo convertToEntityAttribute(String v) { return v == null ? null : new Motivo(v); }
     }
 }

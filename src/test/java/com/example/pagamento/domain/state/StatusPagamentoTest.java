@@ -6,7 +6,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 
 import static com.example.pagamento.domain.state.StatusPagamento.AGENDADO;
@@ -19,14 +18,14 @@ import static com.example.pagamento.domain.state.StatusPagamento.RECUSADO;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/** A máquina de estados como TABELA: para cada ação, de onde se pode sair e para onde se vai. */
-class EstadoPagamentoTest {
+/** A máquina de estados (enum) como TABELA: para cada ação, de onde se pode sair e para onde se vai. */
+class StatusPagamentoTest {
 
-    private static final Map<String, Function<EstadoPagamento, EstadoPagamento>> ACOES = Map.of(
-            "submeter", EstadoPagamento::submeter,
-            "enviar", EstadoPagamento::enviarAoBanco,
-            "reenviar", EstadoPagamento::reenviarAoBanco,
-            "cancelar", EstadoPagamento::cancelar);
+    private static final Map<String, Function<StatusPagamento, StatusPagamento>> ACOES = Map.of(
+            "submeter", StatusPagamento::submeter,
+            "enviar", StatusPagamento::enviarAoBanco,
+            "reenviar", StatusPagamento::reenviarAoBanco,
+            "cancelar", StatusPagamento::cancelar);
 
     /** ação -> (origem -> destino). O que não está aqui deve dar 409. */
     private static final Map<String, Map<StatusPagamento, StatusPagamento>> PERMITIDAS = Map.of(
@@ -38,29 +37,26 @@ class EstadoPagamentoTest {
     @ParameterizedTest
     @EnumSource(StatusPagamento.class)
     void cadaEstadoAceitaSoAsAcoesDaTabela(StatusPagamento origem) {
-        var estado = EstadoPagamento.de(origem);
-        assertEquals(origem, estado.status());
         ACOES.forEach((acao, executar) -> {
             var destino = PERMITIDAS.get(acao).get(origem);
             if (destino == null) {
-                assertThrows(TransicaoEstadoInvalidaException.class, () -> executar.apply(estado), acao + " em " + origem);
+                assertThrows(TransicaoEstadoInvalidaException.class, () -> executar.apply(origem), acao + " em " + origem);
             } else {
-                assertEquals(destino, executar.apply(estado).status(), acao + " em " + origem);
+                assertEquals(destino, executar.apply(origem), acao + " em " + origem);
             }
         });
     }
 
     @Test
     void retornoDoBancoSoEmProcessamento() {
-        var emProcessamento = EstadoPagamento.de(EM_PROCESSAMENTO);
-        assertEquals(PAGO, emProcessamento.receberRetornoBanco(true, true).status());
-        assertEquals(EM_ANALISE, emProcessamento.receberRetornoBanco(true, false).status());
-        assertEquals(RECUSADO, emProcessamento.receberRetornoBanco(false, true).status());
+        assertEquals(PAGO, EM_PROCESSAMENTO.receberRetornoBanco(true, true));
+        assertEquals(EM_ANALISE, EM_PROCESSAMENTO.receberRetornoBanco(true, false));
+        assertEquals(RECUSADO, EM_PROCESSAMENTO.receberRetornoBanco(false, true));
 
         for (var outro : StatusPagamento.values()) {
             if (outro != EM_PROCESSAMENTO) {
                 assertThrows(TransicaoEstadoInvalidaException.class,
-                        () -> EstadoPagamento.de(outro).receberRetornoBanco(true, true));
+                        () -> outro.receberRetornoBanco(true, true));
             }
         }
     }
@@ -68,13 +64,12 @@ class EstadoPagamentoTest {
     @ParameterizedTest
     @EnumSource(StatusPagamento.class)
     void soORascunhoEditaEExclui(StatusPagamento status) {
-        var estado = EstadoPagamento.de(status);
-        if (Set.of(EM_EDICAO).contains(status)) {
-            estado.validarEdicao();
-            estado.validarExclusao();
+        if (status == EM_EDICAO) {
+            status.validarEdicao();
+            status.validarExclusao();
         } else {
-            assertThrows(TransicaoEstadoInvalidaException.class, estado::validarEdicao);
-            assertThrows(TransicaoEstadoInvalidaException.class, estado::validarExclusao);
+            assertThrows(TransicaoEstadoInvalidaException.class, status::validarEdicao);
+            assertThrows(TransicaoEstadoInvalidaException.class, status::validarExclusao);
         }
     }
 }

@@ -1,12 +1,11 @@
 package com.example.pagamento.application.pagamento;
 
 import com.example.pagamento.adapter.banco.BancoPagamentos;
-import com.example.pagamento.adapter.database.PagamentoRepository;
 import com.example.pagamento.application.pagamento.comando.ComandoPagamento;
 import com.example.pagamento.application.pagamento.comando.ContextoComando;
 import com.example.pagamento.application.pagamento.dto.PagamentoOutput;
 import com.example.pagamento.domain.entity.Pagamento;
-import com.example.pagamento.domain.valueobject.PagamentoId;
+import com.example.pagamento.domain.repository.PagamentoRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Status;
 import jakarta.transaction.Synchronization;
@@ -39,7 +38,7 @@ public class ExecutarComandoPagamentoUC {
 
     @Transactional
     public PagamentoOutput executar(UUID id, ComandoPagamento comando) {
-        var pagamento = repository.obterParaAlteracao(new PagamentoId(id));
+        var pagamento = repository.obterParaAlteracao(id);
 
         comando.executar(pagamento, contexto);
 

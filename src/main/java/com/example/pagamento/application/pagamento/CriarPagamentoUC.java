@@ -1,8 +1,8 @@
 package com.example.pagamento.application.pagamento;
 
-import com.example.pagamento.adapter.database.PagamentoRepository;
 import com.example.pagamento.application.pagamento.dto.PagamentoOutput;
 import com.example.pagamento.domain.entity.Pagamento;
+import com.example.pagamento.domain.repository.PagamentoRepository;
 import com.example.pagamento.domain.valueobject.Modalidade;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;

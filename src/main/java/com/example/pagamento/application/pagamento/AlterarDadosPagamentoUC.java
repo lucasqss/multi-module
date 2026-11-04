@@ -1,9 +1,8 @@
 package com.example.pagamento.application.pagamento;
 
-import com.example.pagamento.adapter.database.PagamentoRepository;
 import com.example.pagamento.application.pagamento.dto.AlterarDadosInput;
 import com.example.pagamento.application.pagamento.dto.PagamentoOutput;
-import com.example.pagamento.domain.valueobject.PagamentoId;
+import com.example.pagamento.domain.repository.PagamentoRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -19,7 +18,7 @@ public class AlterarDadosPagamentoUC {
 
     @Transactional
     public PagamentoOutput executar(AlterarDadosInput input) {
-        var pagamento = repository.obterParaAlteracao(new PagamentoId(input.id()));
+        var pagamento = repository.obterParaAlteracao(input.id());
         pagamento.alterarDadosGerais(input.conta(), input.dataPagamento());
         repository.salvar(pagamento);
         return PagamentoOutput.de(pagamento);

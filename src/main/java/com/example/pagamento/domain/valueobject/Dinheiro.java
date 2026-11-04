@@ -1,6 +1,8 @@
 package com.example.pagamento.domain.valueobject;
 
 import com.example.pagamento.domain.exception.ValorMonetarioInvalidoException;
+import jakarta.persistence.AttributeConverter;
+import jakarta.persistence.Converter;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -45,5 +47,12 @@ public record Dinheiro(BigDecimal valor) implements Comparable<Dinheiro> {
     @Override
     public String toString() {
         return "R$ " + valor.toPlainString();
+    }
+
+    /** Persistência: coluna decimal. {@code autoApply}: vale para todo atributo {@code Dinheiro}. */
+    @Converter(autoApply = true)
+    public static class Conversor implements AttributeConverter<Dinheiro, BigDecimal> {
+        @Override public BigDecimal convertToDatabaseColumn(Dinheiro d) { return d == null ? null : d.valor(); }
+        @Override public Dinheiro convertToEntityAttribute(BigDecimal v) { return v == null ? null : new Dinheiro(v); }
     }
 }

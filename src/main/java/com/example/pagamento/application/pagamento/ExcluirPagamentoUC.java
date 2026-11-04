@@ -1,7 +1,6 @@
 package com.example.pagamento.application.pagamento;
 
-import com.example.pagamento.adapter.database.PagamentoRepository;
-import com.example.pagamento.domain.valueobject.PagamentoId;
+import com.example.pagamento.domain.repository.PagamentoRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -19,8 +18,7 @@ public class ExcluirPagamentoUC {
 
     @Transactional
     public void executar(UUID id) {
-        var pagamentoId = new PagamentoId(id);
-        repository.obterParaAlteracao(pagamentoId).validarExclusao();
-        repository.remover(pagamentoId);
+        repository.obterParaAlteracao(id).validarExclusao();
+        repository.remover(id);
     }
 }

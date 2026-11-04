@@ -32,6 +32,12 @@ Dependências permitidas: `entrypoint → application → (domain, adapter)`; `a
   `shared/`. Ao encontrar uma, **mova e apague a pasta** (enum de status → `state/`; outros enums e
   records → `valueobject/`; fábrica → método estático `criar` na entidade; utilitário de regra → spec/VO).
 - **Contratos separados:** Request/Response (HTTP, versionado) ≠ Input/Output (application) ≠ entidade ≠ JpaEntity.
+  Quem converte: `Request.paraInput(...)` (entrypoint), `Output.de(entidade)` (application),
+  `Response.de(output)` (entrypoint), `<Agregado>Mapper` (só em `adapter/database`).
+- **Entrypoint fino:** só traduz HTTP ⇄ UC. Bean Validation no Request só para o **sintático** (`@NotNull`,
+  `@NotBlank`, `@Min`) → 400; formato com regra (linha digitável, conta) fica no VO.
+  Rotas: `POST` cria → 201 + `Location`; seção = `PUT /{id}/<secao>` (inteira); transição =
+  `POST /{id}/<substantivo>` (`/submissao`, `/cancelamento`); fato externo só por `webhook/v1`.
 
 ## 2. Entidade rica e value objects
 
@@ -67,7 +73,8 @@ um método `executar`, uma transação. Pergunta-teste: "o usuário faria isso s
 | Fato de sistema externo | um `Receber<Fato>UC`, chamado pelo webhook |
 
 O UC **orquestra, não decide**: carrega, chama o método de negócio, salva, devolve Output. Nenhum `if`
-de regra no UC. Proibido UC com vários métodos públicos e UC por entidade-parte.
+de regra no UC. Proibido UC com vários métodos públicos e UC por entidade-parte. `@Transactional` fica
+**só no UC** (leitura também, para carregar coleções LAZY), nunca no Resource nem no repositório.
 
 **Command para transições.** Quando várias transições têm o mesmo roteiro (travar → executar → salvar →
 efeito externo), crie um **invocador único** e um comando por transição. O comando só orquestra; a regra
@@ -103,6 +110,24 @@ para fatos), `CadeiaValidacao<T>` (elos condicionais).
 4. Regras que **variam por tipo/modalidade** viram elos de `CadeiaValidacao`: um elo comum + um elo por
    tipo, cada um com seu predicado de aplicação. Tipo novo = elo novo; nada de `if`/`switch` por tipo.
 
+Ilustração de uma spec (`domain/specification/pagamento/QuantidadeDeBoletosSpec`):
+
+```java
+public class QuantidadeDeBoletosSpec extends RegraNegocio<SubmissaoPagamento> {   // candidato = record
+    private final int minimo, maximo;                                            // parametrizada: serve a vários elos
+    ...
+    @Override public boolean isSatisfiedBy(SubmissaoPagamento s) {
+        var quantidade = s.boletos().quantidade();
+        return quantidade >= minimo && quantidade <= maximo;
+    }
+    @Override protected QuantidadeDeBoletosInvalidaException violacao(SubmissaoPagamento s) {
+        return new QuantidadeDeBoletosInvalidaException(s.modalidade(), minimo, maximo);   // 422 específica
+    }
+}
+```
+
+Regra de uma linha que não merece classe: `RegraNegocio.de(spec, candidato -> new <Situacao>Exception(...))`.
+
 Ilustração: `domain/specification/pagamento/RegrasPagamento`:
 
 ```java
@@ -121,7 +146,8 @@ public static final CadeiaValidacao<SubmissaoPagamento> SUBMISSAO = CadeiaValida
 - Enum `Status<Agregado>` (persistido) + classe abstrata **sealed** `Estado<Agregado>` com um método por
   ação; por padrão **toda ação lança** `TransicaoEstadoInvalidaException` (409).
 - Cada estado concreto (singleton `INSTANCIA`) sobrescreve só o que permite e **retorna o próximo estado**.
-  `de(status)` é um `switch` exaustivo (sealed garante que nenhum fica de fora).
+  `de(status)` é um `switch` sobre o enum **sem `default`**: status novo sem estado não compila.
+  O `sealed` limita quem pode ser estado (só as classes listadas em `permits`).
 - Validações "pode editar/excluir?" também são do estado (`validarEdicao`, `validarExclusao`).
 - Proibido `if (status == ...)`/`switch (status)` fora de `de(status)`.
 
@@ -178,6 +204,8 @@ Proibido `RuntimeException`/`IllegalStateException` genérica para regra de neg�
 - Coleções do agregado (`@ElementCollection`) ficam LAZY (`FOR UPDATE` não combina com join de coleção),
   com `@BatchSize(size = <página máxima>)` para a listagem não fazer N+1 (o padrão do Quarkus é 16).
 - Sem `@Version` junto: um mecanismo só.
+- O tempo de espera (hint) é traduzido de forma diferente por banco/dialeto (aqui testado só no H2):
+  confirme no banco real com o teste de lock antes de confiar no valor.
 
 Ilustração: `adapter/database/PagamentoRepository.obterParaAlteracao`; `PagamentoJpaEntity.boletos`.
 
@@ -203,8 +231,11 @@ Domínio testa sem Quarkus (JUnit puro, rápido). `@QuarkusTest` só para adapte
    Contém: base de specs (`Specification`, `RegraNegocio`, `ValidadorRegras`, `CadeiaValidacao`), famílias de
    exceção, `Dinheiro`, `Motivo`, `Pagina`, `ClockProducer` (`app.fuso-horario`), `ApiExceptionHandler`,
    `ErroResponse`, `MotivoRequest`, `PaginaResponse` e `SpecificationTest`.
+   **Não** têm template (dependem do agregado; crie junto com ele, copiando a forma da Ilustração):
+   `TransicaoEstadoInvalidaException` (recebe o `Status<Agregado>`), `<Agregado>NaoEncontradoException`,
+   `RecursoBloqueadoException`.
 3. Dependências Quarkus: `quarkus-rest-jackson`, `quarkus-hibernate-validator`, `quarkus-hibernate-orm-panache`
-   (+ driver) quando houver banco; testes com `quarkus-junit5` e `rest-assured`. Em Spring, adapte só
+   (+ driver) quando houver banco; testes com `quarkus-junit` (`quarkus-junit5` em versões antigas) e `rest-assured`. Em Spring, adapte só
    entrypoint/config (`@RestControllerAdvice`, `@Bean`, `@Value`).
 4. Copie `mapa-do-projeto.md` para o fim de `.github/copilot-instructions.md` e preencha com os nomes reais.
 5. `mvn test` (o `SpecificationTest` deve passar) e `verificar-camadas.sh`.
@@ -221,7 +252,8 @@ construtor público, `now()` sem clock, `if` em status, UC chamando UC, pastas f
 - [ ] Cada regra é uma spec pura com exceção específica, registrada no catálogo; variação por tipo na cadeia.
 - [ ] Status só via State; tabela de estados testada.
 - [ ] Um UC por intenção (ou Command com invocador único); seção = um `Salvar<Secao>UC`.
-- [ ] Alteração usa `obterParaAlteracao` (lock); leitura usa `obter`.
+- [ ] Alteração usa `obterParaAlteracao` (lock); leitura usa `obter`; coleção LAZY com `@BatchSize`.
+- [ ] Efeito em sistema externo só depois do commit (Synchronization/Outbox), nunca dentro da transação.
 - [ ] Fato externo classificado (não recusado), idempotente, entrando por entrypoint próprio autenticado.
 - [ ] Request/Response separados de Input/Output; nenhum JpaEntity fora de `adapter/database`.
 - [ ] Testes: cenário válido por padrão, limites das regras, tabela de estados, um erro por família na API.

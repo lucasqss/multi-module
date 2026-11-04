@@ -78,6 +78,9 @@ verificar_base() {
     "^import (static )?$p\\.(application|entrypoint)\\."
   checar "entrypoint não depende de adapter" "$base/entrypoint" \
     "^import (static )?$p\\.adapter\\."
+  for camada in domain application entrypoint; do
+    checar "JpaEntity só em adapter/database ($camada)" "$base/$camada" '^import (static )?.*JpaEntity(\.[A-Za-z]+)?;'
+  done
 
   echo "== Domínio rico =="
   checar "entidades sem setters públicos" "$entidades" 'public\s+void\s+set[A-Z]'

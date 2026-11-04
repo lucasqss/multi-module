@@ -8,7 +8,8 @@ import com.example.pagamento.domain.exception.TransicaoEstadoInvalidaException;
  *
  * <p>Por padrão TODA ação é proibida ({@link TransicaoEstadoInvalidaException}, 409); cada estado
  * sobrescreve só o que permite. As transições RETORNAM o próximo estado; a entidade faz
- * {@code estado = estado.acao()}. {@code sealed}: o {@code switch} de {@link #de} não compila se faltar um.
+ * {@code estado = estado.acao()}. {@code sealed}: só as classes de {@code permits} são estados; o {@code switch}
+ * de {@link #de} sobre o enum, sem {@code default}, não compila se faltar um status.
  */
 public abstract sealed class EstadoPagamento
         permits EstadoEmEdicao, EstadoAgendado, EstadoEmProcessamento, EstadoRecusado,

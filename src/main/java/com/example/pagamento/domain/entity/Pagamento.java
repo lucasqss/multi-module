@@ -8,6 +8,7 @@ import com.example.pagamento.domain.state.StatusPagamento;
 import com.example.pagamento.domain.valueobject.BoletosDoPagamento;
 import com.example.pagamento.domain.valueobject.ContaDebito;
 import com.example.pagamento.domain.valueobject.Dinheiro;
+import com.example.pagamento.domain.valueobject.IdTransacao;
 import com.example.pagamento.domain.valueobject.Modalidade;
 import com.example.pagamento.domain.valueobject.Motivo;
 import com.example.pagamento.domain.valueobject.MotivoAnalise;
@@ -38,14 +39,14 @@ public class Pagamento {
     private LocalDate dataPagamento;
     private EstadoPagamento estado;
     private int envios;
-    private String idTransacao;
+    private IdTransacao idTransacao;
     private String autenticacao;
     private String motivoRecusa;
     private MotivoAnalise motivoAnalise;
     private Motivo motivoCancelamento;
 
     private Pagamento(PagamentoId id, Modalidade modalidade, Instant criadoEm, BoletosDoPagamento boletos,
-                      ContaDebito contaDebito, LocalDate dataPagamento, EstadoPagamento estado, int envios, String idTransacao,
+                      ContaDebito contaDebito, LocalDate dataPagamento, EstadoPagamento estado, int envios, IdTransacao idTransacao,
                       String autenticacao, String motivoRecusa, MotivoAnalise motivoAnalise, Motivo motivoCancelamento) {
         this.id = Objects.requireNonNull(id);
         this.modalidade = Objects.requireNonNull(modalidade);
@@ -73,7 +74,7 @@ public class Pagamento {
     /** Reconstrói a partir da persistência, sem reaplicar regras (o dado já foi validado). */
     public static Pagamento reconstituir(PagamentoId id, Modalidade modalidade, Instant criadoEm,
                                          BoletosDoPagamento boletos, ContaDebito contaDebito, LocalDate dataPagamento,
-                                         StatusPagamento status, int envios, String idTransacao, String autenticacao,
+                                         StatusPagamento status, int envios, IdTransacao idTransacao, String autenticacao,
                                          String motivoRecusa, MotivoAnalise motivoAnalise, Motivo motivoCancelamento) {
         return new Pagamento(id, modalidade, criadoEm, boletos, contaDebito, dataPagamento, EstadoPagamento.de(status),
                 envios, idTransacao, autenticacao, motivoRecusa, motivoAnalise, motivoCancelamento);
@@ -130,7 +131,7 @@ public class Pagamento {
 
     /**
      * O banco informa o resultado. É um FATO: a conformidade CLASSIFICA (não lança).
-     * Idempotente: retorno de uma transação que não é a atual (repetido ou antigo) é ignorado.
+     * Idempotente: retorno repetido, ou de uma transação que não é a atual (envio antigo), é ignorado.
      */
     public void registrarRetornoBanco(RetornoBanco retorno) {
         if (!retorno.idTransacao().equals(idTransacao) || autenticacao != null || motivoRecusa != null) {
@@ -147,7 +148,7 @@ public class Pagamento {
 
     private void novaTransacao() {
         envios++;
-        idTransacao = id + "-" + envios;
+        idTransacao = new IdTransacao(id, envios);
         autenticacao = null;
         motivoRecusa = null;
     }
@@ -164,7 +165,7 @@ public class Pagamento {
     public Optional<LocalDate> getDataPagamento() { return Optional.ofNullable(dataPagamento); }
     public StatusPagamento getStatus() { return estado.status(); }
     public int getEnvios() { return envios; }
-    public Optional<String> getIdTransacao() { return Optional.ofNullable(idTransacao); }
+    public Optional<IdTransacao> getIdTransacao() { return Optional.ofNullable(idTransacao); }
     public Optional<String> getAutenticacao() { return Optional.ofNullable(autenticacao); }
     public Optional<String> getMotivoRecusa() { return Optional.ofNullable(motivoRecusa); }
     public Optional<MotivoAnalise> getMotivoAnalise() { return Optional.ofNullable(motivoAnalise); }

@@ -11,6 +11,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.restassured.RestAssured.given;
@@ -172,7 +173,8 @@ class PagamentoResourceTest {
         String segunda = post(API + "/" + id + "/reenvio", "").statusCode(200)
                 .body("status", equalTo("EM_PROCESSAMENTO")).body("transacao.envios", equalTo(2))
                 .extract().path("transacao.id");
-        bancoRetorna(primeira, "RECUSADO", null).statusCode(404); // transação antiga não é mais a do pagamento
+        bancoRetorna(primeira, "RECUSADO", null).statusCode(200)  // aviso atrasado do 1º envio: 200, ignorado
+                .body("status", equalTo("EM_PROCESSAMENTO"));
         bancoRetorna(segunda, "LIQUIDADO", 10000L).statusCode(200).body("status", equalTo("PAGO"));
     }
 
@@ -215,11 +217,13 @@ class PagamentoResourceTest {
     }
 
     @Test
-    void webhookExigeTokenEConheceATransacao() {
+    void webhookExigeTokenEUmaTransacaoNossa() {
         given().contentType(ContentType.JSON).header("X-Webhook-Token", "token-errado")
                 .body("{\"idTransacao\":\"x\",\"situacao\":\"LIQUIDADO\",\"valorLiquidadoCentavos\":1,\"dataHora\":\"2026-11-04T10:00:00-03:00\"}")
                 .post(WEBHOOK_BANCO).then().statusCode(401).body("codigo", equalTo("NAO_AUTORIZADO"));
-        bancoRetorna("transacao-inexistente", "LIQUIDADO", 1L).statusCode(404)
+        bancoRetorna(UUID.randomUUID() + "-1", "LIQUIDADO", 1L).statusCode(404)
                 .body("codigo", equalTo("PAGAMENTO_NAO_ENCONTRADO"));
+        bancoRetorna("transacao-inexistente", "LIQUIDADO", 1L).statusCode(400)
+                .body("codigo", equalTo("ID_TRANSACAO_INVALIDO"));
     }
 }

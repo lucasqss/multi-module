@@ -63,7 +63,8 @@ a completude só é exigida na submissão.
 | State | `domain/state`: `EstadoPagamento` (sealed) e um estado por classe |
 | Command | `application/pagamento/comando`: submeter, enviar, reenviar, cancelar; invocador `ExecutarComandoPagamentoUC` |
 | Exceções por família | `domain/exception`: 400 / 404 / 409 / 422, mapeadas por `ApiExceptionHandler` |
-| Comando × fato | retorno do banco não é recusado: é **classificado** (`EM_ANALISE` se diverge) e é idempotente |
+| Comando × fato | retorno do banco não é recusado: é **classificado** (`EM_ANALISE` se diverge); idempotente via `IdTransacao` (aviso repetido ou antigo = 200) |
+| Efeito após o commit | o envio ao banco só sai se a transação confirmou (`ExecutarComandoPagamentoUC.aposCommit`) |
 | Lock pessimista | `PagamentoRepository.obterParaAlteracao` (`SELECT ... FOR UPDATE`); bloqueio → 409 `RECURSO_BLOQUEADO` |
 
 ## API
@@ -88,7 +89,7 @@ O emissor é simulado: a linha digitável (47 dígitos) segue um layout fake
 
 ```bash
 mvn quarkus:dev   # http://localhost:8081
-mvn test          # domínio (JUnit puro) + lock pessimista + ponta a ponta (@QuarkusTest, H2)
+mvn test          # domínio (JUnit puro) + repositório/transação + ponta a ponta (@QuarkusTest, H2)
 ```
 
 ## Copilot e reuso em outros projetos

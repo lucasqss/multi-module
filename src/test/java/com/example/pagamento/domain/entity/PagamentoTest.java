@@ -5,6 +5,7 @@ import com.example.pagamento.domain.exception.DataPagamentoNoPassadoException;
 import com.example.pagamento.domain.exception.TransicaoEstadoInvalidaException;
 import com.example.pagamento.domain.exception.ValorLiquidadoDivergenteException;
 import com.example.pagamento.domain.state.StatusPagamento;
+import com.example.pagamento.domain.valueobject.IdTransacao;
 import com.example.pagamento.domain.valueobject.Motivo;
 import com.example.pagamento.domain.valueobject.RetornoBanco;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ class PagamentoTest {
     @Test
     void envioGeraTransacaoEPagoQuandoLiquidaOTotal() {
         var p = Cenarios.processo().enviado();
-        assertEquals(p.getId() + "-1", p.getIdTransacao().orElseThrow());
+        assertEquals(new IdTransacao(p.getId(), 1), p.getIdTransacao().orElseThrow());
 
         p.registrarRetornoBanco(liquidado(p, "500.00"));
 
@@ -74,7 +75,7 @@ class PagamentoTest {
         p.reenviarAoBanco();
 
         assertEquals(StatusPagamento.EM_PROCESSAMENTO, p.getStatus());
-        assertEquals(p.getId() + "-2", p.getIdTransacao().orElseThrow());
+        assertEquals(new IdTransacao(p.getId(), 2), p.getIdTransacao().orElseThrow());
         assertTrue(p.getMotivoRecusa().isEmpty());
         p.registrarRetornoBanco(new RetornoBanco(
                 antiga, false, null, null, "atrasado", Cenarios.AGORA)); // retorno da transação antiga: ignorado

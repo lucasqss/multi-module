@@ -8,8 +8,9 @@ import jakarta.transaction.Transactional;
 
 /**
  * O BANCO informa o resultado (chamado pelo webhook, não pelo usuário). É um FATO: o domínio não o
- * recusa por regra, só o classifica (PAGO, RECUSADO ou EM_ANALISE). Retornos repetidos são ignorados
- * pela entidade (idempotência) e o lock impede que dois avisos simultâneos sejam aplicados juntos.
+ * recusa por regra, só o classifica (PAGO, RECUSADO ou EM_ANALISE). Retornos repetidos ou de envios
+ * antigos são ignorados pela entidade e respondem 200 (idempotência); o lock impede que dois avisos
+ * simultâneos sejam aplicados juntos.
  */
 @ApplicationScoped
 public class ReceberRetornoBancoUC {
@@ -22,8 +23,9 @@ public class ReceberRetornoBancoUC {
 
     @Transactional
     public PagamentoOutput executar(RetornoBancoInput input) {
-        var pagamento = repository.obterPorTransacaoParaAlteracao(input.idTransacao());
-        pagamento.registrarRetornoBanco(input.retorno());
+        var retorno = input.retorno();
+        var pagamento = repository.obterParaAlteracao(retorno.idTransacao().pagamento()); // o id é nosso: leva ao pagamento
+        pagamento.registrarRetornoBanco(retorno);
         repository.salvar(pagamento);
         return PagamentoOutput.de(pagamento);
     }

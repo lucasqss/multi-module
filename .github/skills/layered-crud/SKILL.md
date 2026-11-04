@@ -82,7 +82,7 @@ public PagamentoOutput executar(UUID id, ComandoPagamento comando) {
     var pagamento = repository.obterParaAlteracao(new PagamentoId(id));   // lock
     comando.executar(pagamento, contexto);
     repository.salvar(pagamento);
-    comando.depoisDeSalvar(pagamento, contexto);   // ex.: EnviarAoBanco chama o banco
+    aposCommit(comando, pagamento);   // registra comando.depoisDoCommit: EnviarAoBanco só chama o banco se confirmou
     return PagamentoOutput.de(pagamento);
 }
 ```
@@ -159,10 +159,15 @@ Proibido `RuntimeException`/`IllegalStateException` genérica para regra de neg�
 - **Comando × fato.** Comando (usuário pede) pode ser **recusado** (422). Fato (algo já aconteceu lá fora)
   **não se recusa**: as mesmas specs **classificam** (`primeiraViolacao`) e o agregado vai para um estado
   de análise guardando o motivo. Ilustração: valor liquidado ≠ total → `EM_ANALISE` com `VALOR_LIQUIDADO_DIVERGENTE`.
-- **Idempotência:** identifique o fato por um id que **nós** geramos e enviamos (ex.: id da transação);
-  aviso repetido ou antigo é ignorado pela entidade e responde 200.
-- Efeito externo depois de salvar fica no fim do UC (ou `depoisDeSalvar` do comando). Em produção, prefira
-  **Outbox** (gravar a intenção na mesma transação e enviar após o commit).
+- **Idempotência:** identifique o fato por um id que **nós** geramos e enviamos e que **carrega a chave do
+  agregado** (VO com `de(String)`). Assim todo aviso — repetido ou de um envio antigo — chega ao agregado,
+  que o ignora e responde 200; só agregado inexistente dá 404 (o sistema externo não reenvia para sempre).
+  Ilustração: `IdTransacao(pagamento, envio)` → `"<uuid>-2"`; `ReceberRetornoBancoUC` faz `obterParaAlteracao(id.pagamento())`.
+- **Efeito externo só depois do commit**, nunca dentro da transação: senão um commit que falha deixa o
+  sistema externo com algo que não gravamos, e a resposta dele pode chegar antes de gravarmos. Registre um
+  `Synchronization` no `TransactionSynchronizationRegistry` e aja em `afterCompletion(STATUS_COMMITTED)`.
+  Ilustração: `ExecutarComandoPagamentoUC.aposCommit` + `ComandoPagamento.depoisDoCommit`. Falha depois do
+  commit não desfaz nada: em produção, **Outbox** (gravar a intenção na mesma transação; um job envia e reenvia).
 
 ## 8. Concorrência: lock pessimista
 
@@ -170,10 +175,11 @@ Proibido `RuntimeException`/`IllegalStateException` genérica para regra de neg�
   `LockModeType.PESSIMISTIC_WRITE` + hint `jakarta.persistence.lock.timeout`. Leitura pura usa `obter(id)`, sem lock.
 - O repositório traduz `PessimisticLockException`/`LockTimeoutException`/`LockAcquisitionException` para
   uma `ConflitoException` específica (`RecursoBloqueadoException` → 409). Nada de JPA vaza do adapter.
-- Coleções do agregado (`@ElementCollection`) ficam LAZY: `FOR UPDATE` não combina com join de coleção.
+- Coleções do agregado (`@ElementCollection`) ficam LAZY (`FOR UPDATE` não combina com join de coleção),
+  com `@BatchSize(size = <página máxima>)` para a listagem não fazer N+1 (o padrão do Quarkus é 16).
 - Sem `@Version` junto: um mecanismo só.
 
-Ilustração: `adapter/database/PagamentoRepository.obterParaAlteracao` / `obterPorTransacaoParaAlteracao`.
+Ilustração: `adapter/database/PagamentoRepository.obterParaAlteracao`; `PagamentoJpaEntity.boletos`.
 
 ## 9. Testes
 
@@ -183,7 +189,7 @@ Ilustração: `adapter/database/PagamentoRepository.obterParaAlteracao` / `obter
 | Specs/catálogo | uma classe `@Nested` por elo/momento; o limite exato de cada regra | `RegrasPagamentoTest` |
 | Estados | **tabela** ação → (origem → destino); o resto deve dar 409 | `EstadoPagamentoTest` |
 | Entidade | ordem 409 → 422 → muda; fatos e idempotência | `PagamentoTest` |
-| Lock | 2ª transação no mesmo registro → 409 | `LockPessimistaTest` |
+| Repositório e transação | 2ª transação no mesmo registro → 409; nº de consultas da listagem; efeito externo só com commit | `PagamentoRepositoryTest` |
 | Ponta a ponta | fluxo HTTP feliz + um erro por família + webhook | `PagamentoResourceTest` |
 
 Domínio testa sem Quarkus (JUnit puro, rápido). `@QuarkusTest` só para adapter e entrypoint.

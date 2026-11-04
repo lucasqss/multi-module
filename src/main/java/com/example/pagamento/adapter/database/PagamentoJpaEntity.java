@@ -14,6 +14,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
@@ -42,8 +43,12 @@ public class PagamentoJpaEntity {
     @Column(name = "criado_em", nullable = false, updatable = false)
     public Instant criadoEm;
 
-    /** LAZY: carregada dentro da transação pelo mapper (FOR UPDATE não combina com join de coleção). */
+    /**
+     * LAZY porque FOR UPDATE não combina com join de coleção. {@code @BatchSize}: ao listar, os boletos de
+     * vários pagamentos vêm numa consulta só (sem N+1). O Quarkus já usa lote 16 por padrão; 100 = página máxima.
+     */
     @ElementCollection
+    @BatchSize(size = 100)
     @CollectionTable(name = "pagamento_boleto", joinColumns = @JoinColumn(name = "pagamento_id"))
     @OrderColumn(name = "ordem")
     public List<BoletoJpa> boletos = new ArrayList<>();

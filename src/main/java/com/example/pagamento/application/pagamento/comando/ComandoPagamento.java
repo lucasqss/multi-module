@@ -4,7 +4,7 @@ import com.example.pagamento.domain.entity.Pagamento;
 
 /**
  * Padrão COMMAND: cada TRANSIÇÃO pedida pelo usuário é um objeto. Todas têm o mesmo roteiro
- * (travar, executar, salvar, efeito externo), que fica num só invocador:
+ * (travar, executar, salvar, efeito externo após o commit), que fica num só invocador:
  * {@code ExecutarComandoPagamentoUC}. Novo comando = nova classe aqui, sem novo caso de uso.
  *
  * <p>O comando só ORQUESTRA: a regra continua no agregado ({@code pagamento.submeter(...)}).
@@ -14,7 +14,11 @@ public sealed interface ComandoPagamento permits SubmeterPagamento, EnviarAoBanc
     /** Muda o agregado (dentro da transação, com o pagamento travado). */
     void executar(Pagamento pagamento, ContextoComando contexto);
 
-    /** Efeito fora do nosso banco de dados, depois de salvar (ex.: enviar ao banco). Padrão: nenhum. */
-    default void depoisDeSalvar(Pagamento pagamento, ContextoComando contexto) {
+    /**
+     * Efeito fora do nosso banco de dados (ex.: enviar ao banco). Roda só DEPOIS DO COMMIT: se a transação
+     * falhar, nada sai; e o sistema externo nunca responde sobre algo que ainda não gravamos.
+     * Uma falha aqui não desfaz o pagamento: em produção, use Outbox ou um job de reenvio. Padrão: nenhum.
+     */
+    default void depoisDoCommit(Pagamento pagamento, ContextoComando contexto) {
     }
 }

@@ -6,6 +6,7 @@ import com.example.pagamento.domain.valueobject.BoletoAPagar;
 import com.example.pagamento.domain.valueobject.BoletosDoPagamento;
 import com.example.pagamento.domain.valueobject.ContaDebito;
 import com.example.pagamento.domain.valueobject.Dinheiro;
+import com.example.pagamento.domain.valueobject.IdTransacao;
 import com.example.pagamento.domain.valueobject.LinhaDigitavel;
 import com.example.pagamento.domain.valueobject.Motivo;
 import com.example.pagamento.domain.valueobject.MotivoAnalise;
@@ -29,7 +30,7 @@ final class PagamentoMapper {
         destino.dataPagamento = origem.getDataPagamento().orElse(null);
         destino.status = origem.getStatus();
         destino.envios = origem.getEnvios();
-        destino.idTransacao = origem.getIdTransacao().orElse(null);
+        destino.idTransacao = origem.getIdTransacao().map(IdTransacao::toString).orElse(null);
         destino.autenticacao = origem.getAutenticacao().orElse(null);
         destino.motivoRecusa = origem.getMotivoRecusa().orElse(null);
         destino.motivoAnaliseCodigo = origem.getMotivoAnalise().map(MotivoAnalise::codigo).orElse(null);
@@ -47,7 +48,7 @@ final class PagamentoMapper {
                 e.dataPagamento,
                 e.status,
                 e.envios,
-                e.idTransacao,
+                e.idTransacao == null ? null : IdTransacao.de(e.idTransacao),
                 e.autenticacao,
                 e.motivoRecusa,
                 e.motivoAnaliseCodigo == null ? null : new MotivoAnalise(e.motivoAnaliseCodigo, e.motivoAnaliseMensagem),

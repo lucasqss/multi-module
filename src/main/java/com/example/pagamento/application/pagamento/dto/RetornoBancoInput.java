@@ -1,6 +1,7 @@
 package com.example.pagamento.application.pagamento.dto;
 
 import com.example.pagamento.domain.valueobject.Dinheiro;
+import com.example.pagamento.domain.valueobject.IdTransacao;
 import com.example.pagamento.domain.valueobject.RetornoBanco;
 
 import java.math.BigDecimal;
@@ -11,7 +12,7 @@ public record RetornoBancoInput(String idTransacao, boolean liquidado, BigDecima
                                 String codigoAutenticacao, String motivoRecusa, Instant momento) {
 
     public RetornoBanco retorno() {
-        return new RetornoBanco(idTransacao, liquidado, valorLiquidado == null ? null : new Dinheiro(valorLiquidado),
+        return new RetornoBanco(IdTransacao.de(idTransacao), liquidado, valorLiquidado == null ? null : new Dinheiro(valorLiquidado),
                 codigoAutenticacao, motivoRecusa, momento);
     }
 }

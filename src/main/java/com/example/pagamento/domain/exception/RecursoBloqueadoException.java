@@ -13,8 +13,4 @@ public class RecursoBloqueadoException extends ConflitoException {
     public RecursoBloqueadoException(PagamentoId id) {
         super(CODIGO, "O pagamento %s está sendo alterado por outra operação. Tente de novo.".formatted(id));
     }
-
-    public RecursoBloqueadoException(String idTransacao) {
-        super(CODIGO, "O pagamento da transação %s está sendo alterado por outra operação.".formatted(idTransacao));
-    }
 }

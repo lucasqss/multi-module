@@ -36,9 +36,9 @@ Verifique com `bash .github/skills/layered-crud/verificar-camadas.sh` e `mvn tes
 | Variação por tipo (cadeia) | `Modalidade`: `INDIVIDUAL`, `PROCESSO`, `LOTE` |
 | Máquina de estados | `domain/state`: `EstadoPagamento` + 7 estados + `StatusPagamento` |
 | Casos de uso | `application/pagamento/`: `CriarPagamentoUC`, `SalvarBoletosDoPagamentoUC`, `ExecutarComandoPagamentoUC` (+ `comando/`) |
-| Repositório (lock) | `adapter/database/PagamentoRepository`: `obter`, `obterParaAlteracao`, `obterPorTransacaoParaAlteracao` |
+| Repositório (lock) | `adapter/database/PagamentoRepository`: `obter`, `obterParaAlteracao` (também para o webhook: `IdTransacao` carrega o pagamento) |
 | Integrações externas | `adapter/emissor/EmissorBoletos`, `adapter/banco/BancoPagamentos` (saída); `entrypoint/webhook/v1/BancoWebhookResource` (entrada) |
 | Handler de erros HTTP | `entrypoint/api/v1/handler/ApiExceptionHandler` |
 | `Clock` no fuso do negócio | `shared/ClockProducer` (`pagamento.fuso-horario`) |
-| Testes | `src/test/.../domain/Cenarios`, `EstadoPagamentoTest`, `LockPessimistaTest`, `PagamentoResourceTest` |
+| Testes | `src/test/.../domain/Cenarios`, `EstadoPagamentoTest`, `PagamentoRepositoryTest`, `PagamentoResourceTest` |
 | Comandos | `mvn test`, `mvn quarkus:dev` |

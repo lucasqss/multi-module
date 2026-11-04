@@ -3,6 +3,7 @@ package com.example.pagamento.application.pagamento.dto;
 import com.example.pagamento.domain.entity.Pagamento;
 import com.example.pagamento.domain.state.StatusPagamento;
 import com.example.pagamento.domain.valueobject.ContaDebito;
+import com.example.pagamento.domain.valueobject.IdTransacao;
 import com.example.pagamento.domain.valueobject.Modalidade;
 import com.example.pagamento.domain.valueobject.Motivo;
 import com.example.pagamento.domain.valueobject.MotivoAnalise;
@@ -49,7 +50,7 @@ public record PagamentoOutput(
                 p.getBoletos().boletos().stream().map(b -> new BoletoOutput(b.idNoEmissor(), b.linhaDigitavel().valor(),
                         b.valor().valor(), b.vencimento(), b.beneficiario())).toList(),
                 p.getEnvios(),
-                p.getIdTransacao().orElse(null),
+                p.getIdTransacao().map(IdTransacao::toString).orElse(null),
                 p.getAutenticacao().orElse(null),
                 p.getMotivoRecusa().orElse(null),
                 p.getMotivoAnalise().map(MotivoAnalise::codigo).orElse(null),

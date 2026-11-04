@@ -23,7 +23,8 @@ public class BancoPagamentos {
 
     public void enviar(Pagamento pagamento) {
         var idTransacao = pagamento.getIdTransacao()
-                .orElseThrow(() -> new IllegalStateException("Pagamento sem transação: " + pagamento.getId()));
+                .orElseThrow(() -> new IllegalStateException("Pagamento sem transação: " + pagamento.getId()))
+                .toString();
         envios.add(new EnvioRegistrado(idTransacao, pagamento.getValorTotal(), pagamento.getBoletos().quantidade()));
         LOG.infof("[SIMULAÇÃO] Banco: transação %s, %d boleto(s), total %s",
                 idTransacao, pagamento.getBoletos().quantidade(), pagamento.getValorTotal());

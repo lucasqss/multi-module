@@ -10,9 +10,8 @@ public record EnviarAoBanco() implements ComandoPagamento {
         pagamento.enviarAoBanco();
     }
 
-    /** Em produção, prefira Outbox: gravar a intenção junto com o pagamento e enviar depois do commit. */
     @Override
-    public void depoisDeSalvar(Pagamento pagamento, ContextoComando contexto) {
+    public void depoisDoCommit(Pagamento pagamento, ContextoComando contexto) {
         contexto.banco().enviar(pagamento);
     }
 }

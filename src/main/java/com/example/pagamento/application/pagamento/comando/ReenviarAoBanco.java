@@ -11,7 +11,7 @@ public record ReenviarAoBanco() implements ComandoPagamento {
     }
 
     @Override
-    public void depoisDeSalvar(Pagamento pagamento, ContextoComando contexto) {
+    public void depoisDoCommit(Pagamento pagamento, ContextoComando contexto) {
         contexto.banco().enviar(pagamento);
     }
 }

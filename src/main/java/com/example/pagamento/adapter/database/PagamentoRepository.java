@@ -17,9 +17,7 @@ import org.hibernate.exception.LockAcquisitionException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 /**
  * Repositório do agregado (Panache/JPA), injetado DIRETAMENTE nos use cases (sem interface).
@@ -55,18 +53,14 @@ public class PagamentoRepository implements PanacheRepositoryBase<PagamentoJpaEn
 
     /** Para ALTERAR: trava a linha (FOR UPDATE) até o fim da transação. */
     public Pagamento obterParaAlteracao(PagamentoId id) {
-        return comLock(() -> find("id", id.valor()).withLock(LockModeType.PESSIMISTIC_WRITE)
-                        .withHint("jakarta.persistence.lock.timeout", ESPERA_LOCK_MS).firstResultOptional(),
-                () -> new PagamentoNaoEncontradoException(id),
-                () -> new RecursoBloqueadoException(id));
-    }
-
-    /** O banco identifica pelo id da transação que NÓS enviamos; também trava para alterar. */
-    public Pagamento obterPorTransacaoParaAlteracao(String idTransacao) {
-        return comLock(() -> find("idTransacao", idTransacao).withLock(LockModeType.PESSIMISTIC_WRITE)
-                        .withHint("jakarta.persistence.lock.timeout", ESPERA_LOCK_MS).firstResultOptional(),
-                () -> new PagamentoNaoEncontradoException(idTransacao),
-                () -> new RecursoBloqueadoException(idTransacao));
+        try {
+            return find("id", id.valor()).withLock(LockModeType.PESSIMISTIC_WRITE)
+                    .withHint("jakarta.persistence.lock.timeout", ESPERA_LOCK_MS).firstResultOptional()
+                    .map(PagamentoMapper::paraDominio)
+                    .orElseThrow(() -> new PagamentoNaoEncontradoException(id));
+        } catch (PessimisticLockException | LockTimeoutException | LockAcquisitionException e) {
+            throw new RecursoBloqueadoException(id); // nada de JPA vaza do adapter
+        }
     }
 
     public Pagina<Pagamento> listar(FiltroPagamento filtro, int pagina, int tamanho) {
@@ -90,16 +84,5 @@ public class PagamentoRepository implements PanacheRepositoryBase<PagamentoJpaEn
 
     public void remover(PagamentoId id) {
         deleteById(id.valor());
-    }
-
-    /** Traduz as exceções de lock do JPA/Hibernate para exceção de domínio: nada de JPA vaza do adapter. */
-    private static Pagamento comLock(Supplier<Optional<PagamentoJpaEntity>> consulta,
-                                     Supplier<RuntimeException> naoEncontrado,
-                                     Supplier<RuntimeException> bloqueado) {
-        try {
-            return consulta.get().map(PagamentoMapper::paraDominio).orElseThrow(naoEncontrado);
-        } catch (PessimisticLockException | LockTimeoutException | LockAcquisitionException e) {
-            throw bloqueado.get();
-        }
     }
 }

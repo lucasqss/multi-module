@@ -90,9 +90,15 @@ O emissor é simulado: a linha digitável (47 dígitos) segue um layout fake
 
 ## Rodar
 
+Banco: **Oracle** em todos os profiles. Em dev e test, o Quarkus Dev Services sobe sozinho um Oracle Free em
+container (precisa de **Docker**; imagem `ghcr.io/gvenzl/oracle-free`, versão fixa no `application.properties`).
+Para usar um Oracle existente, defina `QUARKUS_DATASOURCE_JDBC_URL`, `..._USERNAME` e `..._PASSWORD`.
+Em produção: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (e o esquema por migração, não pelo Hibernate).
+
 ```bash
-mvn quarkus:dev   # http://localhost:8081
-mvn test          # domínio (JUnit puro) + repositório/transação + ponta a ponta (@QuarkusTest, H2)
+mvn quarkus:dev   # http://localhost:8081 (sobe o Oracle em container)
+mvn test          # domínio (JUnit puro) + repositório/transação + ponta a ponta (@QuarkusTest, Oracle)
+mvn verify        # + integração: o jar empacotado contra o Oracle (@QuarkusIntegrationTest, PagamentoResourceIT)
 ```
 
 ## Copilot e reuso em outros projetos

@@ -43,5 +43,6 @@ Verifique com `bash .github/skills/layered-crud/verificar-camadas.sh` e `mvn tes
 | Integrações externas | `adapter/emissor/EmissorBoletos`, `adapter/banco/BancoPagamentos` (saída); `entrypoint/webhook/v1/BancoWebhookResource` (entrada) |
 | Handler de erros HTTP | `entrypoint/api/v1/handler/ApiExceptionHandler` |
 | `Clock` no fuso do negócio | `shared/ClockProducer` (`pagamento.fuso-horario`) |
-| Testes | `src/test/.../domain/Cenarios`, `StatusPagamentoTest`, `PagamentoRepositoryTest`, `PagamentoResourceTest` |
-| Comandos | `mvn test`, `mvn quarkus:dev` |
+| Testes | `src/test/.../domain/Cenarios`, `StatusPagamentoTest`, `PagamentoRepositoryTest`, `PagamentoResourceTest`, `PagamentoResourceIT` (`@QuarkusIntegrationTest`) |
+| Banco | Oracle em todos os profiles; dev/test via Dev Services (Docker); prod por `DB_URL`/`DB_USERNAME`/`DB_PASSWORD` |
+| Comandos | `mvn test`, `mvn verify` (integração), `mvn quarkus:dev` |

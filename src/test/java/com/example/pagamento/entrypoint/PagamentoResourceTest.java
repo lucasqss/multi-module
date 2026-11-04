@@ -1,10 +1,8 @@
 package com.example.pagamento.entrypoint;
 
-import com.example.pagamento.adapter.banco.BancoPagamentos;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.response.ValidatableResponse;
-import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import java.time.DayOfWeek;
@@ -20,30 +18,29 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Ponta a ponta: HTTP -> use case -> domínio -> adapters -> H2.
+ * Ponta a ponta: HTTP -> use case -> domínio -> repositório -> Oracle (Dev Services).
  * Sistemas externos simulados: o EMISSOR decodifica a linha digitável (adapter fake);
  * o BANCO recebe os envios (adapter fake) e devolve o resultado pelo webhook.
+ *
+ * <p>CAIXA-PRETA de propósito (só HTTP, nada injetado): assim {@link PagamentoResourceIT} herda os mesmos
+ * cenários e os roda contra a aplicação empacotada. O que precisa de CDI fica em {@code PagamentoRepositoryTest}.
  */
 @QuarkusTest
 class PagamentoResourceTest {
 
-    private static final String API = "/api/v1/pagamentos";
-    private static final String WEBHOOK_BANCO = "/webhooks/v1/banco/retornos";
-    private static final AtomicInteger SEQUENCIA = new AtomicInteger(1);
+    static final String API = "/api/v1/pagamentos";
+    static final String WEBHOOK_BANCO = "/webhooks/v1/banco/retornos";
+    static final AtomicInteger SEQUENCIA = new AtomicInteger(1);
 
-    @Inject
-    BancoPagamentos banco;
+    // ============================== apoio (também usado pelo IT) ==============================
 
-    // ============================== apoio ==============================
-
-    private static LocalDate hoje() {
+    static LocalDate hoje() {
         return LocalDate.now(ZoneId.of("America/Sao_Paulo"));
     }
 
-    private static LocalDate diaUtil() {
+    static LocalDate diaUtil() {
         var d = hoje().plusDays(5);
         return switch (d.getDayOfWeek()) {
             case SATURDAY -> d.plusDays(2);
@@ -56,42 +53,42 @@ class PagamentoResourceTest {
      * Linha no layout FAKE do emissor: 9 + emissor(3) + id(25) + vencimento + centavos(10).
      * Os 4 últimos dígitos do id identificam o beneficiário.
      */
-    private static String linha(int fornecedor, long centavos) {
+    static String linha(int fornecedor, long centavos) {
         var id = SEQUENCIA.incrementAndGet() * 10_000L + fornecedor;
         return "9001" + "%025d".formatted(id) + hoje().plusDays(30).toString().replace("-", "") + "%010d".formatted(centavos);
     }
 
-    private static ValidatableResponse post(String path, String body) {
+    static ValidatableResponse post(String path, String body) {
         return given().contentType(ContentType.JSON).body(body).when().post(path).then();
     }
 
-    private static ValidatableResponse put(String path, String body) {
+    static ValidatableResponse put(String path, String body) {
         return given().contentType(ContentType.JSON).body(body).when().put(path).then();
     }
 
-    private static String criar(String modalidade) {
+    static String criar(String modalidade) {
         return post(API, "{\"modalidade\":\"" + modalidade + "\"}").statusCode(201).extract().path("id");
     }
 
-    private static ValidatableResponse salvarBoletos(String id, String... linhas) {
+    static ValidatableResponse salvarBoletos(String id, String... linhas) {
         var lista = linhas.length == 0 ? "" : "\"" + String.join("\",\"", linhas) + "\"";
         return put(API + "/" + id + "/boletos", "{\"linhasDigitaveis\":[" + lista + "]}");
     }
 
-    private static void dadosGerais(String id, LocalDate data) {
+    static void dadosGerais(String id, LocalDate data) {
         put(API + "/" + id, "{\"contaDebito\":{\"agencia\":\"1234\",\"conta\":\"998877\"},\"dataPagamento\":\"" + data + "\"}")
                 .statusCode(200);
     }
 
     /** Cria, preenche, submete e envia ao banco. Devolve o id da transação. */
-    private static String enviado(String id, String... linhas) {
+    static String enviado(String id, String... linhas) {
         salvarBoletos(id, linhas).statusCode(200);
         dadosGerais(id, diaUtil());
         post(API + "/" + id + "/submissao", "").statusCode(200);
         return post(API + "/" + id + "/envio", "").statusCode(200).extract().path("transacao.id");
     }
 
-    private static ValidatableResponse bancoRetorna(String idTransacao, String situacao, Long centavos) {
+    static ValidatableResponse bancoRetorna(String idTransacao, String situacao, Long centavos) {
         var corpo = """
                 {"idTransacao":"%s","situacao":"%s","valorLiquidadoCentavos":%s,"autenticacao":"AUT-%s",
                  "motivoRecusa":%s,"dataHora":"%sT10:15:00-03:00"}
@@ -124,7 +121,6 @@ class PagamentoResourceTest {
         // 4. envio ao BANCO (saída) e retorno pelo webhook (entrada)
         String transacao = post(API + "/" + id + "/envio", "").statusCode(200)
                 .body("status", equalTo("EM_PROCESSAMENTO")).extract().path("transacao.id");
-        assertTrue(banco.envios().stream().anyMatch(e -> e.idTransacao().equals(transacao)));
         post(API + "/" + id + "/cancelamento", "{\"motivo\":\"desisti\"}").statusCode(409); // já no banco
 
         bancoRetorna(transacao, "LIQUIDADO", 50000L).statusCode(200).body("status", equalTo("PAGO"));

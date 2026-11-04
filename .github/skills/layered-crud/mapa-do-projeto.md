@@ -16,5 +16,5 @@
 | Integrações externas | `adapter/<sistema>/<Classe>` (saída), `entrypoint/webhook/v1/<Resource>` (entrada) |
 | Handler de erros HTTP | `entrypoint/api/v1/handler/ApiExceptionHandler` |
 | `Clock` no fuso do negócio | `shared/ClockProducer` |
-| Testes | `src/test/.../domain/Cenarios`, `Status<Agregado>Test`, `<Agregado>ResourceTest` |
-| Comandos | `mvn test`, `mvn quarkus:dev` |
+| Testes | `src/test/.../domain/Cenarios`, `Status<Agregado>Test`, `<Agregado>ResourceTest`, `<Agregado>ResourceIT` |
+| Comandos | `mvn test`, `mvn verify` (integração), `mvn quarkus:dev` |

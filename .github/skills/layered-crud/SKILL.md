@@ -226,8 +226,8 @@ Proibido `RuntimeException`/`IllegalStateException` genérica para regra de neg�
   uma `ConflitoException` específica (`RecursoBloqueadoException` → 409). Nada de exceção JPA sai dele.
 - Coleções do agregado (`@ElementCollection`) ficam LAZY (`FOR UPDATE` não combina com join de coleção),
   com `@BatchSize(size = <página máxima>)` para a listagem não fazer N+1 (o padrão do Quarkus é 16).
-- Sem `@Version` junto (um mecanismo só). O hint de espera varia por banco/dialeto (testado só no H2):
-  confirme no banco real com o teste de lock.
+- Sem `@Version` junto (um mecanismo só). O hint de espera vira SQL do dialeto (no Oracle, `FOR UPDATE WAIT n`):
+  teste o lock **no banco real** (Dev Services), nunca só em banco em memória.
 
 Ilustração: `domain/repository/PagamentoRepository` (`listar` com filtros nulos = todos); `Pagamento.boletos`.
 
@@ -240,9 +240,13 @@ Ilustração: `domain/repository/PagamentoRepository` (`listar` com filtros nulo
 | Estados | **tabela** ação → (origem → destino); o resto deve dar 409 | `StatusPagamentoTest` |
 | Entidade | ordem 409 → 422 → muda; fatos e idempotência | `PagamentoTest` |
 | Repositório e transação | 2ª transação no mesmo registro → 409; nº de consultas da listagem; efeito externo só com commit | `PagamentoRepositoryTest` |
-| Ponta a ponta | fluxo HTTP feliz + um erro por família + webhook | `PagamentoResourceTest` |
+| Ponta a ponta | fluxo HTTP feliz + um erro por família + webhook (**caixa-preta**: só HTTP) | `PagamentoResourceTest` |
+| Integração | o app **empacotado** + banco real; herda o ponta a ponta + cenários com requisições paralelas | `PagamentoResourceIT` |
 
 Entidade, regras e estados: JUnit puro (anotação JPA não exige runtime). `@QuarkusTest`: repositório, adapter, entrypoint.
+Banco de teste = o de produção, via **Dev Services** (container; sem URL no profile test). `@QuarkusIntegrationTest`:
+`class <X>ResourceIT extends <X>ResourceTest` (por isso o teste HTTP não injeta nada), sem CDI, profile via
+`quarkus.test.integration-test-profile=test`, nome `*IT` (failsafe, `mvn verify`).
 
 ## 10. Iniciar um projeto no padrão
 
@@ -255,8 +259,10 @@ Entidade, regras e estados: JUnit puro (anotação JPA não exige runtime). `@Qu
    `ErroResponse`, `MotivoRequest`, `PaginaResponse`, `SpecificationTest`. Sem template (criadas com o agregado):
    `TransicaoEstadoInvalidaException` (recebe o `Status<Agregado>`), `<Agregado>NaoEncontradoException`, `RecursoBloqueadoException`.
 3. Dependências Quarkus: `quarkus-rest-jackson`, `quarkus-hibernate-validator`, `quarkus-hibernate-orm-panache`
-   (+ driver; os templates `Dinheiro`/`Motivo` já trazem o `Conversor` JPA); testes com `quarkus-junit`
-   (`quarkus-junit5` em versões antigas) e `rest-assured`. Em Spring, adapte entrypoint/config
+   + `quarkus-jdbc-<banco>` (os templates `Dinheiro`/`Motivo` já trazem o `Conversor` JPA); testes com
+   `quarkus-junit` (`quarkus-junit5` em versões antigas), `rest-assured` e `maven-failsafe-plugin`.
+   Banco: dev/test por Dev Services com imagem de versão fixa; prod por variáveis de ambiente e
+   `schema-management.strategy=none` (esquema por migração). Em Spring, adapte entrypoint/config
    (`@RestControllerAdvice`, `@Bean`, `@Value`) e troque o Panache por Spring Data.
 4. Copie `mapa-do-projeto.md` para o fim de `.github/copilot-instructions.md` e preencha com os nomes reais.
 5. `mvn test` (o `SpecificationTest` deve passar) e `verificar-camadas.sh`.

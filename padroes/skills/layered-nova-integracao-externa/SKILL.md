@@ -1,35 +1,42 @@
 ---
 name: layered-nova-integracao-externa
-description: Adiciona integração com sistema externo (e-mail, SMS, fila, outro serviço, legado, mainframe) em projeto Java layered, como classe concreta em adapter/ injetada diretamente no use case (sem ports and adapters), sem vazar framework para o domínio. Use quando o sistema precisar chamar, consultar ou notificar algo fora da aplicação.
+description: Adiciona integração com sistema externo (e-mail, SMS, fila, pagamentos, legado, mainframe) em projeto Java layered, nos dois sentidos — SAÍDA (nós chamamos: classe concreta em adapter/, injetada no use case, sem ports and adapters) e ENTRADA (ele nos avisa: entrypoint próprio, contrato dele, fato classificado e idempotência) — sem vazar framework para o domínio. Use quando o sistema precisar chamar, consultar, notificar ou ser avisado por algo fora da aplicação.
 ---
 
-# Nova integração externa (classe em `adapter/`, injetada no use case)
+# Nova integração externa
 
-O padrão **não** usa ports and adapters: não existe interface no domínio. A integração é uma classe
-concreta em `adapter/`, injetada pelo construtor no use case.
+Primeiro descubra o **sentido**:
+
+| Sentido | Quem chama | Onde fica | Exemplo |
+|---|---|---|---|
+| **Saída** | nós → sistema externo | classe concreta em `adapter/<sistema>/`, injetada no use case | notificar por e-mail, pedir devolução de pagamento |
+| **Entrada** | sistema externo → nós | entrypoint próprio (`entrypoint/webhook/v1`, `entrypoint/iib/v1`, consumidor de fila) que chama **um** use case | aviso de pagamento, retorno de processamento |
+
+O padrão **não** usa ports and adapters: não existe interface no domínio para nenhum dos dois.
 
 ## 0. Siga a convenção do projeto
 
-Veja o **"Mapa do projeto"** do `copilot-instructions.md`/`AGENTS.md`, ou observe como os adapters
-existentes estão organizados (normalmente um subpacote por sistema externo: `adapter/<sigla-do-sistema>/`).
-Leia um adapter existente antes de criar outro.
+Veja o **"Mapa do projeto"** do `copilot-instructions.md`/`AGENTS.md`, ou observe como os adapters e
+entrypoints existentes estão organizados (normalmente um subpacote por sistema externo:
+`adapter/<sigla-do-sistema>/`). Leia um existente antes de criar outro.
 
-## 1. Classe da integração
+## SAÍDA (nós chamamos o sistema externo)
+
+### 1. Classe da integração
 
 `adapter/<sistema>/<Nome>.java` (`@ApplicationScoped` ou equivalente):
 
-- Nome pelo que o negócio precisa (`NotificadorContrato`, `ConsultaCliente`), não pela tecnologia
+- Nome pelo que o negócio precisa (`NotificadorContrato`, `SistemaPagamentos`), não pela tecnologia
   (`SmtpClient`, `MciRestClient`).
 - **Fala a língua do domínio**: métodos públicos recebem/devolvem entidades e VOs de domínio.
-  DTOs do sistema externo e a conversão domínio ↔ externo ficam **dentro** do adapter.
+  DTOs do sistema externo e a conversão ficam **dentro** do adapter.
 - Erros técnicos (timeout, 5xx, código de retorno do legado) → exceção de domínio específica quando
   o chamador precisa reagir. Exceção de SDK/cliente HTTP nunca chega à application.
 - URLs/credenciais em configuração, lidas **no adapter**.
-- Simulação: Javadoc dizendo o que seria na vida real; guarde as chamadas numa lista thread-safe.
 - **Não** crie interface. Só quando surgir uma segunda implementação real em produção.
 - Nunca importe `application` nem `entrypoint`.
 
-## 2. Use case
+### 2. Use case
 
 - Injete a classe pelo construtor.
 - Ordem: domínio valida/transiciona → salvar → **depois** a chamada externa (conflito ou regra
@@ -38,13 +45,33 @@ Leia um adapter existente antes de criar outro.
 - Se o retorno alimenta uma **regra de negócio**, a regra continua pura: o use case chama a
   integração e entrega o resultado no candidato da spec (skill `layered-nova-regra-de-negocio`, passo 5).
 
-## 3. Testes
+## ENTRADA (o sistema externo nos avisa)
+
+1. **Entrypoint próprio**, separado da nossa API: outro cliente, outro contrato, outra autenticação.
+   Continua fino: autentica, traduz, chama **um** use case.
+2. **O contrato é DELE.** O `*Request` espelha o formato externo (centavos, data/hora com fuso, nomes
+   dele) e traduz para o `*Input` na borda. O domínio nunca vê o formato externo.
+3. **Autenticação na borda** (token/assinatura de configuração; comparação em tempo constante → 401).
+4. **Fato, não comando.** Aviso de algo que já aconteceu (pagamento, processamento concluído) não é
+   recusado por regra: o domínio **classifica** com `ValidadorRegras.primeiraViolacao(...)` (as mesmas
+   regras que recusariam um comando) e vai para um estado de análise com o motivo. Só o **estado** pode
+   recusar (409) quando o aviso não faz sentido.
+5. **Idempotência.** O agregado guarda o id externo e ignora o mesmo aviso repetido (responde 200 de novo):
+   webhooks e filas entregam "pelo menos uma vez".
+6. **Identificação** pelo que o sistema externo conhece (código de barras, protocolo): o repositório ganha
+   `obterPor<Chave>(...)` que lança a exceção `*NaoEncontrado` (404).
+7. Decisões humanas sobre o fato (aceitar, devolver, reprocessar) são **casos de uso próprios** na nossa API.
+
+## Testes
 
 - Domínio continua testável sem a integração.
-- Teste de integração: injete a classe (simulada) e verifique o que ela registrou; para uma
-  integração real, substitua-a no teste (`@InjectMock` no Quarkus, `@MockBean` no Spring).
-- Garanta que **nada** é enviado quando o domínio recusa (409/422).
+- Saída: injete a classe (simulada) e verifique o que ela registrou; para uma integração real,
+  substitua-a no teste (`@InjectMock` no Quarkus, `@MockBean` no Spring). Garanta que **nada** é enviado
+  quando o domínio recusa (409/422).
+- Entrada: simule o sistema externo chamando o entrypoint **no formato dele**; cubra autenticação (401),
+  chave desconhecida (404), formato inválido (400), aviso repetido (200 sem efeito) e o fato divergente
+  (vai para análise).
 
-## 4. Feche
+## Feche
 
 Atualize o "Mapa do projeto", rode a skill `layered-revisao-arquitetura` e os testes.

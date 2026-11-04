@@ -1,13 +1,16 @@
 ---
 name: nova-integracao-externa
-description: Adiciona uma integração com sistema externo (e-mail, SMS, fila, outro serviço, banco registrador) como classe concreta em adapter/, injetada diretamente no use case, mantendo o domínio livre de frameworks. Use quando o sistema precisar chamar, consultar ou notificar algo fora da aplicação.
+description: Adiciona uma integração com sistema externo nos dois sentidos — SAÍDA (nós chamamos: classe concreta em adapter/, injetada no use case) e ENTRADA (ele nos avisa: entrypoint próprio, webhook/fila, com fato classificado e idempotência) — mantendo o domínio livre de frameworks. Use quando o sistema precisar chamar, consultar, notificar ou ser avisado por algo fora da aplicação.
 ---
 
 # Nova integração externa (classe em `adapter/`, injetada no use case)
 
 Este projeto **não** usa ports and adapters: não há interface no domínio. A integração é uma classe
 concreta em `adapter/`, injetada pelo construtor no use case.
-Modelo existente: `adapter/notificacao/NotificadorBoleto`, usado por `application/boleto/NotificarBoletoUC`.
+Modelos existentes:
+- **Saída**: `adapter/notificacao/NotificadorBoleto` (`NotificarBoletoUC`) e `adapter/pagamentos/SistemaPagamentos`
+  (`DevolverPagamentoBoletoUC`).
+- **Entrada**: `entrypoint/webhook/v1/PagamentoWebhookResource` → `ReceberPagamentoBoletoUC`.
 
 ## 1. Classe da integração
 
@@ -41,7 +44,29 @@ Modelo existente: `adapter/notificacao/NotificadorBoleto`, usado por `applicatio
   Para uma integração real, use `@InjectMock` (quarkus-junit-mockito) ou um perfil de teste.
 - Garanta que o efeito externo **não** acontece quando o domínio recusa (409/422).
 
-## 4. Feche
+## 4. Integração de ENTRADA (o sistema externo nos avisa)
+
+Modelo: `entrypoint/webhook/v1/PagamentoWebhookResource` + `ReceberPagamentoBoletoUC` + `Boleto.registrarPagamento`.
+
+1. **Entrypoint próprio** (`entrypoint/webhook/v1`, `entrypoint/iib/v1`, consumidor de fila), separado
+   da nossa API: outro cliente, outro contrato, outra autenticação. Continua fino: autentica, traduz,
+   chama **um** use case.
+2. **O contrato é DELE.** O `*Request` espelha o formato externo (centavos, data/hora com fuso, nomes
+   dele) e traduz para o `*Input` na borda. O domínio nunca vê o formato externo.
+3. **Autenticação na borda** (token/assinatura vindos de configuração; comparação em tempo constante).
+   401 sai pelo `ApiExceptionHandler`.
+4. **Fato, não comando.** Se o aviso descreve algo que já aconteceu (pagamento), o domínio não o recusa
+   por regra: classifica com `ValidadorRegras.primeiraViolacao(...)` e vai para um estado de análise com
+   o motivo. Só o **estado** pode recusar (409) quando o aviso não faz sentido (ex.: boleto já pago por
+   outra transação).
+5. **Idempotência.** O agregado guarda o id externo (`idTransacao`) e ignora o mesmo aviso repetido,
+   respondendo 200 de novo.
+6. **Identificação.** O sistema externo identifica pelo que ELE conhece (ex.: linha digitável): o
+   repositório ganha `obterPor<Chave>(...)`, que lança a exceção `*NaoEncontrado` (404).
+7. **Testes:** simule o sistema externo chamando o webhook no formato dele; cubra token inválido (401),
+   chave desconhecida (404), formato inválido (400), aviso repetido (200 sem efeito) e o fato divergente.
+
+## 5. Feche
 
 - Adicione o pacote à tabela de camadas e ao "Mapa do projeto".
 - `.github/skills/revisao-arquitetura/verificar-camadas.sh` e `mvn test`.

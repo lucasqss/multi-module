@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import static __PACOTE__.domain.specification.Specification.quando;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -40,6 +41,17 @@ class SpecificationTest {
         assertDoesNotThrow(() -> validador.validar(2));
         assertThrows(ImparException.class, () -> validador.validar(3));
         assertThrows(NaoPositivoException.class, () -> validador.validar(-3)); // viola as duas: vale a 1ª
+    }
+
+    @Test
+    void primeiraViolacaoClassificaSemLancar() {
+        var validador = ValidadorRegras.<Integer>de(
+                RegraNegocio.de(positivo, n -> new NaoPositivoException()),
+                RegraNegocio.de(par, n -> new ImparException()));
+
+        assertTrue(validador.primeiraViolacao(2).isEmpty());
+        assertInstanceOf(ImparException.class, validador.primeiraViolacao(3).orElseThrow());
+        assertInstanceOf(NaoPositivoException.class, validador.primeiraViolacao(-3).orElseThrow());
     }
 
     static class NaoPositivoException extends RegraNegocioException {

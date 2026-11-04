@@ -7,6 +7,7 @@ import com.example.boleto.domain.state.EstadoBoleto;
 import com.example.boleto.domain.state.StatusBoleto;
 import com.example.boleto.domain.valueobject.BoletoId;
 import com.example.boleto.domain.valueobject.Documento;
+import com.example.boleto.domain.valueobject.LinhaDigitavel;
 import com.example.boleto.shared.Pagina;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import io.quarkus.panache.common.Page;
@@ -90,6 +91,13 @@ public class BoletoRepository implements PanacheRepositoryBase<BoletoJpaEntity, 
 
     public void remover(BoletoId id) {
         deleteById(id.valor());
+    }
+
+    /** Busca pela linha digitável: é assim que o sistema externo de pagamentos identifica o boleto. */
+    public Boleto obterPorLinhaDigitavel(LinhaDigitavel linhaDigitavel) {
+        return find("linhaDigitavel", linhaDigitavel.valor()).firstResultOptional()
+                .map(BoletoMapper::paraDominio)
+                .orElseThrow(() -> new BoletoNaoEncontradoException(linhaDigitavel));
     }
 
     /** Atalho usado por todos os use cases que operam sobre um boleto existente. */

@@ -19,6 +19,11 @@ public abstract class RegraNegocio<T> implements Specification<T> {
     /** A exceção específica desta regra, já com os dados do candidato na mensagem. */
     protected abstract RegraNegocioException violacao(T candidato);
 
+    /** A exceção específica desta regra para o candidato, SEM lançar (para classificar fatos). */
+    public final RegraNegocioException violacaoDe(T candidato) {
+        return violacao(candidato);
+    }
+
     /** Lança a exceção específica se o candidato não satisfizer a regra. */
     public final void exigir(T candidato) {
         if (!isSatisfiedBy(candidato)) {

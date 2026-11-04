@@ -18,7 +18,9 @@ import static com.example.boleto.domain.specification.Specification.quando;
  *   <li><b>Seções</b> ({@link #ITENS}, {@link #DESTINATARIOS}): coerência da parte enviada, a cada
  *       salvamento em EM_EDICAO. O boleto como um todo pode continuar incompleto.</li>
  *   <li><b>Emissão</b> ({@link #EMISSAO}): completude e regras do boleto inteiro, só ao finalizar a edição.</li>
- *   <li><b>Recebimento</b> ({@link #RECEBIMENTO}): o pagamento informado pelo banco.</li>
+ *   <li><b>Conformidade do pagamento</b> ({@link #CONFORMIDADE_PAGAMENTO}): usado como CLASSIFICAÇÃO,
+ *       não como validação. O pagamento já aconteceu no sistema externo (é um fato): a primeira regra
+ *       não atendida vira o motivo da análise, em vez de um erro.</li>
  * </ul>
  *
  * <p>Para criar uma regra nova: crie a exceção específica (em {@code domain.exception}), a spec
@@ -67,9 +69,10 @@ public final class RegrasBoleto {
             new VencimentoEmDiaUtilSpec(),
             new LimiteBoletosEmAbertoSpec());
 
-    // ======================= recebimento do pagamento =======================
+    // ======================= conformidade do pagamento (classifica um FATO) =======================
 
-    public static final ValidadorRegras<RecebimentoPagamento> RECEBIMENTO = ValidadorRegras.de(
+    public static final ValidadorRegras<RecebimentoPagamento> CONFORMIDADE_PAGAMENTO = ValidadorRegras.de(
+            new BoletoEmAbertoSpec(),
             new DataPagamentoNaoFuturaSpec(),
             new PagamentoAteOVencimentoSpec(),
             new ValorPagoIgualAoBoletoSpec());

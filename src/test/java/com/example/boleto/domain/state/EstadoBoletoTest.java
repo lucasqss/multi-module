@@ -8,7 +8,9 @@ import java.util.Set;
 import java.util.function.Function;
 
 import static com.example.boleto.domain.state.StatusBoleto.CANCELADO;
+import static com.example.boleto.domain.state.StatusBoleto.DEVOLVIDO;
 import static com.example.boleto.domain.state.StatusBoleto.EMITIDO;
+import static com.example.boleto.domain.state.StatusBoleto.EM_ANALISE;
 import static com.example.boleto.domain.state.StatusBoleto.EM_EDICAO;
 import static com.example.boleto.domain.state.StatusBoleto.NOTIFICADO;
 import static com.example.boleto.domain.state.StatusBoleto.PAGO;
@@ -24,16 +26,24 @@ class EstadoBoletoTest {
     private static final Map<String, Function<EstadoBoleto, EstadoBoleto>> ACOES = Map.of(
             "emitir", EstadoBoleto::emitir,
             "notificar", EstadoBoleto::notificar,
-            "receberPagamento", EstadoBoleto::receberPagamento,
+            "pagamentoConforme", e -> e.receberPagamento(true),
+            "pagamentoDivergente", e -> e.receberPagamento(false),
+            "aceitarPagamento", EstadoBoleto::aceitarPagamento,
+            "devolverPagamento", EstadoBoleto::devolverPagamento,
             "cancelar", EstadoBoleto::cancelar);
 
     /** Transições PERMITIDAS. Tudo que não está aqui deve falhar. */
     private static final Map<StatusBoleto, Map<String, StatusBoleto>> PERMITIDAS = Map.of(
             EM_EDICAO, Map.of("emitir", EMITIDO),
-            EMITIDO, Map.of("notificar", NOTIFICADO, "receberPagamento", PAGO, "cancelar", CANCELADO),
-            NOTIFICADO, Map.of("notificar", NOTIFICADO, "receberPagamento", PAGO, "cancelar", CANCELADO),
+            EMITIDO, Map.of("notificar", NOTIFICADO, "cancelar", CANCELADO,
+                    "pagamentoConforme", PAGO, "pagamentoDivergente", EM_ANALISE),
+            NOTIFICADO, Map.of("notificar", NOTIFICADO, "cancelar", CANCELADO,
+                    "pagamentoConforme", PAGO, "pagamentoDivergente", EM_ANALISE),
+            EM_ANALISE, Map.of("aceitarPagamento", PAGO, "devolverPagamento", DEVOLVIDO),
+            // cancelado não aceita ações do usuário, mas dinheiro recebido mesmo assim vai para análise
+            CANCELADO, Map.of("pagamentoConforme", EM_ANALISE, "pagamentoDivergente", EM_ANALISE),
             PAGO, Map.of(),
-            CANCELADO, Map.of());
+            DEVOLVIDO, Map.of());
 
     @Test
     void tabelaDeTransicoes() {

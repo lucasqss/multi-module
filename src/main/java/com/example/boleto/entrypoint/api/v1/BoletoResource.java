@@ -1,14 +1,15 @@
 package com.example.boleto.entrypoint.api.v1;
 
+import com.example.boleto.application.boleto.AceitarPagamentoBoletoUC;
 import com.example.boleto.application.boleto.AlterarBoletoUC;
 import com.example.boleto.application.boleto.CancelarBoletoUC;
 import com.example.boleto.application.boleto.ConsultarBoletoUC;
 import com.example.boleto.application.boleto.CriarBoletoUC;
+import com.example.boleto.application.boleto.DevolverPagamentoBoletoUC;
 import com.example.boleto.application.boleto.EmitirBoletoUC;
 import com.example.boleto.application.boleto.ExcluirBoletoUC;
 import com.example.boleto.application.boleto.ListarBoletosUC;
 import com.example.boleto.application.boleto.NotificarBoletoUC;
-import com.example.boleto.application.boleto.ReceberPagamentoBoletoUC;
 import com.example.boleto.application.boleto.SalvarDestinatariosBoletoUC;
 import com.example.boleto.application.boleto.SalvarItensBoletoUC;
 import com.example.boleto.application.boleto.dto.ListarBoletosInput;
@@ -16,7 +17,6 @@ import com.example.boleto.domain.state.StatusBoleto;
 import com.example.boleto.entrypoint.api.v1.request.AlterarBoletoRequest;
 import com.example.boleto.entrypoint.api.v1.request.CriarBoletoRequest;
 import com.example.boleto.entrypoint.api.v1.request.MotivoRequest;
-import com.example.boleto.entrypoint.api.v1.request.ReceberPagamentoRequest;
 import com.example.boleto.entrypoint.api.v1.request.SalvarDestinatariosBoletoRequest;
 import com.example.boleto.entrypoint.api.v1.request.SalvarItensBoletoRequest;
 import com.example.boleto.entrypoint.api.v1.response.BoletoResponse;
@@ -46,7 +46,7 @@ import java.util.UUID;
  * <ul>
  *   <li>CRUD do rascunho nos verbos HTTP ({@code POST}, {@code GET}, {@code PUT /{id}}, {@code DELETE /{id}});</li>
  *   <li>cada SEÇÃO do boleto como sub-recurso substituído inteiro ({@code PUT /{id}/itens});</li>
- *   <li>transições/eventos de negócio como {@code POST /{id}/<substantivo>} ({@code /emissao}, {@code /pagamento}).</li>
+ *   <li>transições/eventos de negócio como {@code POST /{id}/<substantivo>} ({@code /emissao}, {@code /devolucao}).</li>
  * </ul>
  */
 @Path("/api/v1/boletos")
@@ -61,14 +61,16 @@ public class BoletoResource {
     private final ExcluirBoletoUC excluir;
     private final EmitirBoletoUC emitir;
     private final NotificarBoletoUC notificar;
-    private final ReceberPagamentoBoletoUC receberPagamento;
+    private final AceitarPagamentoBoletoUC aceitarPagamento;
+    private final DevolverPagamentoBoletoUC devolverPagamento;
     private final CancelarBoletoUC cancelar;
 
     public BoletoResource(CriarBoletoUC criar, ConsultarBoletoUC consultar, ListarBoletosUC listar,
                           AlterarBoletoUC alterar, SalvarItensBoletoUC salvarItens,
                           SalvarDestinatariosBoletoUC salvarDestinatarios, ExcluirBoletoUC excluir,
                           EmitirBoletoUC emitir, NotificarBoletoUC notificar,
-                          ReceberPagamentoBoletoUC receberPagamento, CancelarBoletoUC cancelar) {
+                          AceitarPagamentoBoletoUC aceitarPagamento, DevolverPagamentoBoletoUC devolverPagamento,
+                          CancelarBoletoUC cancelar) {
         this.criar = criar;
         this.salvarItens = salvarItens;
         this.salvarDestinatarios = salvarDestinatarios;
@@ -78,7 +80,8 @@ public class BoletoResource {
         this.alterar = alterar;
         this.excluir = excluir;
         this.notificar = notificar;
-        this.receberPagamento = receberPagamento;
+        this.aceitarPagamento = aceitarPagamento;
+        this.devolverPagamento = devolverPagamento;
         this.cancelar = cancelar;
     }
 
@@ -151,11 +154,21 @@ public class BoletoResource {
         return BoletoResponse.de(notificar.executar(id));
     }
 
-    /** Simula o banco avisando que o boleto foi pago. */
+    // O PAGAMENTO não entra por aqui: quem avisa é o sistema externo, pelo webhook
+    // (entrypoint.webhook.v1.PagamentoWebhookResource). Aqui ficam as decisões do financeiro.
+
+    /** Financeiro aceita o pagamento em análise como quitação. */
     @POST
-    @Path("/{id}/pagamento")
-    public BoletoResponse receberPagamento(@PathParam("id") UUID id, @Valid @NotNull ReceberPagamentoRequest request) {
-        return BoletoResponse.de(receberPagamento.executar(request.paraInput(id)));
+    @Path("/{id}/aceite-pagamento")
+    public BoletoResponse aceitarPagamento(@PathParam("id") UUID id) {
+        return BoletoResponse.de(aceitarPagamento.executar(id));
+    }
+
+    /** Financeiro devolve o pagamento em análise; o sistema de pagamentos é acionado. */
+    @POST
+    @Path("/{id}/devolucao")
+    public BoletoResponse devolverPagamento(@PathParam("id") UUID id, @Valid @NotNull MotivoRequest request) {
+        return BoletoResponse.de(devolverPagamento.executar(id, request.motivo()));
     }
 
     @POST

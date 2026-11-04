@@ -5,10 +5,13 @@ package com.example.boleto.domain.state;
  * O COMPORTAMENTO de cada estado está nas classes {@code Estado*} deste pacote.
  *
  * <pre>
- *   EM_EDICAO ──emitir──▶ EMITIDO ──notificar──▶ NOTIFICADO ──receber pagamento──▶ PAGO
- *   (rascunho:              │  ╰───────── receber pagamento ─────────────────────────▲
- *    seções editáveis,      │                    │ ↺ notificar (reenvio)
- *    pode estar incompleto) └──── cancelar ──────┴──── cancelar ────▶ CANCELADO
+ *  EM_EDICAO ─emitir─▶ EMITIDO ─notificar─▶ NOTIFICADO (↺ reenvio)
+ *                         │                     │
+ *                         │  pagamento recebido (webhook do sistema externo)
+ *                         ├── conforme ───────▶ PAGO
+ *                         └── divergente ─────▶ EM_ANALISE ─aceitar─▶ PAGO
+ *                         │                         └──────devolver──▶ DEVOLVIDO
+ *                         └─cancelar─▶ CANCELADO ──pagamento recebido──▶ EM_ANALISE
  * </pre>
  */
 public enum StatusBoleto {
@@ -16,5 +19,7 @@ public enum StatusBoleto {
     EMITIDO,
     NOTIFICADO,
     PAGO,
+    EM_ANALISE,
+    DEVOLVIDO,
     CANCELADO
 }

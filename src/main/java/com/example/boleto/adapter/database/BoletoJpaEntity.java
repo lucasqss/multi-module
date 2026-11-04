@@ -32,7 +32,9 @@ import java.util.UUID;
  * ({@code @ElementCollection}): são gravadas e apagadas junto com ele, sem repositório próprio.
  */
 @Entity
-@Table(name = "boleto", indexes = @Index(name = "ix_boleto_pagador_status", columnList = "pagador_documento, status"))
+@Table(name = "boleto", indexes = {
+        @Index(name = "ix_boleto_pagador_status", columnList = "pagador_documento, status"),
+        @Index(name = "ux_boleto_linha_digitavel", columnList = "linha_digitavel", unique = true)})
 public class BoletoJpaEntity {
 
     @Id
@@ -81,11 +83,23 @@ public class BoletoJpaEntity {
     @Column(name = "notificado_em")
     public Instant notificadoEm;
 
+    @Column(name = "id_transacao_pagamento", length = 64)
+    public String idTransacaoPagamento;
+
     @Column(name = "valor_pago", precision = 15, scale = 2)
     public BigDecimal valorPago;
 
     @Column(name = "data_pagamento")
     public LocalDate dataPagamento;
+
+    @Column(name = "motivo_analise_codigo", length = 60)
+    public String motivoAnaliseCodigo;
+
+    @Column(name = "motivo_analise_mensagem")
+    public String motivoAnaliseMensagem;
+
+    @Column(name = "motivo_devolucao")
+    public String motivoDevolucao;
 
     @Column(name = "motivo_cancelamento")
     public String motivoCancelamento;

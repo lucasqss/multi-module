@@ -67,6 +67,7 @@ public class ApiExceptionHandler {
             return inesperado(e);
         }
         var erro = switch (status) {
+            case 401 -> new ErroResponse("NAO_AUTORIZADO", "Credencial ausente ou inválida");
             case 404 -> new ErroResponse("RECURSO_NAO_ENCONTRADO", "Recurso não encontrado");
             case 405 -> new ErroResponse("METODO_NAO_PERMITIDO", "Método HTTP não suportado neste recurso");
             case 415 -> new ErroResponse("TIPO_DE_CONTEUDO_NAO_SUPORTADO", "Use Content-Type: application/json");

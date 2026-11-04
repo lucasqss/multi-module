@@ -26,6 +26,8 @@ public record BoletoResponse(
         Instant emitidoEm,
         Instant notificadoEm,
         PagamentoResponse pagamento,
+        AnaliseResponse analise,
+        String motivoDevolucao,
         String motivoCancelamento) {
 
     public record PagadorResponse(String nome, String documento, String email) {
@@ -34,11 +36,18 @@ public record BoletoResponse(
     public record ItemResponse(String descricao, BigDecimal valor) {
     }
 
-    public record PagamentoResponse(BigDecimal valorPago, LocalDate dataPagamento) {
+    public record PagamentoResponse(String idTransacao, BigDecimal valorPago, LocalDate dataPagamento) {
+    }
+
+    /** Por que o pagamento foi para análise (a regra de conformidade não atendida). */
+    public record AnaliseResponse(String codigo, String mensagem) {
     }
 
     public static BoletoResponse de(BoletoOutput o) {
-        var pagamento = o.valorPago() == null ? null : new PagamentoResponse(o.valorPago(), o.dataPagamento());
+        var pagamento = o.valorPago() == null ? null
+                : new PagamentoResponse(o.idTransacaoPagamento(), o.valorPago(), o.dataPagamento());
+        var analise = o.motivoAnaliseCodigo() == null ? null
+                : new AnaliseResponse(o.motivoAnaliseCodigo(), o.motivoAnaliseMensagem());
         return new BoletoResponse(
                 o.id(),
                 o.status().name(),
@@ -52,6 +61,8 @@ public record BoletoResponse(
                 o.emitidoEm(),
                 o.notificadoEm(),
                 pagamento,
+                analise,
+                o.motivoDevolucao(),
                 o.motivoCancelamento());
     }
 }

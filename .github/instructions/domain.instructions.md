@@ -16,13 +16,17 @@ Sem anotações de framework (nem `@ApplicationScoped`): quem liga objetos de do
   (`Boleto.criar(...)`) e `reconstituir(...)` para o adapter, sem revalidar.
 - Métodos com **nome de negócio** e esta ordem fixa:
   ```java
-  public void receberPagamento(Pagamento p, LocalDate hoje) {
-      var proximo = estado.receberPagamento();          // 1. estado autoriza (409)
-      RegrasBoleto.RECEBIMENTO.validar(candidato);      // 2. specs validam (422)
+  public void emitir(CondicoesEmissao condicoes) {
+      var proximo = estado.emitir();                    // 1. estado autoriza (409)
+      RegrasBoleto.EMISSAO.validar(candidato);          // 2. specs validam (422)
       estado = proximo;                                 // 3. só então muda
-      pagamento = p;
+      linhaDigitavel = ...;
   }
   ```
+- **Fato vindo de fora** (aviso de pagamento) não é recusado por regra: classifique
+  (`RegrasBoleto.CONFORMIDADE_PAGAMENTO.primeiraViolacao(...)`) e deixe o estado escolher o destino
+  (`estado.receberPagamento(conforme)`), como em `Boleto.registrarPagamento`. Ignore o mesmo id externo
+  (idempotência).
 - Getters são permitidos (leitura); `Optional` para campos que podem não existir.
 - Se um método só lê campos de OUTRO objeto para decidir algo, a lógica pertence ao outro objeto
   (Information Expert). Ex.: `documento.pessoaFisica()`, não `documento.numero().length() == 11`.

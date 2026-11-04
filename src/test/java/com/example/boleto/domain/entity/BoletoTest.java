@@ -1,5 +1,6 @@
 package com.example.boleto.domain.entity;
 
+import com.example.boleto.domain.exception.BoletoNaoEstaEmAbertoException;
 import com.example.boleto.domain.exception.BoletoSemItensException;
 import com.example.boleto.domain.exception.MotivoInvalidoException;
 import com.example.boleto.domain.exception.QuantidadeMaximaItensExcedidaException;
@@ -34,7 +35,11 @@ class BoletoTest {
     }
 
     private static Pagamento pagamentoDe(String valor) {
-        return new Pagamento(Dinheiro.de(valor), HOJE);
+        return pagamentoDe("TX-1", valor);
+    }
+
+    private static Pagamento pagamentoDe(String idTransacao, String valor) {
+        return new Pagamento(idTransacao, Dinheiro.de(valor), HOJE);
     }
 
     @Test
@@ -94,7 +99,7 @@ class BoletoTest {
     @Test
     void rascunhoNaoRecebePagamento() {
         var boleto = boleto().rascunho();
-        assertThrows(TransicaoEstadoInvalidaException.class, () -> boleto.receberPagamento(pagamentoDe("500.00"), HOJE));
+        assertThrows(TransicaoEstadoInvalidaException.class, () -> boleto.registrarPagamento(pagamentoDe("500.00"), HOJE));
     }
 
     @Test
@@ -105,17 +110,69 @@ class BoletoTest {
         assertEquals(StatusBoleto.NOTIFICADO, boleto.getStatus());
         assertEquals(AGORA.plusSeconds(60), boleto.getNotificadoEm().orElseThrow());
 
-        boleto.receberPagamento(pagamentoDe("500.00"), HOJE);
+        boleto.registrarPagamento(pagamentoDe("500.00"), HOJE);
 
         assertEquals(StatusBoleto.PAGO, boleto.getStatus());
+        assertTrue(boleto.getMotivoAnalise().isEmpty());
         assertThrows(TransicaoEstadoInvalidaException.class, () -> boleto.cancelar(new Motivo("tarde demais")));
     }
 
+    // ===================== pagamento recebido do sistema externo (FATO) =====================
+
     @Test
-    void pagamentoInvalidoNaoMudaOEstado() {
+    void pagamentoDivergenteNaoEhRecusado_vaiParaAnaliseComOMotivo() {
         var boleto = boleto().emitido();
-        assertThrows(ValorPagoDivergenteException.class, () -> boleto.receberPagamento(pagamentoDe("100.00"), HOJE));
-        assertEquals(StatusBoleto.EMITIDO, boleto.getStatus());
+
+        boleto.registrarPagamento(pagamentoDe("100.00"), HOJE); // não lança: o dinheiro já entrou
+
+        assertEquals(StatusBoleto.EM_ANALISE, boleto.getStatus());
+        assertEquals(ValorPagoDivergenteException.CODIGO, boleto.getMotivoAnalise().orElseThrow().codigo());
+        assertEquals(Dinheiro.de("100"), boleto.getPagamento().orElseThrow().valorPago());
+    }
+
+    @Test
+    void avisoRepetidoDaMesmaTransacaoEhIgnorado() {
+        var boleto = boleto().emitido();
+        boleto.registrarPagamento(pagamentoDe("TX-9", "500.00"), HOJE);
+
+        boleto.registrarPagamento(pagamentoDe("TX-9", "500.00"), HOJE); // webhook reenviado
+
+        assertEquals(StatusBoleto.PAGO, boleto.getStatus());
+    }
+
+    @Test
+    void outraTransacaoParaBoletoJaPagoEhRecusadaPeloEstado() {
+        var boleto = boleto().emitido();
+        boleto.registrarPagamento(pagamentoDe("TX-1", "500.00"), HOJE);
+        assertThrows(TransicaoEstadoInvalidaException.class,
+                () -> boleto.registrarPagamento(pagamentoDe("TX-2", "500.00"), HOJE));
+    }
+
+    @Test
+    void pagamentoDeBoletoCanceladoVaiParaAnalise() {
+        var boleto = boleto().emitido();
+        boleto.cancelar(new Motivo("emitido por engano"));
+
+        boleto.registrarPagamento(pagamentoDe("500.00"), HOJE);
+
+        assertEquals(StatusBoleto.EM_ANALISE, boleto.getStatus());
+        assertEquals(BoletoNaoEstaEmAbertoException.CODIGO, boleto.getMotivoAnalise().orElseThrow().codigo());
+    }
+
+    @Test
+    void financeiroAceitaOuDevolve() {
+        var aceito = boleto().emitido();
+        aceito.registrarPagamento(pagamentoDe("499.00"), HOJE);
+        aceito.aceitarPagamento();
+        assertEquals(StatusBoleto.PAGO, aceito.getStatus());
+
+        var devolvido = boleto().emitido();
+        devolvido.registrarPagamento(pagamentoDe("499.00"), HOJE);
+        devolvido.devolverPagamento(new Motivo("valor menor que o devido"));
+        assertEquals(StatusBoleto.DEVOLVIDO, devolvido.getStatus());
+
+        // sem análise pendente, não há o que aceitar
+        assertThrows(TransicaoEstadoInvalidaException.class, () -> boleto().emitido().aceitarPagamento());
     }
 
     @Test

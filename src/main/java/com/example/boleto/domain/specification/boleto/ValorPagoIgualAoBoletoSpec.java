@@ -3,7 +3,7 @@ package com.example.boleto.domain.specification.boleto;
 import com.example.boleto.domain.exception.ValorPagoDivergenteException;
 import com.example.boleto.domain.specification.RegraNegocio;
 
-/** Regra fake: não aceita pagamento parcial nem a maior. */
+/** Conformidade (fake): valor pago igual ao do boleto; parcial ou a maior vai para análise. */
 public class ValorPagoIgualAoBoletoSpec extends RegraNegocio<RecebimentoPagamento> {
 
     @Override

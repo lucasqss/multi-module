@@ -3,7 +3,6 @@ package com.example.boleto.application.boleto;
 import com.example.boleto.adapter.database.BoletoRepository;
 import com.example.boleto.application.boleto.dto.BoletoOutput;
 import com.example.boleto.application.boleto.dto.ReceberPagamentoInput;
-import com.example.boleto.domain.valueobject.BoletoId;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -11,9 +10,11 @@ import java.time.Clock;
 import java.time.LocalDate;
 
 /**
- * Simula o RECEBIMENTO do pagamento informado pelo banco. EMITIDO|NOTIFICADO -> PAGO.
- * O estado diz se o boleto ainda aceita pagamento (409); as specifications de recebimento
- * dizem se o pagamento informado é válido (422).
+ * O SISTEMA EXTERNO de pagamentos avisa que um boleto foi pago (chamado pelo webhook, não pelo usuário).
+ *
+ * <p>O aviso é um FATO: o domínio não o recusa por regra de negócio, só o classifica (PAGO ou
+ * EM_ANALISE, com o motivo). Avisos repetidos (mesma transação) são ignorados pela entidade,
+ * porque webhooks são reenviados quando a resposta não chega.
  */
 @ApplicationScoped
 public class ReceberPagamentoBoletoUC {
@@ -28,8 +29,8 @@ public class ReceberPagamentoBoletoUC {
 
     @Transactional
     public BoletoOutput executar(ReceberPagamentoInput input) {
-        var boleto = repository.obter(new BoletoId(input.id()));
-        boleto.receberPagamento(input.pagamento(), LocalDate.now(clock));
+        var boleto = repository.obterPorLinhaDigitavel(input.linha());
+        boleto.registrarPagamento(input.pagamento(clock.getZone()), LocalDate.now(clock));
         repository.salvar(boleto);
         return BoletoOutput.de(boleto);
     }

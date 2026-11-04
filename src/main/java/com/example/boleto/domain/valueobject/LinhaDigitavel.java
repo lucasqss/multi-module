@@ -1,5 +1,7 @@
 package com.example.boleto.domain.valueobject;
 
+import com.example.boleto.domain.exception.LinhaDigitavelInvalidaException;
+
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
@@ -18,8 +20,8 @@ public record LinhaDigitavel(String valor) {
     public LinhaDigitavel {
         Objects.requireNonNull(valor);
         if (!valor.matches("\\d{47}")) {
-            // só nós geramos linha digitável: formato errado é bug, não erro do usuário
-            throw new IllegalArgumentException("Linha digitável deve ter 47 dígitos");
+            // também chega de fora (aviso do sistema de pagamentos): formato errado é dado inválido (400)
+            throw new LinhaDigitavelInvalidaException();
         }
     }
 

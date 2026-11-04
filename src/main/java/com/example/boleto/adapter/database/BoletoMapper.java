@@ -9,6 +9,7 @@ import com.example.boleto.domain.valueobject.ItemBoleto;
 import com.example.boleto.domain.valueobject.ItensBoleto;
 import com.example.boleto.domain.valueobject.LinhaDigitavel;
 import com.example.boleto.domain.valueobject.Motivo;
+import com.example.boleto.domain.valueobject.MotivoAnalise;
 import com.example.boleto.domain.valueobject.Pagador;
 import com.example.boleto.domain.valueobject.Pagamento;
 
@@ -36,8 +37,12 @@ final class BoletoMapper {
         destino.criadoEm = origem.getCriadoEm();
         destino.emitidoEm = origem.getEmitidoEm().orElse(null);
         destino.notificadoEm = origem.getNotificadoEm().orElse(null);
+        destino.idTransacaoPagamento = origem.getPagamento().map(Pagamento::idTransacao).orElse(null);
         destino.valorPago = origem.getPagamento().map(p -> p.valorPago().valor()).orElse(null);
         destino.dataPagamento = origem.getPagamento().map(Pagamento::data).orElse(null);
+        destino.motivoAnaliseCodigo = origem.getMotivoAnalise().map(MotivoAnalise::codigo).orElse(null);
+        destino.motivoAnaliseMensagem = origem.getMotivoAnalise().map(MotivoAnalise::mensagem).orElse(null);
+        destino.motivoDevolucao = origem.getMotivoDevolucao().map(Motivo::texto).orElse(null);
         destino.motivoCancelamento = origem.getMotivoCancelamento().map(Motivo::texto).orElse(null);
     }
 
@@ -45,7 +50,10 @@ final class BoletoMapper {
         var itens = new ItensBoleto(e.itens.stream()
                 .map(i -> new ItemBoleto(i.descricao, new Dinheiro(i.valor))).toList());
         var destinatarios = new Destinatarios(e.destinatarios.stream().map(Email::new).toList());
-        var pagamento = e.valorPago == null ? null : new Pagamento(new Dinheiro(e.valorPago), e.dataPagamento);
+        var pagamento = e.valorPago == null ? null
+                : new Pagamento(e.idTransacaoPagamento, new Dinheiro(e.valorPago), e.dataPagamento);
+        var motivoAnalise = e.motivoAnaliseCodigo == null ? null
+                : new MotivoAnalise(e.motivoAnaliseCodigo, e.motivoAnaliseMensagem);
         return Boleto.reconstituir(
                 new BoletoId(e.id),
                 Pagador.de(e.pagadorNome, e.pagadorDocumento, e.pagadorEmail),
@@ -58,6 +66,8 @@ final class BoletoMapper {
                 e.emitidoEm,
                 e.notificadoEm,
                 pagamento,
+                motivoAnalise,
+                e.motivoDevolucao == null ? null : new Motivo(e.motivoDevolucao),
                 e.motivoCancelamento == null ? null : new Motivo(e.motivoCancelamento));
     }
 }

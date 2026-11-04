@@ -60,6 +60,9 @@ Para cada violação: `arquivo:linha`, princípio violado e correção concreta.
 - [ ] Cada UC é **uma intenção** (um `executar`)? UC com vários métodos públicos, UC por entidade-parte
       ou por operação técnica (incluir/alterar/remover item) é violação (critério na skill `layered-novo-caso-de-uso`).
 - [ ] Completude só no UC de finalização; regras de seção no salvamento da seção.
+- [ ] Aviso de sistema externo (fato) é **classificado**, não recusado por regra (`primeiraViolacao`)?
+      Tem idempotência pelo id externo? Entra por entrypoint próprio, com contrato e autenticação dele
+      (ver a skill `layered-nova-integracao-externa`).
 - [ ] Só orquestra: buscar fatos nos repositórios → domínio decide → salvar → efeito externo → `*Output`.
 - [ ] Nenhum `if` de regra de negócio; nenhum `switch` em status.
 - [ ] Efeitos externos depois de salvar; risco de "enviou e o commit falhou" documentado (Outbox).

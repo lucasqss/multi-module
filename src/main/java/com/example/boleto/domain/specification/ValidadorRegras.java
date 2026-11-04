@@ -1,11 +1,18 @@
 package com.example.boleto.domain.specification;
 
+import com.example.boleto.domain.exception.RegraNegocioException;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
- * Conjunto ORDENADO de regras. Avalia na ordem e para na primeira violada (fail-fast),
- * lançando a exceção específica dela. A ordem importa: coloque primeiro as regras mais "fundamentais"
+ * Conjunto ORDENADO de regras, avaliado na ordem até a primeira violada (fail-fast). Dois usos:
+ * <ul>
+ *   <li>{@link #validar}: para COMANDOS (o usuário pede algo): lança a exceção específica e recusa;</li>
+ *   <li>{@link #primeiraViolacao}: para FATOS (algo já aconteceu lá fora): só informa qual regra não
+ *       foi atendida, para o domínio classificar em vez de recusar.</li>
+ * </ul> A ordem importa: coloque primeiro as regras mais "fundamentais"
  * (ex.: limites de valor) e depois as de detalhe.
  */
 public final class ValidadorRegras<T> {
@@ -29,7 +36,20 @@ public final class ValidadorRegras<T> {
         return new ValidadorRegras<>(todas);
     }
 
+    /** COMANDO: lança a exceção específica da primeira regra violada. */
     public void validar(T candidato) {
         regras.forEach(regra -> regra.exigir(candidato));
+    }
+
+    /**
+     * FATO: não lança; devolve a primeira regra violada (ou vazio). Use quando o domínio não pode
+     * recusar o que aconteceu (ex.: dinheiro já recebido) e precisa só CLASSIFICAR o fato.
+     * As mesmas regras e exceções servem aos dois casos.
+     */
+    public Optional<RegraNegocioException> primeiraViolacao(T candidato) {
+        return regras.stream()
+                .filter(regra -> !regra.isSatisfiedBy(candidato))
+                .findFirst()
+                .map(regra -> regra.violacaoDe(candidato));
     }
 }

@@ -46,6 +46,9 @@ Para cada item violado, aponte arquivo:linha, o princípio e a correção concre
 - [ ] Cada UC é **uma intenção** (um `executar`)? UC com vários métodos públicos, UC por entidade-parte
       ou por operação técnica (incluir/alterar/remover item) é violação (ver "O que é um caso de uso").
 - [ ] Completude só no UC de finalização; regras de seção no salvamento da seção.
+- [ ] Aviso de sistema externo (fato) é **classificado**, não recusado por regra (`primeiraViolacao`)?
+      Tem idempotência pelo id externo? Entra por entrypoint próprio, com contrato e autenticação dele
+      (ver a seção "Comando × fato" de `.github/copilot-instructions.md`).
 - [ ] O UC só orquestra (buscar fatos → domínio decide → salvar → efeito externo → Output)?
 - [ ] Algum `if` no UC é regra de negócio? → vire spec (skill `nova-regra-de-negocio`).
 - [ ] Efeitos externos (integrações de `adapter`) acontecem **depois** de `salvar`?

@@ -1,6 +1,7 @@
 package com.example.boleto.domain.specification;
 
 import com.example.boleto.domain.Cenarios;
+import com.example.boleto.domain.exception.BoletoNaoEstaEmAbertoException;
 import com.example.boleto.domain.exception.BoletoSemItensException;
 import com.example.boleto.domain.exception.BoletoVencidoException;
 import com.example.boleto.domain.exception.DataPagamentoFuturaException;
@@ -20,6 +21,7 @@ import com.example.boleto.domain.exception.VencimentoNoPassadoException;
 import com.example.boleto.domain.specification.boleto.DestinatariosDoBoleto;
 import com.example.boleto.domain.specification.boleto.RecebimentoPagamento;
 import com.example.boleto.domain.specification.boleto.RegrasBoleto;
+import com.example.boleto.domain.state.StatusBoleto;
 import com.example.boleto.domain.valueobject.Destinatarios;
 import com.example.boleto.domain.valueobject.Dinheiro;
 import com.example.boleto.domain.valueobject.Email;
@@ -31,6 +33,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.IntStream;
 
 import static com.example.boleto.domain.Cenarios.CNPJ;
@@ -38,6 +41,7 @@ import static com.example.boleto.domain.Cenarios.EMAIL_PAGADOR;
 import static com.example.boleto.domain.Cenarios.HOJE;
 import static com.example.boleto.domain.Cenarios.boleto;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -170,39 +174,45 @@ class RegrasBoletoTest {
     }
 
     @Nested
-    class Recebimento {
+    class ConformidadeDoPagamento {
 
         private static final LocalDate VENCIMENTO = HOJE.plusDays(5);
 
-        private RecebimentoPagamento recebimento(String valorPago, LocalDate data) {
-            return new RecebimentoPagamento(Dinheiro.de("500.00"), VENCIMENTO,
-                    new Pagamento(Dinheiro.de(valorPago), data), HOJE);
+        private RecebimentoPagamento recebimento(boolean emAberto, LocalDate vencimento, String valorPago, LocalDate data) {
+            return new RecebimentoPagamento(Dinheiro.de("500.00"), vencimento,
+                    emAberto ? StatusBoleto.EMITIDO : StatusBoleto.CANCELADO, emAberto,
+                    new Pagamento("TX-1", Dinheiro.de(valorPago), data), HOJE);
+        }
+
+        /** FATO: a regra não lança; devolve qual não foi atendida (o motivo da análise). */
+        private Optional<String> motivo(RecebimentoPagamento r) {
+            return RegrasBoleto.CONFORMIDADE_PAGAMENTO.primeiraViolacao(r).map(RegraNegocioException::getCodigo);
         }
 
         @Test
-        void pagamentoValido() {
-            assertDoesNotThrow(() -> RegrasBoleto.RECEBIMENTO.validar(recebimento("500.00", HOJE)));
+        void conforme() {
+            assertEquals(Optional.empty(), motivo(recebimento(true, VENCIMENTO, "500.00", HOJE)));
+        }
+
+        @Test
+        void boletoNaoEmAberto() {
+            assertEquals(Optional.of(BoletoNaoEstaEmAbertoException.CODIGO), motivo(recebimento(false, VENCIMENTO, "500.00", HOJE)));
         }
 
         @Test
         void dataFutura() {
-            assertThrows(DataPagamentoFuturaException.class,
-                    () -> RegrasBoleto.RECEBIMENTO.validar(recebimento("500.00", HOJE.plusDays(1))));
+            assertEquals(Optional.of(DataPagamentoFuturaException.CODIGO), motivo(recebimento(true, VENCIMENTO, "500.00", HOJE.plusDays(1))));
         }
 
         @Test
         void aposOVencimento() {
-            var recebimento = new RecebimentoPagamento(Dinheiro.de("500.00"), HOJE.minusDays(2),
-                    new Pagamento(Dinheiro.de("500.00"), HOJE), HOJE);
-            assertThrows(BoletoVencidoException.class, () -> RegrasBoleto.RECEBIMENTO.validar(recebimento));
+            assertEquals(Optional.of(BoletoVencidoException.CODIGO), motivo(recebimento(true, HOJE.minusDays(2), "500.00", HOJE)));
         }
 
         @Test
         void valorParcialOuAMaior() {
-            assertThrows(ValorPagoDivergenteException.class,
-                    () -> RegrasBoleto.RECEBIMENTO.validar(recebimento("499.99", HOJE)));
-            assertThrows(ValorPagoDivergenteException.class,
-                    () -> RegrasBoleto.RECEBIMENTO.validar(recebimento("500.01", HOJE)));
+            assertEquals(Optional.of(ValorPagoDivergenteException.CODIGO), motivo(recebimento(true, VENCIMENTO, "499.99", HOJE)));
+            assertEquals(Optional.of(ValorPagoDivergenteException.CODIGO), motivo(recebimento(true, VENCIMENTO, "500.01", HOJE)));
         }
     }
 }

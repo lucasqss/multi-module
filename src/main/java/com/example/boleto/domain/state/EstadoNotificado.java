@@ -23,9 +23,10 @@ public final class EstadoNotificado extends EstadoBoleto {
         return this;
     }
 
+    /** Conforme quita; divergente vai para análise (o dinheiro já entrou, não dá para recusar). */
     @Override
-    public EstadoBoleto receberPagamento() {
-        return EstadoPago.INSTANCIA;
+    public EstadoBoleto receberPagamento(boolean conforme) {
+        return conforme ? EstadoPago.INSTANCIA : EstadoEmAnalise.INSTANCIA;
     }
 
     @Override

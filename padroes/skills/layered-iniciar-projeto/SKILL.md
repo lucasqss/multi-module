@@ -24,7 +24,7 @@ Para cada `templates/<caminho>/<Nome>.java.tmpl`:
 
 | Template | Papel |
 |---|---|
-| `domain/specification/{Specification,RegraNegocio,ValidadorRegras}` | Specification pattern componível, regra com exceção específica, validador fail-fast |
+| `domain/specification/{Specification,RegraNegocio,ValidadorRegras}` | Specification pattern componível, regra com exceção específica, validador fail-fast para comandos (`validar`) e classificação de fatos (`primeiraViolacao`) |
 | `domain/exception/DomainException` + `DadoInvalido`/`RecursoNaoEncontrado`/`Conflito`/`RegraNegocio` | As quatro famílias (400/404/409/422) |
 | `domain/exception/{ValorMonetarioInvalido,MotivoInvalido}Exception` | Usadas por `Dinheiro` e `Motivo` |
 | `domain/valueobject/{Dinheiro,Motivo}` | VOs genéricos |
@@ -67,6 +67,8 @@ leem esse mapa primeiro. Acrescente também, antes do mapa, as regras inegociáv
 12. Caso de uso = uma intenção do usuário: uma classe, um `executar`, uma transação. Nada de UC com
     vários métodos nem UC por entidade-parte; seção editada como bloco = um UC `Salvar<Secao>` (`PUT`);
     agregado que pode ficar incompleto nasce `EM_EDICAO` e só a finalização exige completude.
+13. Comando × fato: comando pode ser recusado (422); aviso de sistema externo (fato) é classificado
+    (`primeiraViolacao`) e vai para análise; idempotência pelo id externo; entrada por entrypoint próprio.
 ```
 
 ## 5. Valide

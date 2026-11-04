@@ -31,6 +31,11 @@ Se a base não existir, use antes a skill `layered-iniciar-projeto`.
 | Sobre quais dados decide? | Use o candidato desse momento (criação, alteração, outra ação). Não existe? Crie um `record` em `domain/specification/<agregado>`, com métodos estáticos `para<Momento>(...)`. |
 | Precisa de dado externo (banco, outro sistema)? | O **use case** consulta; o dado entra como campo do candidato. A spec continua pura. |
 
+**Comando ou fato?** Se a regra avalia algo que o usuário **pede** (comando), ela recusa: `validar(...)`
+lança a exceção (422). Se avalia algo que **já aconteceu** fora (fato: pagamento recebido), ela
+**classifica**: `primeiraViolacao(...)` devolve a exceção sem lançar, e ela vira o motivo de um estado
+de análise. A spec e a exceção são escritas do mesmo jeito nos dois casos.
+
 ## 2. Exceção específica
 
 `domain/exception/<Situacao>Exception.java`, estendendo `RegraNegocioException`:

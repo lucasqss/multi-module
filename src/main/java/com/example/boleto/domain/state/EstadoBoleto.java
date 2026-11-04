@@ -16,7 +16,7 @@ import com.example.boleto.domain.exception.TransicaoEstadoInvalidaException;
  * <p>{@code sealed}: o compilador conhece todos os estados, e o {@code switch} em {@link #de}
  * falha a compilação se um novo status for criado sem estado correspondente.
  */
-public abstract sealed class EstadoBoleto permits EstadoEmEdicao, EstadoEmitido, EstadoNotificado, EstadoPago, EstadoCancelado {
+public abstract sealed class EstadoBoleto permits EstadoEmEdicao, EstadoEmitido, EstadoNotificado, EstadoPago, EstadoEmAnalise, EstadoDevolvido, EstadoCancelado {
 
     public abstract StatusBoleto status();
 
@@ -31,8 +31,22 @@ public abstract sealed class EstadoBoleto permits EstadoEmEdicao, EstadoEmitido,
         throw acaoNaoPermitida("notificar");
     }
 
-    public EstadoBoleto receberPagamento() {
+    /**
+     * Pagamento recebido do sistema externo (um FATO). {@code conforme} = passou nas regras de conformidade.
+     * Cada estado decide o destino: quitar, mandar para análise, ou recusar (409) se não faz sentido.
+     */
+    public EstadoBoleto receberPagamento(boolean conforme) {
         throw acaoNaoPermitida("receber pagamento de");
+    }
+
+    /** Financeiro aceita o pagamento divergente como quitação. */
+    public EstadoBoleto aceitarPagamento() {
+        throw acaoNaoPermitida("aceitar pagamento de");
+    }
+
+    /** Financeiro decide devolver o pagamento divergente ao pagador. */
+    public EstadoBoleto devolverPagamento() {
+        throw acaoNaoPermitida("devolver pagamento de");
     }
 
     public EstadoBoleto cancelar() {
@@ -68,6 +82,8 @@ public abstract sealed class EstadoBoleto permits EstadoEmEdicao, EstadoEmitido,
             case EMITIDO -> EstadoEmitido.INSTANCIA;
             case NOTIFICADO -> EstadoNotificado.INSTANCIA;
             case PAGO -> EstadoPago.INSTANCIA;
+            case EM_ANALISE -> EstadoEmAnalise.INSTANCIA;
+            case DEVOLVIDO -> EstadoDevolvido.INSTANCIA;
             case CANCELADO -> EstadoCancelado.INSTANCIA;
         };
     }

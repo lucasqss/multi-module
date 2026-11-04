@@ -1,6 +1,7 @@
 package com.example.boleto.entrypoint;
 
 import com.example.boleto.adapter.notificacao.NotificadorBoleto;
+import com.example.boleto.adapter.pagamentos.SistemaPagamentos;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.response.ValidatableResponse;
@@ -23,7 +24,8 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Ponta a ponta: HTTP -> use case -> domínio -> adapters -> H2.
+ * Ponta a ponta: HTTP -> use case -> domínio -> adapters -> H2. O sistema externo de pagamentos é
+ * simulado chamando o webhook (entrada) e verificando o {@link SistemaPagamentos} (saída).
  * Cada teste usa um pagador (documento) diferente para não interferir nos outros.
  */
 @QuarkusTest
@@ -33,6 +35,9 @@ class BoletoResourceTest {
 
     @Inject
     NotificadorBoleto notificador;
+
+    @Inject
+    SistemaPagamentos sistemaPagamentos;
 
     private static LocalDate hoje() {
         return LocalDate.now(ZoneId.of("America/Sao_Paulo"));
@@ -83,8 +88,23 @@ class BoletoResourceTest {
         return id;
     }
 
-    private static String pagamento(String valor) {
-        return "{\"valorPago\":%s,\"dataPagamento\":\"%s\"}".formatted(valor, hoje());
+    // ===================== simulação do SISTEMA EXTERNO de pagamentos =====================
+
+    private static final String WEBHOOK = "/webhooks/v1/pagamentos";
+    private static final String TOKEN = "token-local-de-desenvolvimento";
+
+    private static String linhaDe(String id) {
+        return given().get(PATH + "/" + id).then().extract().path("linhaDigitavel");
+    }
+
+    /** O sistema externo avisa: no formato DELE (centavos, data/hora com fuso). */
+    private static ValidatableResponse sistemaExternoAvisaPagamento(String idBoleto, String idTransacao, long centavos) {
+        var aviso = """
+                {"idTransacao":"%s","linhaDigitavel":"%s","valorPagoCentavos":%d,
+                 "dataHoraPagamento":"%sT10:15:00-03:00"}
+                """.formatted(idTransacao, linhaDe(idBoleto), centavos, hoje());
+        return given().contentType(ContentType.JSON).header("X-Webhook-Token", TOKEN).body(aviso)
+                .when().post(WEBHOOK).then();
     }
 
     @Test
@@ -135,12 +155,61 @@ class BoletoResourceTest {
         assertTrue(notificador.enviadas().stream().anyMatch(n -> n.destinatario().equals("maria@example.com")));
         post(boleto + "/notificacao", "").statusCode(200).body("status", equalTo("NOTIFICADO")); // reenvio
 
-        post(boleto + "/pagamento", pagamento("499.99")).statusCode(422).body("codigo", equalTo("VALOR_PAGO_DIVERGENTE"));
-        post(boleto + "/pagamento", pagamento("500.00"))
-                .statusCode(200).body("status", equalTo("PAGO")).body("pagamento.valorPago", equalTo(500.00f));
+        // o pagamento acontece no sistema externo, que avisa pelo webhook
+        String id = boleto.substring(boleto.lastIndexOf('/') + 1);
+        sistemaExternoAvisaPagamento(id, "TX-CICLO", 50000).statusCode(200).body("status", equalTo("PAGO"));
+        given().get(boleto).then().body("pagamento.valorPago", equalTo(500.00f))
+                .body("pagamento.idTransacao", equalTo("TX-CICLO")).body("analise", nullValue());
 
-        post(boleto + "/pagamento", pagamento("500.00")).statusCode(409);
+        sistemaExternoAvisaPagamento(id, "TX-CICLO", 50000).statusCode(200);  // reenvio: idempotente
+        sistemaExternoAvisaPagamento(id, "TX-OUTRA", 50000).statusCode(409);  // outra transação p/ boleto pago
         post(boleto + "/cancelamento", "{\"motivo\":\"desistência\"}").statusCode(409);
+    }
+
+    @Test
+    void pagamentoDivergenteVaiParaAnaliseEOFinanceiroDecide() {
+        // valor a menor: o webhook NÃO recebe erro (o dinheiro já entrou); o boleto vai para análise
+        String aceito = emitido("81818181818", "500.00");
+        sistemaExternoAvisaPagamento(aceito, "TX-A", 49900).statusCode(200).body("status", equalTo("EM_ANALISE"));
+        given().get(PATH + "/" + aceito).then()
+                .body("analise.codigo", equalTo("VALOR_PAGO_DIVERGENTE"))
+                .body("pagamento.valorPago", equalTo(499.00f));
+        post(PATH + "/" + aceito + "/aceite-pagamento", "").statusCode(200).body("status", equalTo("PAGO"));
+
+        // devolver: o sistema externo é acionado para estornar
+        String devolvido = emitido("82828282828", "500.00");
+        sistemaExternoAvisaPagamento(devolvido, "TX-D", 60000).statusCode(200).body("status", equalTo("EM_ANALISE"));
+        post(PATH + "/" + devolvido + "/devolucao", "{\"motivo\":\"pago a maior\"}")
+                .statusCode(200).body("status", equalTo("DEVOLVIDO")).body("motivoDevolucao", equalTo("pago a maior"));
+        assertTrue(sistemaPagamentos.devolucoes().stream().anyMatch(d -> d.idTransacao().equals("TX-D")));
+
+        // sem análise pendente, não há o que aceitar
+        post(PATH + "/" + emitido("83838383838", "100.00") + "/aceite-pagamento", "").statusCode(409);
+    }
+
+    @Test
+    void boletoCanceladoPagoMesmoAssimVaiParaAnalise() {
+        String id = emitido("84848484848", "100.00");
+        post(PATH + "/" + id + "/cancelamento", "{\"motivo\":\"desistência\"}").statusCode(200);
+        sistemaExternoAvisaPagamento(id, "TX-C", 10000).statusCode(200).body("status", equalTo("EM_ANALISE"));
+        given().get(PATH + "/" + id).then().body("analise.codigo", equalTo("BOLETO_NAO_ESTA_EM_ABERTO"));
+    }
+
+    @Test
+    void webhookExigeTokenEReconheceSoBoletosEmitidos() {
+        String id = emitido("85858585858", "100.00");
+        var aviso = "{\"idTransacao\":\"TX-T\",\"linhaDigitavel\":\"" + linhaDe(id)
+                + "\",\"valorPagoCentavos\":10000,\"dataHoraPagamento\":\"" + hoje() + "T10:00:00-03:00\"}";
+        given().contentType(ContentType.JSON).header("X-Webhook-Token", "errado").body(aviso)
+                .post(WEBHOOK).then().statusCode(401).body("codigo", equalTo("NAO_AUTORIZADO"));
+        given().contentType(ContentType.JSON).body(aviso).post(WEBHOOK).then().statusCode(401);
+
+        var desconhecida = aviso.replace(linhaDe(id), "9".repeat(47));
+        given().contentType(ContentType.JSON).header("X-Webhook-Token", TOKEN).body(desconhecida)
+                .post(WEBHOOK).then().statusCode(404).body("codigo", equalTo("BOLETO_NAO_ENCONTRADO"));
+        var malFormada = aviso.replace(linhaDe(id), "123");
+        given().contentType(ContentType.JSON).header("X-Webhook-Token", TOKEN).body(malFormada)
+                .post(WEBHOOK).then().statusCode(400).body("codigo", equalTo("LINHA_DIGITAVEL_INVALIDA"));
     }
 
     @Test
@@ -182,7 +251,7 @@ class BoletoResourceTest {
         post(PATH + "/" + quarto + "/emissao", "")
                 .statusCode(422).body("codigo", equalTo("LIMITE_BOLETOS_EM_ABERTO_EXCEDIDO"));
 
-        post(PATH + "/" + primeiro + "/pagamento", pagamento("500.00")).statusCode(200); // libera uma vaga
+        sistemaExternoAvisaPagamento(primeiro, "TX-LIMITE", 50000).statusCode(200); // pago: libera uma vaga
         post(PATH + "/" + quarto + "/emissao", "").statusCode(200);
     }
 

@@ -5,6 +5,7 @@ import com.example.boleto.domain.state.StatusBoleto;
 import com.example.boleto.domain.valueobject.Email;
 import com.example.boleto.domain.valueobject.LinhaDigitavel;
 import com.example.boleto.domain.valueobject.Motivo;
+import com.example.boleto.domain.valueobject.MotivoAnalise;
 import com.example.boleto.domain.valueobject.Pagamento;
 
 import java.math.BigDecimal;
@@ -28,8 +29,12 @@ public record BoletoOutput(
         Instant criadoEm,
         Instant emitidoEm,
         Instant notificadoEm,
+        String idTransacaoPagamento,
         BigDecimal valorPago,
         LocalDate dataPagamento,
+        String motivoAnaliseCodigo,
+        String motivoAnaliseMensagem,
+        String motivoDevolucao,
         String motivoCancelamento) {
 
     public record Item(String descricao, BigDecimal valor) {
@@ -50,8 +55,12 @@ public record BoletoOutput(
                 b.getCriadoEm(),
                 b.getEmitidoEm().orElse(null),
                 b.getNotificadoEm().orElse(null),
+                b.getPagamento().map(Pagamento::idTransacao).orElse(null),
                 b.getPagamento().map(p -> p.valorPago().valor()).orElse(null),
                 b.getPagamento().map(Pagamento::data).orElse(null),
+                b.getMotivoAnalise().map(MotivoAnalise::codigo).orElse(null),
+                b.getMotivoAnalise().map(MotivoAnalise::mensagem).orElse(null),
+                b.getMotivoDevolucao().map(Motivo::texto).orElse(null),
                 b.getMotivoCancelamento().map(Motivo::texto).orElse(null));
     }
 }

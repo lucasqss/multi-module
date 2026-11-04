@@ -22,10 +22,10 @@ public final class EstadoEmitido extends EstadoBoleto {
         return EstadoNotificado.INSTANCIA;
     }
 
-    /** O pagador pode pagar mesmo sem ter recebido a notificação (ex.: recebeu a linha digitável por outro meio). */
+    /** Conforme quita; divergente vai para análise (o dinheiro já entrou, não dá para recusar). */
     @Override
-    public EstadoBoleto receberPagamento() {
-        return EstadoPago.INSTANCIA;
+    public EstadoBoleto receberPagamento(boolean conforme) {
+        return conforme ? EstadoPago.INSTANCIA : EstadoEmAnalise.INSTANCIA;
     }
 
     @Override

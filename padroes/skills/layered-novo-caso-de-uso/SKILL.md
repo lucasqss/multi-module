@@ -28,9 +28,19 @@ sistema dispara isso como **uma** ação? Então é um caso de uso.
 | Editar uma seção/parte editada como bloco | 1 por seção (`PUT` substitui a seção) | `SalvarParcelasContratoUC`, `SalvarBeneficiariosContratoUC` |
 | Incluir/remover uma parte que é ação de negócio própria (regras, permissão ou evento próprios) | 1 por ação | `AnexarDocumentoUC` |
 | Finalizar a edição (exige completude) | 1 | `FinalizarEdicaoContratoUC` |
+| Aviso de **sistema externo** (fato: pagamento, retorno de processamento) | 1, chamado por um entrypoint de integração (webhook/fila) | `RegistrarRetornoProcessamentoUC` (webhook/fila) |
 | Transição de estado / evento de negócio | 1 por transição | `AprovarContratoUC`, `CancelarContratoUC` |
 | Consultar | 1 por consulta | `ConsultarContratoUC`, `ListarContratosUC` |
 | Entidade com vida própria, usada por vários agregados | CRUD próprio; aqui só o id | `Pagador` cadastrado à parte |
+
+#### Comando × fato
+
+- **Comando** = alguém pede algo ("emita", "cancele"). Pode ser recusado: regra violada → 422.
+- **Fato** = algo que já aconteceu lá fora ("o pagador pagou R$ 499"). **Não** se recusa: o domínio
+  registra e **classifica**. As mesmas regras servem: `ValidadorRegras.primeiraViolacao(...)` não lança,
+  devolve a regra não atendida, que vira o motivo de um estado de análise.
+- Fatos vindos de fora chegam repetidos (webhook/fila entregam "pelo menos uma vez"): o agregado ignora
+  o mesmo id externo (**idempotência**).
 
 #### Agregado editado por partes (padrão `EM_EDICAO`)
 

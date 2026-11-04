@@ -3,7 +3,7 @@ package com.example.boleto.domain.specification.boleto;
 import com.example.boleto.domain.exception.BoletoVencidoException;
 import com.example.boleto.domain.specification.RegraNegocio;
 
-/** Regra fake: boleto vencido não aceita pagamento (não há cálculo de juros/multa). */
+/** Conformidade (fake): pago até o vencimento; depois disso vai para análise (não há cálculo de juros/multa). */
 public class PagamentoAteOVencimentoSpec extends RegraNegocio<RecebimentoPagamento> {
 
     @Override

@@ -13,7 +13,7 @@ Regra de negócio **nunca** vai em use case, resource ou adapter. Siga os passos
 |---|---|
 | É só formato do dado (tamanho, dígitos, casas decimais)? | Não é spec: valide no **value object** com exceção da família `DadoInvalidoException` (400). |
 | Depende do status do boleto ("não pode X se já pago")? | Não é spec: é **State** → skill `novo-estado`. |
-| Em que MOMENTO ela vale? | Ao salvar uma seção → candidato da seção (`ItensBoleto`, `DestinatariosDoBoleto`), conjunto `ITENS`/`DESTINATARIOS`. É completude ou depende do boleto inteiro/do dia → `EmissaoBoleto`, conjunto `EMISSAO`. Pagamento → `RecebimentoPagamento`. Outro momento → crie um candidato (`record`) em `domain/specification/boleto`. |
+| Em que MOMENTO ela vale? | Ao salvar uma seção → candidato da seção (`ItensBoleto`, `DestinatariosDoBoleto`), conjunto `ITENS`/`DESTINATARIOS`. É completude ou depende do boleto inteiro/do dia → `EmissaoBoleto`, conjunto `EMISSAO`. Aviso de pagamento (fato externo) → `RecebimentoPagamento`, conjunto `CONFORMIDADE_PAGAMENTO`: **não lança**, a regra não atendida vira o motivo de `EM_ANALISE` (`primeiraViolacao`). Outro momento → crie um candidato (`record`) em `domain/specification/boleto`. |
 | Precisa de dado externo (banco, outro sistema, feriados)? | O **use case** consulta e o dado entra como campo do candidato. A spec continua pura. |
 
 ## 2. Crie a exceção específica
@@ -70,7 +70,8 @@ Regras da spec: **pura** (sem I/O, `Clock`, injeção, `now()`); só lê o candi
 ## 4. Registre no catálogo
 
 Em `domain/specification/boleto/RegrasBoleto.java`, adicione ao conjunto certo:
-`ITENS` e `DESTINATARIOS` (a cada salvamento de seção), `EMISSAO` (completude, ao finalizar), `RECEBIMENTO`.
+`ITENS` e `DESTINATARIOS` (a cada salvamento de seção), `EMISSAO` (completude, ao finalizar),
+`CONFORMIDADE_PAGAMENTO` (classifica o aviso de pagamento; a exceção da regra vira motivo de análise, não erro).
 **A posição importa**: é fail-fast, a primeira regra violada é a que o cliente recebe. Regras mais
 fundamentais (limites de valor) vêm antes das de detalhe.
 

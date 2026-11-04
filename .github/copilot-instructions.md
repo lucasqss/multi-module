@@ -47,7 +47,8 @@ com.example.boleto
 │   ├── database        <Agregado>Repository, *JpaEntity, *Mapper, Filtro*
 │   └── <sistema>       uma pasta por sistema externo
 ├── entrypoint
-│   └── api/v1          *Resource, request/, response/, handler/ (outros: iib/v1...)
+│   ├── api/v1          *Resource, request/, response/, handler/
+│   └── webhook/v1      entrada de sistemas externos (outros: iib/v1, consumidores de fila...)
 └── shared              Pagina, ClockProducer (sem subpastas)
 ```
 
@@ -124,9 +125,19 @@ sistema dispara isso como **uma** ação? Então é um caso de uso.
 | Editar uma seção/parte editada como bloco | 1 por seção (`PUT` substitui a seção) | `SalvarItensBoletoUC`, `SalvarDestinatariosBoletoUC`, `AlterarBoletoUC` (vencimento) |
 | Incluir/remover uma parte que é ação de negócio própria (regras, permissão ou evento próprios) | 1 por ação | `AnexarDocumentoUC` |
 | Finalizar a edição (exige completude) | 1 | `EmitirBoletoUC` |
+| Aviso de **sistema externo** (fato: pagamento, retorno de processamento) | 1, chamado por um entrypoint de integração (webhook/fila) | `ReceberPagamentoBoletoUC` (webhook) |
 | Transição de estado / evento de negócio | 1 por transição | `NotificarBoletoUC`, `ReceberPagamentoBoletoUC`, `CancelarBoletoUC` |
 | Consultar | 1 por consulta | `ConsultarBoletoUC`, `ListarBoletosUC` |
 | Entidade com vida própria, usada por vários agregados | CRUD próprio; aqui só o id | `Pagador` cadastrado à parte |
+
+### Comando × fato
+
+- **Comando** = alguém pede algo ("emita", "cancele"). Pode ser recusado: regra violada → 422.
+- **Fato** = algo que já aconteceu lá fora ("o pagador pagou R$ 499"). **Não** se recusa: o domínio
+  registra e **classifica**. As mesmas regras servem: `ValidadorRegras.primeiraViolacao(...)` não lança,
+  devolve a regra não atendida, que vira o motivo de um estado de análise.
+- Fatos vindos de fora chegam repetidos (webhook/fila entregam "pelo menos uma vez"): o agregado ignora
+  o mesmo id externo (**idempotência**).
 
 ### Agregado editado por partes (padrão `EM_EDICAO`)
 
@@ -167,15 +178,15 @@ acima, que apontam as classes-modelo concretas.
 | Papel | Neste projeto |
 |---|---|
 | Pacote base | `com.example.boleto` (`src/main/java/com/example/boleto`) |
-| Entrypoints | `entrypoint/api/v1` (REST) |
+| Entrypoints | `entrypoint/api/v1` (REST, nossa API), `entrypoint/webhook/v1` (aviso de pagamento do sistema externo) |
 | Agregados | `Boleto` (`domain/entity/Boleto`) |
 | Base de specs | `domain/specification/Specification`, `RegraNegocio`, `ValidadorRegras` |
-| Catálogo de regras | `RegrasBoleto` — por momento: seções `ITENS`, `DESTINATARIOS`; finalização `EMISSAO`; `RECEBIMENTO` |
+| Catálogo de regras | `RegrasBoleto` — por momento: seções `ITENS`, `DESTINATARIOS`; finalização `EMISSAO`; `CONFORMIDADE_PAGAMENTO` (classifica fato) |
 | Candidatos das regras | `ItensBoleto`, `DestinatariosDoBoleto` (seções); `EmissaoBoleto` + `CondicoesEmissao.de(clock, ...)` (emissão); `RecebimentoPagamento` — montados pela entidade |
 | Agregado editado por partes | `Boleto`: `EM_EDICAO` → seções (`SalvarItensBoletoUC`, `SalvarDestinatariosBoletoUC`) → `EmitirBoletoUC` |
 | Máquina de estados | `domain/state`: `EstadoBoleto`, estados concretos e enum `StatusBoleto` |
 | Repositórios (injetados nos UCs) | `adapter/database/BoletoRepository` (Panache, fala domínio) |
-| Integrações externas (injetadas nos UCs) | `adapter/notificacao/NotificadorBoleto` |
+| Integrações externas (injetadas nos UCs) | `adapter/notificacao/NotificadorBoleto`, `adapter/pagamentos/SistemaPagamentos` (saída: devolução) |
 | Handler de erros HTTP | `entrypoint/api/v1/handler/ApiExceptionHandler` |
 | `Clock` no fuso do negócio | `shared/ClockProducer` |
 | Builder de cenários de teste | `src/test/java/com/example/boleto/domain/Cenarios` |

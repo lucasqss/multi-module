@@ -13,6 +13,7 @@ import com.example.boleto.domain.valueobject.Dinheiro;
 import com.example.boleto.domain.valueobject.ItensBoleto;
 import com.example.boleto.domain.valueobject.LinhaDigitavel;
 import com.example.boleto.domain.valueobject.Motivo;
+import com.example.boleto.domain.valueobject.MotivoAnalise;
 import com.example.boleto.domain.valueobject.Pagador;
 import com.example.boleto.domain.valueobject.Pagamento;
 
@@ -33,7 +34,9 @@ import java.util.Optional;
  * </ul>
  *
  * <p>Ciclo: nasce em EM_EDICAO (rascunho, pode estar incompleto) → as seções são salvas por partes
- * → {@link #emitir} exige completude, gera a linha digitável e o boleto passa a valer.
+ * → {@link #emitir} exige completude, gera a linha digitável e o boleto passa a valer
+ * → o pagamento acontece no SISTEMA EXTERNO, que avisa; {@link #registrarPagamento} classifica o aviso
+ * (fato, não comando): conforme quita, divergente vai para análise do financeiro.
  *
  * <p>Padrão das operações: 1º o ESTADO diz se a ação é permitida (409);
  * 2º as SPECIFICATIONS dizem se os dados são válidos (422); 3º só então o estado muda.
@@ -51,11 +54,14 @@ public class Boleto {
     private Instant emitidoEm;
     private Instant notificadoEm;
     private Pagamento pagamento;
+    private MotivoAnalise motivoAnalise;
+    private Motivo motivoDevolucao;
     private Motivo motivoCancelamento;
 
     private Boleto(BoletoId id, Pagador pagador, Instant criadoEm, LocalDate dataVencimento, ItensBoleto itens,
                    Destinatarios destinatarios, EstadoBoleto estado, LinhaDigitavel linhaDigitavel, Instant emitidoEm,
-                   Instant notificadoEm, Pagamento pagamento, Motivo motivoCancelamento) {
+                   Instant notificadoEm, Pagamento pagamento, MotivoAnalise motivoAnalise,
+                   Motivo motivoDevolucao, Motivo motivoCancelamento) {
         this.id = Objects.requireNonNull(id);
         this.pagador = Objects.requireNonNull(pagador);
         this.criadoEm = Objects.requireNonNull(criadoEm);
@@ -67,6 +73,8 @@ public class Boleto {
         this.emitidoEm = emitidoEm;
         this.notificadoEm = notificadoEm;
         this.pagamento = pagamento;
+        this.motivoAnalise = motivoAnalise;
+        this.motivoDevolucao = motivoDevolucao;
         this.motivoCancelamento = motivoCancelamento;
     }
 
@@ -75,16 +83,17 @@ public class Boleto {
     /** Cria o rascunho (EM_EDICAO) só com o mínimo. Completude é exigida na emissão, não aqui. */
     public static Boleto criar(Pagador pagador, LocalDate dataVencimento, Instant agora) {
         return new Boleto(BoletoId.novo(), pagador, agora, dataVencimento, ItensBoleto.VAZIO,
-                Destinatarios.NENHUM, EstadoBoleto.inicial(), null, null, null, null, null);
+                Destinatarios.NENHUM, EstadoBoleto.inicial(), null, null, null, null, null, null, null);
     }
 
     /** Reconstrói a partir da persistência, sem reaplicar regras (o dado já foi validado). */
     public static Boleto reconstituir(BoletoId id, Pagador pagador, Instant criadoEm, LocalDate dataVencimento,
                                       ItensBoleto itens, Destinatarios destinatarios, StatusBoleto status,
                                       LinhaDigitavel linhaDigitavel, Instant emitidoEm, Instant notificadoEm,
-                                      Pagamento pagamento, Motivo motivoCancelamento) {
+                                      Pagamento pagamento, MotivoAnalise motivoAnalise, Motivo motivoDevolucao,
+                                      Motivo motivoCancelamento) {
         return new Boleto(id, pagador, criadoEm, dataVencimento, itens, destinatarios, EstadoBoleto.de(status),
-                linhaDigitavel, emitidoEm, notificadoEm, pagamento, motivoCancelamento);
+                linhaDigitavel, emitidoEm, notificadoEm, pagamento, motivoAnalise, motivoDevolucao, motivoCancelamento);
     }
 
     // =============================== seções (só em EM_EDICAO) ===============================
@@ -131,12 +140,35 @@ public class Boleto {
         notificadoEm = Objects.requireNonNull(momento);
     }
 
-    public void receberPagamento(Pagamento pagamentoInformado, LocalDate hoje) {
-        var proximo = estado.receberPagamento();
-        RegrasBoleto.RECEBIMENTO.validar(
-                new RecebimentoPagamento(getValor(), dataVencimento, pagamentoInformado, hoje));
-        estado = proximo;
+    /**
+     * Registra o pagamento avisado pelo sistema externo. É um FATO (o dinheiro já entrou), então as
+     * regras de conformidade não lançam erro: a primeira não atendida vira o motivo da análise.
+     *
+     * <p>Idempotente: o mesmo aviso reenviado (mesma transação) não muda nada.
+     * O estado ainda decide se o aviso faz sentido (ex.: boleto já PAGO recusa outra transação, 409).
+     */
+    public void registrarPagamento(Pagamento pagamentoInformado, LocalDate hoje) {
+        if (pagamento != null && pagamento.mesmaTransacao(pagamentoInformado)) {
+            return; // aviso repetido: já processado
+        }
+        var divergencia = RegrasBoleto.CONFORMIDADE_PAGAMENTO.primeiraViolacao(new RecebimentoPagamento(
+                getValor(), dataVencimento, estado.status(), estado.emAberto(), pagamentoInformado, hoje));
+
+        estado = estado.receberPagamento(divergencia.isEmpty());
         pagamento = pagamentoInformado;
+        motivoAnalise = divergencia.map(MotivoAnalise::de).orElse(null);
+    }
+
+    /** Financeiro aceita o pagamento divergente como quitação. EM_ANALISE -> PAGO. */
+    public void aceitarPagamento() {
+        estado = estado.aceitarPagamento();
+    }
+
+    /** Financeiro decide devolver o pagamento divergente. EM_ANALISE -> DEVOLVIDO. */
+    public void devolverPagamento(Motivo motivo) {
+        Objects.requireNonNull(motivo, "motivo é obrigatório");
+        estado = estado.devolverPagamento();
+        motivoDevolucao = motivo;
     }
 
     public void cancelar(Motivo motivo) {
@@ -162,5 +194,7 @@ public class Boleto {
     public Optional<Instant> getEmitidoEm() { return Optional.ofNullable(emitidoEm); }
     public Optional<Instant> getNotificadoEm() { return Optional.ofNullable(notificadoEm); }
     public Optional<Pagamento> getPagamento() { return Optional.ofNullable(pagamento); }
+    public Optional<MotivoAnalise> getMotivoAnalise() { return Optional.ofNullable(motivoAnalise); }
+    public Optional<Motivo> getMotivoDevolucao() { return Optional.ofNullable(motivoDevolucao); }
     public Optional<Motivo> getMotivoCancelamento() { return Optional.ofNullable(motivoCancelamento); }
 }
